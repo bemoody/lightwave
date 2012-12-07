@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	30 November 2012  version 0.01
+//			Last revised:	 7 December 2012  version 0.02
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -36,7 +36,10 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
-// retrieve the selected data and load them into the page
+
+var recinfo;  // metadata for the selected record, initialized by loadslist()
+
+// retrieve the selected data as HTML and load them into the page
 function fetchdata() {
     db = $('[name=db]').val();
     if (!db) { alert('Choose a database'); return false; }
@@ -54,7 +57,8 @@ function fetchdata() {
     dt = $('[name=dt]').val();
     if (dt) { url += '&dt=' + dt; }
     $.get(url, function(data) {
-	$('#results').html(data);
+	$('#results').html('<p>Sampling frequency = ' + recinfo.signal[0].freq +
+	  ' Hz</p>\n' + data);
 	// the rest of this block is just a placeholder for the code to
 	// generate the graphical output (not yet implemented)
 	svg000 = "M 0,100 l 10,10 10,30 10,50 10,-90, 10,-10, 10,0";
@@ -65,24 +69,54 @@ function fetchdata() {
     });
 };
 
-// fetch the list of signals in the selected record, and load it into the page
+// fetch the selected data as JSON and load them into the page
+function fetch() {
+    db = $('[name=db]').val();
+    if (!db) { alert('Choose a database'); return false; }
+    record = $('[name=record]').val();
+    if (!record) { alert('Choose a record'); return false; }
+    url = '/cgi-bin/lightwave?action=fetch&db=' + db
+	+ '&record=' + record;
+    $('[name=signal]').each(function() {
+	if (this.checked) { url += '&signal=' + $(this).val(); }
+    });
+    annotator = $('[name=annotator]').val();
+    if (annotator) { url += '&annotator=' + annotator; }
+    outtype = $('[name=outtype]').val();
+    t0 = $('[name=t0]').val();
+    if (t0) { url += '&t0=' + t0; }
+    dt = $('[name=dt]').val();
+    if (dt) { url += '&dt=' + dt; }
+    $.getJSON(url, function(data) {
+	$('#results').html('<p>Sampling frequency = ' + recinfo.signal[0].freq +
+	  ' Hz</p>\n' + data);
+	// the rest of this block is just a placeholder for the code to
+	// generate the graphical output (not yet implemented)
+	svg000 = "M 0,100 l 10,10 10,30 10,50 10,-90, 10,-10, 10,0";
+	$('.s000').attr('d', svg000);
+	svg001 = "M 0,100 l 10,-10 10,30 10,0 10,-40, 10,10, 10,0";
+	$('.s001').attr('transform', 'translate(0,-30)')
+	    .attr('stroke','blue').attr('d', svg001);
+    });
+};
+
 function loadslist() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
-    $.get('/cgi-bin/lightwave?action=slist&db=' + db
-	+ '&record=' + record, function(data) {
-	$('#slist').html(data);});
-    loadinfo();	  
-};
-
-// fetch the signal info for the selected record, and load it into the page
-function loadinfo() {
-    db = $('[name=db]').val();
-    record = $('[name=record]').val();
-    $.get('/cgi-bin/lightwave?action=info&db=' + db
-	  + '&record=' + record, function(data) {
-	      $('#info').html(data);
-	  });
+    request = '/cgi-bin/lightwave?action=info&db=' + db + '&record=' + record;
+    $.getJSON(request, function(data) {
+	    recinfo = data.info;
+	    slist = '<td align="right">Signals:</td>\n<td>\n';
+	    if (recinfo.signal.length > 5)
+	        slist += '<div class="container">\n';
+	    for (i = 0; i < recinfo.signal.length; i++)
+	        slist += '<input type="checkbox" checked="checked" value="' + i
+		    + '" name="signal">' + recinfo.signal[i].desc + '<br>\n';
+	    if (recinfo.signal.length > 5)
+	        slist += '</div>\n';
+            slist += '</td>\n';
+	    $('#slist').html(slist);
+    });
 };
 
 // fetch the lists of records and annotators in the selected database, load them
@@ -90,24 +124,47 @@ function loadinfo() {
 function loadrlist() {
     db = $('[name=db]').val();
     $('#slist').empty();
-    $.get('/cgi-bin/lightwave?action=rlist&db=' + db, function(data) {
-	$('#rlist').html(data);
-	// fetch the list of signals when the user selects a record
-	$('[name=record]').on("change", loadslist);
-    });
-    $.get('/cgi-bin/lightwave?action=alist&db=' + db, function(data) {
-	$('#alist').html(data); });
+    $('#info').empty();
+    $.getJSON('/cgi-bin/lightwave?action=alist&db=' + db, function(data) {
+	    alist = '<td align=right>Annotator:</td>' + 
+		'<td><select name=\"annotator\">\n';
+	    for (i = 0; i < data.annotator.length; i++)
+	        alist += '<option value=\"' + data.annotator[i].name +
+		    '\">' + data.annotator[i].desc + '(' +
+		    data.annotator[i].name + ')</option>\n';
+	    alist += '<option value=\"\">[none]\n</select></td>\n';
+	    $('#alist').html(alist);
+	});
+    $.getJSON('/cgi-bin/lightwave?action=rlist&db=' + db, function(data) {
+	    rlist = '<td align=right>Record:</td>' + 
+		'<td><select name=\"record\">\n' +
+		'<option value=\"\" selected>--Choose one--</option>\n';
+	    for (i = 0; i < data.record.length; i++)
+	        rlist += '<option value=\"' + data.record[i] +
+		    '\">' + data.record[i] + '</option>\n';
+	    rlist += '</select></td>\n';
+	    $('#rlist').html(rlist);
+	    // fetch the list of signals when the user selects a record
+	    $('[name=record]').on("change", loadslist);
+	});
 };
+
 
 // when the page is loaded, fetch the list of databases, load it into the page,
 // and set up event handlers for database selection and form submission
 $(document).ready(function(){
-    // fetch the list of databases once the page has been loaded
-    $.get('/cgi-bin/lightwave?action=dblist', function(data) {
-	$('#dblist').html(data);
-	// fetch the record and annotator lists when the user selects a database
-	$('[name=db]').on("change", loadrlist);
-    });
+    $.getJSON('/cgi-bin/lightwave?action=dblist', function(data) {
+	    dblist = '<td align=right>Database:</td>' + 
+		'<td><select name=\"db\">\n' +
+		'<option value=\"\" selected>--Choose one--</option>\n';
+	    for (i = 0; i < data.database.length; i++)
+	        dblist += '<option value=\"' + data.database[i].name +
+		    '\">' + data.database[i].desc + '(' +
+		    data.database[i].name + ')</option>\n';
+	    dblist += '</select></td>\n';
+	    $('#dblist').html(dblist);
+	    $('[name=db]').on("change", loadrlist);
+	});
     $('#lwform').on("submit", false);      // disable form submission
     $('#retrieve').on("click", fetchdata); // get results using ajax instead
 });

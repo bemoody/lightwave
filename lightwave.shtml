@@ -14,7 +14,7 @@ LightWAVE.  When this page is loaded by a JavaScript-enabled web browser, the
 browser loads lightwave.css (a style sheet), jquery.min.js (the jQuery
 JavaScript library, which must be version 1.7 or later), and lightwave.js
 (LightWAVE-specific JavaScript code, which runs within the browser to provide
-highly responsive interaction with the user).
+low-latency interaction with the user).
 -->
 <html>
 <head>
@@ -85,7 +85,7 @@ provides some of the functions of LightWAVE without Javascript.
 <div id="s000">
 <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http:/www.w3.org/1999/xlink'
      width="100%" height="100%" viewBox="0 0 1000 200"
-     preserveAspectRatio="xMidyMid meet">
+     preserveAspectRatio="xMidYMid meet">
 <defs>
   <pattern id="gridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
     <path d="M10,0 H0 V10" fill="none" stroke="gray" stroke-width=".5"/>

@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	30 November 2012  version 0.01
+			Last revised:	 7 December 2012  version 0.02
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -40,55 +40,147 @@ _______________________________________________________________________________
 #include <libcgi/cgi.h>
 #include <wfdb/wfdblib.h>
 
-#ifndef HTMLDIR
-#define HTMLDIR "/home/physionet/html/lightwave"
+#ifndef LWDIR
+#define LWDIR "/home/physionet/html/lightwave"
 #endif
 
 #ifndef BUFSIZE
 #define BUFSIZE 1024	/* bytes read at a time */
 #endif
 
-static char *action, buf[BUFSIZE], *db, *p, *record, *recpath;
+static char *action, *annotator, buf[BUFSIZE], *db, *record, *recpath;
+static int interactive, nsig, nosig, *sigmap;
 WFDB_FILE *ifile;
+WFDB_Frequency sps;
+WFDB_Sample *v;
 WFDB_Siginfo *s;
+WFDB_Time t0, tf, dt;
 
+char *get_param(char *name), *get_param_multiple(char *name);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
     retrieve(void), print_file(char *filename);
 
-int main(void)
+int main(int argc, char **argv)
 {
-    cgi_init();
-    atexit(cgi_end);
-    cgi_process_form();
-    cgi_init_headers();
+    if (argc < 2) {  /* normal operation as a CGI application */
+        cgi_init();
+	atexit(cgi_end);
+	cgi_process_form();
+	cgi_init_headers();
+    }
+    else
+        interactive = 1;  /* interactive mode for debugging */
+    wfdbquiet();	  /* suppress WFDB library error messages */
 
-    if (!(action = cgi_param("action")))
-	print_file(HTMLDIR "/index.shtml");
+    if (!(action = get_param("action")))
+	print_file(LWDIR "/index.shtml");
 
-    if (strcmp(action, "dblist") == 0)
+    else if (strcmp(action, "dblist") == 0) {
 	dblist();
+	exit(0);
+    }
 
-    else if (strcmp(action, "rlist") == 0)
+    else if ((db = get_param("db")) == NULL)
+        exit(0);	/* early exit if no database chosen */
+
+    else if (strcmp(action, "rlist") == 0) {
 	rlist();
+	exit(0);
+    }
 
-    else if (strcmp(action, "alist") == 0)
+    else if (strcmp(action, "alist") == 0) {
 	alist();
+	exit(0);
+    }
 
-    else if (strcmp(action, "slist") == 0)
-	slist();
+    else if ((record = get_param("record")) == NULL)
+        exit(0);	/* early exit if no record chosen */
 
-    else if (strcmp(action, "info") == 0)
-	info();
+    else {
+      // FIXME: uncomment the next line to work around a WFDB library bug
+      //   setwfdb("/usr/local/database");
+        SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
+        sprintf(recpath, "%s/%s", db, record);
 
-    else if (strcmp(action, "Retrieve") == 0)
-	retrieve();
+	/* Discover the number of signals defined in the header, allocate
+	   memory for their signal information structures, open the signals. */
+	if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
+	    setgvmode(WFDB_LOWRES);
+	    sps = sampfreq(NULL);
+	    SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
+	    nsig = isigopen(recpath, s, nsig);
+	} 
+
+	if (strcmp(action, "info") == 0)
+	    info();
+
+	else if (strcmp(action, "Retrieve") == 0) {
+	    char *p;
+	    int n;
+
+	    if (nsig > 0) {
+	        SUALLOC(v, nsig, sizeof(WFDB_Sample));
+		SUALLOC(sigmap, nsig, sizeof(int));
+		while (p = get_param_multiple("signal"))
+		  if (0 <= (n = atoi(p)) && n < nsig) {
+		       sigmap[n] = 1; nosig++;
+		  }
+	    }
+	    annotator = get_param("annotator");
+	    if ((p = get_param("t0")) == NULL) p = "0";
+	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
+	    if ((p = get_param("dt")) == NULL) p = "1";
+	    if ((dt = strtim(p)) < 0L) dt = -dt;
+	    tf = t0 + dt;
+
+	    retrieve();
+
+	    if (nsig > 0) {
+		SFREE(sigmap);
+		SFREE(v);
+	    }
+	}
+    }
+
+    /* Close open files and release allocated memory. */
+    wfdbquit();
+    if (nsig > 0) SFREE(s);
+    SFREE(recpath);
 
     exit(0);
 }
 
+/* Prompt for input, read a line from stdin, save it, return a pointer to it. */
+char *prompt(char *prompt_string)
+{
+    char *p = NULL;
+
+    printf("%s: ", prompt_string);
+    fflush(stdout);
+    buf[0] = '\0';  /* clear previous content in case of EOF on stdin */
+    if (fgets(buf, sizeof(buf), stdin)) {
+        buf[strlen(buf)-1] = '\0';  /* discard trailing newline */
+	SSTRCPY(p, buf);
+    }
+    return (p); /* Yes, it's a memory leak.  So sue me! */
+}
+
+/* Read a single-valued parameter interactively or from form. */
+char *get_param(char *name)
+{
+    if (interactive) return prompt(name);
+    else return cgi_param(name);
+}
+
+/* Read next value of a multi-valued parameter interactively or from form. */
+char *get_param_multiple(char *name)
+{
+    if (interactive) return prompt(name);
+    else return cgi_param_multiple(name);
+}
+
 void print_file(char *filename)
 {
-    char buf[256];
     FILE *ifile = fopen(filename, "r");
 
     if (ifile == NULL) {
@@ -102,179 +194,116 @@ void print_file(char *filename)
 
 void dblist(void)
 {
-    printf("<td align=right>Database:</td>\n"
-	   "<td><select name=\"db\">\n");
     if (ifile = wfdb_open("DBS", NULL, WFDB_READ)) {
-	printf("<option value=\"\" selected>-- Choose one --</option>\n");
+        int first = 1;
+        printf("{ \"database\": [\n");
 	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
+	    char *p;
+
 	    for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
 		;
 	    if (*p != '\t') continue;
 	    *p++ = '\0';
 	    while (p < buf + sizeof(buf) - 1 && *p == '\t')
 		p++;
-	    printf("<option value=\"%s\">%s (%s)</option>\n", buf, p, buf);
+	    p[strlen(p)-1] = '\0';
+	    if (!first) printf(",\n");
+	    else first = 0;
+	    printf("    { \"name\": \"%s\",\n      \"desc\": \"%s\"\n    }",
+		   buf, p);
 	}
+	printf("\n  ]\n}\n");
 	wfdb_fclose(ifile);
     }
-    printf("</select></td>\n");
 }
 
 void rlist(void)
 {
-    if (db == NULL) db = cgi_param("db");
     sprintf(buf, "%s/RECORDS", db);
     if (ifile = wfdb_open(buf, NULL, WFDB_READ)) {
-	printf("<td align=right>Record:</td>\n"
-	       "<td><select name=\"record\">\n");
-	printf("<option value=\"\" selected>-- Choose one --</option>\n");
+        int first = 1;
+
+        printf("{ \"record\": [\n");
 	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
-	    for (p = buf; p < buf + sizeof(buf) && *p != '\n'; p++)
-		;
-	    if (*p != '\n') continue;
-	    *p++ = '\0';
-	    printf("<option value=\"%s\">%s</option>\n", buf, buf);
+	    buf[strlen(buf)-1] = '\0';
+	    if (!first) printf(",\n");
+	    else first = 0;
+	    printf("    \"%s\"", buf);
 	}
+	printf("\n  ]\n}\n");
 	wfdb_fclose(ifile);
-	printf("</select></td>\n");
     }
 }
 
 void alist(void)
 {
-    if (db == NULL) db = cgi_param("db");
     sprintf(buf, "%s/ANNOTATORS", db);
     if (ifile = wfdb_open(buf, NULL, WFDB_READ)) {
-	printf("<td align=right>Annotator:</td>\n"
-	       "<td><select name=\"annotator\">\n");
+        int first = 1;
+        printf("{ \"annotator\": [\n");
 	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
+	    char *p;
+
 	    for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
 		;
 	    if (*p != '\t') continue;
 	    *p++ = '\0';
 	    while (p < buf + sizeof(buf) - 1 && *p == '\t')
 		p++;
-	    printf("<option value=\"%s\">%s (%s)</option>\n", buf, p, buf);
+	    p[strlen(p)-1] = '\0';
+	    if (!first) printf(",\n");
+	    else first = 0;
+	    printf("    { \"name\": \"%s\",\n      \"desc\": \"%s\"\n    }",
+		   buf, p);
 	}
-	printf("<option value=\"\">[none]\n");
+	printf("\n  ]\n}\n");
 	wfdb_fclose(ifile);
-	printf("</select></td>\n");
     }
-}
-
-void slist(void)
-{
-    int i, nsig;
-    
-    if (db == NULL) db = cgi_param("db");
-    if (record == NULL) record = cgi_param("record");
-    SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
-    sprintf(recpath, "%s/%s", db, record);
-
-    /* Discover the number of signals defined in the header, and
-       allocate storage for nsig signal information structures. */
-    if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
-	SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
-	nsig = isigopen(recpath, s, nsig);
-	printf("<td align=right>Signals:</td><td><div%s>\n",
-	       nsig > 5 ? " class=\"container\"" : "");
-	for (i = 0; i < nsig; i++)
-	    printf("<input type=\"checkbox\" name=\"signal\" value=\"%d\" "
-		   "checked=\"checked\">%s<br>\n", i, s[i].desc);
-	printf("</div></td>\n");
-	wfdbquit();
-	SFREE(s);
-    }
-    SFREE(recpath);
 }
 
 void info(void)
 {
     char *p;
-    int i, nsig;
-    WFDB_Frequency sps;
-    
-    if (db == NULL) db = cgi_param("db");
-    if (record == NULL) record = cgi_param("record");
-    SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
-    sprintf(recpath, "%s/%s", db, record);
+    int i;
 
-    /* Discover the number of signals defined in the header, and
-       allocate storage for nsig signal information structures. */
-    if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
-	SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
-	nsig = isigopen(recpath, s, nsig);
-	setgvmode(WFDB_LOWRES);
-	sps = sampfreq(NULL);
-	printf("{info: { \"db\": \"%s\",\n", db);
-        printf("         \"record\": \"%s\",\n", record);
-	p = timstr(0);
-	if (*p == '[') {
-	    printf("         \"start\": \"%s\",\n", mstimstr(0L));
-	    printf("         \"end\": \"%s\",\n", mstimstr(-strtim("e")));
-	}
-	else {
-	    printf("         \"start\": null,\n");
-	    printf("         \"end\": null,\n");
-	}
-        printf("         \"duration\": \"%s\",\n", mstimstr(strtim("e")));
-	printf("         \"signal\": [\n", record);
-	for (i = 0; i < nsig; i++) {
-	    printf("                    { \"desc\": \"%s\",\n", s[i].desc);
-	    printf("                      \"freq\": %g,\n", sps * s[i].spf);
-	    printf("                      \"units\": \"%s\",\n", s[i].units);
-	    printf("                      \"gain\": %g,\n", s[i].gain);
-	    printf("                      \"adcres\": %d,\n", s[i].adcres);
-	    printf("                      \"adczero\": %d,\n", s[i].adczero);
-	    printf("                      \"baseline\": %d\n", s[i].baseline);
-	    printf("                    }%s\n", i < nsig-1 ? "," : " ] }");
-	}
-	printf("}\n");
-	wfdbquit();
-	SFREE(s);
+    printf("{ \"info\":\n");
+    printf("  { \"db\": \"%s\",\n", db);
+    printf("    \"record\": \"%s\",\n", record);
+    p = timstr(0);
+    if (*p == '[') {
+        printf("    \"start\": \"%s\",\n", mstimstr(0L));
+	printf("    \"end\": \"%s\",\n", mstimstr(-strtim("e")));
     }
-    SFREE(recpath);
+    else {
+        printf("    \"start\": null,\n");
+	printf("    \"end\": null,\n");
+    }
+    p = mstimstr(strtim("e"));
+    while (*p == ' ') p++;
+    printf("    \"duration\": \"%s\"", p);
+    if (nsig > 0) printf(",\n    \"signal\": [\n", record);
+    for (i = 0; i < nsig; i++) {
+        printf("      { \"desc\": \"%s\",\n", s[i].desc);
+	printf("        \"freq\": %g,\n", sps * s[i].spf);
+	if (s[i].units)
+	    printf("        \"units\": \"%s\",\n", s[i].units);
+	else
+	    printf("        \"units\": null,\n");
+	printf("        \"gain\": %g,\n", s[i].gain);
+	printf("        \"adcres\": %d,\n", s[i].adcres);
+	printf("        \"adczero\": %d,\n", s[i].adczero);
+	printf("        \"baseline\": %d\n", s[i].baseline);
+	printf("      }%s", i < nsig-1 ? ",\n" : "\n    ]");
+    }
+    printf("\n  }\n}\n");
 }
 
 void retrieve(void)
 {
-    static char **signal, *annotator, *st0, *sdt;
-    int n, nsig, no, nosig = 0, *sigmap;
-    WFDB_Frequency sps;
-    WFDB_Sample *v;
-    WFDB_Time t, t0, tf, dt;
+    int n, no;
+    WFDB_Time t;
 
-    printf("<hr>");
-
-    printf("<p>\n<table>\n");
-
-    if ((db = cgi_param("db")) == NULL) return;
-    if ((record = cgi_param("record")) == NULL) return;
-    SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
-    sprintf(recpath, "%s/%s", db, record);
-    sps = sampfreq(recpath);  /* not currently used */
-
-    /* Discover the number of signals defined in the header. */
-    if ((nsig = isigopen(recpath, NULL, 0)) < 0) exit(2);
-
-    /* Allocate storage for nsig signal information structures. */
-    if (nsig > 0) {
-	SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
-	SUALLOC(v, nsig, sizeof(WFDB_Sample));
-	SUALLOC(sigmap, nsig, sizeof(int));
-	nsig = isigopen(recpath, s, nsig);
-    }
-
-    while (p = cgi_param_multiple("signal"))
-	if (0 <= (n = atoi(p)) && n < nsig) { sigmap[n] = 1; nosig++; }
-
-    annotator = cgi_param("annotator");
-    if ((st0 = cgi_param("t0")) == NULL) st0 = "0";
-    if ((t0 = strtim(st0)) < 0L) t0 = -t0;
-    if ((sdt = cgi_param("dt")) == NULL) sdt = "1";
-    if ((dt = strtim(sdt)) < 0L) dt = -dt;
-    tf = t0 + dt;
-
+    printf("<hr>\n<p>\n<table>\n");
     if (nosig) {
 	printf("<h2>Signals</h2>\n<p>\n");
 	printf("<table><tr><td>Time</td>");
@@ -308,25 +337,24 @@ void retrieve(void)
 
 	ai.name = annotator;
 	ai.stat = WFDB_READ;
-	if (annopen(recpath, &ai, 1) < 0) exit(0);
+	if (annopen(recpath, &ai, 1) >= 0) {
 
-	printf("<h2>Annotations (%s)</h2>\n<p>\n", annotator);
-	printf("<table>\n<tr>"
-	       "<td>Time</td><td>Type</td><td>Sub/Chan/Num</td><td>Aux</td>"
-	       "</tr>\n");
-
-	iannsettime(t0);
-	while (getann(0, &annot) == 0 && annot.time < tf) {
+	  printf("<h2>Annotations (%s)</h2>\n<p>\n", annotator);
+	  printf("<table>\n<tr>"
+		 "<td>Time</td><td>Type</td><td>Sub/Chan/Num</td><td>Aux</td>"
+		 "</tr>\n");
+	  
+	  iannsettime(t0);
+	  while (getann(0, &annot) == 0 && annot.time < tf) {
 	    printf("<td>%s</td>", mstimstr(annot.time));
 	    printf("<td>%s</td>", annstr(annot.anntyp));
 	    printf("<td>%d/%d/%d</td><td>",
 		   annot.subtyp, annot.chan, annot.num);
 	    if (annot.aux)
-		printf("%s", annot.aux + 1);
+	      printf("%s", annot.aux + 1);
 	    printf("</td></tr>\n");
+	  }
+	  printf("</table>");
 	}
-	printf("</table>");
     }
-    SFREE(recpath);
-    SFREE(s);
 }
