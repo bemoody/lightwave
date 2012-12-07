@@ -1,0 +1,6 @@
+/* file: lightwave.css	G. Moody	18 November 2012
+*/
+
+.container { border:2px solid #ccc; width:300px; height: 100px;
+             overflow-y: scroll; }
+.signalwindow { width: 90%; height: 90%; border: 3px solid grey; margin: 3%; }

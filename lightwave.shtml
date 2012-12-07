@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<!--
+LightWAVE main page	G. Moody	18 November 2012
+			Last revised:	30 November 2012  version 0.01
+
+LightWAVE is a lightweight waveform and annotation viewer and editor.
+
+LightWAVE is modelled on WAVE, an X11/XView application I wrote and maintained
+between 1989 and 2012.  LightWAVE runs within any modern web browser and does
+not require installation on the user's computer.
+
+This file contains the main HTML5 page, which is the starting point for using
+LightWAVE.  When this page is loaded by a JavaScript-enabled web browser, the
+browser loads lightwave.css (a style sheet), jquery.min.js (the jQuery
+JavaScript library, which must be version 1.7 or later), and lightwave.js
+(LightWAVE-specific JavaScript code, which runs within the browser to provide
+highly responsive interaction with the user).
+-->
+<html>
+<head>
+<meta http-equiv='content-type' content='text/html; charset=utf-8'>
+<title>LightWAVE</title>
+<link rel="stylesheet" href="/lightwave/lightwave.css">
+<script src="/js/jquery.min.js"></script>
+<script src="/js/lightwave.js"></script>
+<noscript><style>.js { display: none; }</style></noscript>
+</head>
+<body bgcolor='#fff'>
+
+<h1>LightWAVE</h1>
+
+<noscript>
+<p>LightWAVE requires a Javascript-enabled browser.
+The <a href="http://physionet.org/cgi-bin/ATM">PhysioBank ATM</a>
+provides some of the functions of LightWAVE without Javascript.
+</noscript>
+
+<div class="js">
+<b>Select the data to be retrieved</b>
+
+<form action="/cgi-bin/lightwave" id="lwform" method="get">
+
+<p>
+<table>
+  <tr id="dblist"><td colspan=2>Loading list of databases ...</td></tr>
+
+  <tr id="rlist"></tr>
+
+  <tr id="slist"></tr>
+
+  <tr id="alist"></tr>
+
+  <tr id="outtype"><td align=right>Output:</td>
+    <td><select name="outtype">
+	<option value="plot" selected>plot</option>
+	<option value="text">text</option>
+  </select></td></tr>
+
+  <tr id="start"><td align=right>Start:</td>
+    <td><input type="text" name="t0" size="20"></td>
+  </tr>
+
+  <tr id="duration"><td align=right>Duration:</td>
+    <td><select name="dt">
+	<option value="1">1 second</option>
+	<option value="10">10 seconds</option>
+        <option value="60">1 minute</option>
+        <option value="600">10 minutes</option>
+        <option value="3600">1 hour</option>
+        <option value="36000">10 hours</option>
+        <option value="345600">4 days</option>
+	<option value="2592000">30 days</option>
+  </select></td></tr>
+
+  <tr><td>&nbsp;</td></tr>
+  <tr id="retrieve"><td colspan=2 valign=bottom align=center>
+      <button id="retrieve">Fetch</button>
+      <input type="submit" name="action" value="Retrieve">
+  </td></tr>
+</table>
+</form>
+
+<p>
+<hr>
+<div id="s000">
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http:/www.w3.org/1999/xlink'
+     width="100%" height="100%" viewBox="0 0 1000 200"
+     preserveAspectRatio="xMidyMid meet">
+<defs>
+  <pattern id="gridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
+    <path d="M10,0 H0 V10" fill="none" stroke="gray" stroke-width=".5"/>
+  </pattern>
+  <marker id="tick" viewBox="-10 -5 10 10" markerUnits="strokeWidth"
+          markerWidth="10" markerHeight="10" orient="auto">
+    <path d="M0,-2 V2" stroke="black"/>
+  </marker>
+  <marker id="endArrow" viewBox="-10 -5 10 10" markerUnits="strokeWidth"
+          markerWidth="10" markerHeight="10" orient="auto">
+    <path d="M-10,-2 L0,0 -10,2 z" fill="black" stroke="none"/>
+  </marker>
+  <marker id="startDimArrow" viewBox="0 -5 10 10" markerUnits="strokeWidth"
+          markerWidth="10" markerHeight="10" orient="auto">
+    <path d="M0,0 L10,-2 10,2 z M0,-5 L0,5" stroke="black" />
+  </marker>
+  <marker id="endDimArrow" viewBox="-10 -5 10 10" markerUnits="strokeWidth"
+          markerWidth="10" markerHeight="10" orient="auto">
+    <path d="M-10,-2 L0,0 -10,2 z M0,-5 L0,5" stroke="black" />
+  </marker>
+</defs>
+
+<!-- background grid -->
+<rect id="grid" width="100%" height="100%" stroke="gray" stroke-width=".5"
+      fill="url(#gridPattern)" /> 
+
+<!-- signals -->
+<path stroke="black" stroke-width="1" fill="none" class="s000" d="" />
+<path stroke="black" stroke-width="1" fill="none" class="s001" d="" />
+<path stroke="black" stroke-width="1" fill="none" class="s002" d="" />
+<path stroke="black" stroke-width="1" fill="none" class="s003" d="" />
+<path stroke="black" stroke-width="1" fill="none" class="s004" d="" />
+
+<!--
+<path transform="translate(160,0)"
+      stroke="darkseagreen" stroke-width="4" fill="lightgray" 
+      stroke-linecap="round"
+      d="M 40,80
+         V 60 L 60,40
+         Q 80,20 100,40 T 140,40
+         L 160,60
+         V 80
+         H 40
+         Z" />
+-->
+</svg>
+</div>
+
+<pre>
+<div id="info">
+</div>
+</pre>
+
+<div id="results">
+</div>
+
+</div>
+</body>
+</html>

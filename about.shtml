@@ -1,0 +1,62 @@
+<!--#set var="TITLE" value="About LightWAVE"-->
+<!--#include virtual="/pn/head.shtml"-->
+
+<div class="notice">
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv='content-type' content='text/html; charset=utf-8'>
+<title>About LightWAVE</title>
+</head>
+
+<body bgcolor='#fff'>
+
+<div class="notice">
+<h2>LightWAVE 0.01</h1>
+
+<p>
+LightWAVE is a lightweight waveform and annotation viewer and editor.
+
+<p>
+LightWAVE is modelled on WAVE, an X11/XView application I wrote and maintained
+between 1989 and 2012.  LightWAVE runs within any modern web browser and does
+not require installation on the user's computer.
+
+<p>
+LightWAVE is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 2 of the License, or (at your
+option) any later version.
+
+<p>
+LightWAVE is distributed in the hope that it will be useful, but <strong>
+WITHOUT ANY WARRANTY</strong>; without even the implied warranty of 
+<strong>MERCHANTABILITY</strong> or <strong>FITNESS FOR A PARTICULAR
+PURPOSE</strong>.  See the GNU General Public License for more details.
+
+<p>
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place - Suite 330, Boston, MA 02111-1307, USA.
+
+<p>
+You may contact the author by e-mail (george@mit.edu) or postal mail
+(MIT Room E25-505A, Cambridge, MA 02139 USA).  For updates to this software,
+please visit PhysioNet (http://www.physionet.org/).
+</div>
+
+<p>
+This is an early alpha version of LightWAVE, which I wrote as a
+testbed and proof-of-concept.  It is <em>barely</em> useful, providing
+a way to select and extract data in text form from PhysioBank records
+(with output similar to the ATM's 'show signals as text' and 'show
+annotations as text' tools).  At this time, LightWAVE does not provide
+any graphical output related to the data selected by the user (the grid and
+cartoonish "waveforms" are placeholders for the not-yet-implemented interactive
+display).
+
+<p>
+It is likely that almost all of the current version will be revised
+before the initial public release, which is planned for January 2013.
+
+<!--#include virtual="/pn/footer.shtml" -->
