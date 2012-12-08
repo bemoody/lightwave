@@ -1,6 +1,6 @@
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	 6 December 2012
-# 'make' description file for building and installing LightWAVE  version 0.02
+#			Last revised:	 9 December 2012
+# 'make' description file for building and installing LightWAVE  version 0.03
 #
 # *** It is not necessary to install LightWAVE in order to use it!
 # *** Point your browser to http://physionet.org/lightwave/ to do so.
@@ -92,11 +92,14 @@ install:	$(TARGETS)
 	@echo "(replacing HOST by the hostname of this server, or by localhost"
 	@echo "or 0.0.0.0 to run without a network connection)."
 
-# Build and install the lightwave web application.
-$(BINDIR)/lightwave:	lightwave.c
+# Install the lightwave web application.
+$(BINDIR)/lightwave:	lightwave
 	mkdir -p $(BINDIR)
-	$(CC) $(CFLAGS) lightwave.c -o lightwave $(LDFLAGS)
 	cp -p lightwave $(BINDIR)
+
+# Compile the lightwave web application.
+lightwave:
+	$(CC) $(CFLAGS) lightwave.c -o lightwave $(LDFLAGS)
 
 # Install the lightwave HTML and CSS files.
 $(LWDIR)/index.shtml:	lightwave.shtml lightwave.css about.shtml
@@ -108,6 +111,10 @@ $(LWDIR)/index.shtml:	lightwave.shtml lightwave.css about.shtml
 $(JSDIR)/lightwave.js:	 lightwave.js
 	mkdir -p $(JSDIR)
 	cp lightwave.js $(JSDIR)
+
+# Make a tarball of sources.
+tarball:
+	cd ..; tar cfvz lightwave.tar.gz lightwave
 
 # 'make clean': Remove unneeded files from this directory.
 clean:

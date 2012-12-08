@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	 7 December 2012  version 0.02
+			Last revised:	 9 December 2012  version 0.03
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -58,7 +58,7 @@ WFDB_Time t0, tf, dt;
 
 char *get_param(char *name), *get_param_multiple(char *name);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
-    retrieve(void), print_file(char *filename);
+    fetch(void), retrieve(void), print_file(char *filename);
 
 int main(int argc, char **argv)
 {
@@ -114,26 +114,30 @@ int main(int argc, char **argv)
 	if (strcmp(action, "info") == 0)
 	    info();
 
-	else if (strcmp(action, "Retrieve") == 0) {
+	else if (strcmp(action, "Retrieve")==0 || strcmp(action, "fetch")==0) {
 	    char *p;
 	    int n;
 
 	    if (nsig > 0) {
-	        SUALLOC(v, nsig, sizeof(WFDB_Sample));
 		SUALLOC(sigmap, nsig, sizeof(int));
+		for (n = 0; n < nsig; n++)
+		    sigmap[n] = -1;
 		while (p = get_param_multiple("signal"))
-		  if (0 <= (n = atoi(p)) && n < nsig) {
-		       sigmap[n] = 1; nosig++;
-		  }
+		    if (0 <= (n = atoi(p)) && n < nsig) {
+			sigmap[n] = n; n++; nosig++;
+		    }
 	    }
 	    annotator = get_param("annotator");
 	    if ((p = get_param("t0")) == NULL) p = "0";
 	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
 	    if ((p = get_param("dt")) == NULL) p = "1";
-	    if ((dt = strtim(p)) < 0L) dt = -dt;
+	    if ((dt = strtim(p)) < 1L) dt = (dt < 0L) ? -dt : 1L;
 	    tf = t0 + dt;
 
-	    retrieve();
+	    if (strcmp(action, "Retrieve") == 0)
+	        retrieve();
+	    else
+	        fetch();
 
 	    if (nsig > 0) {
 		SFREE(sigmap);
@@ -155,12 +159,13 @@ char *prompt(char *prompt_string)
 {
     char *p = NULL;
 
-    printf("%s: ", prompt_string);
-    fflush(stdout);
+    fprintf(stderr, "%s: ", prompt_string);
+    fflush(stderr);
     buf[0] = '\0';  /* clear previous content in case of EOF on stdin */
     if (fgets(buf, sizeof(buf), stdin)) {
         buf[strlen(buf)-1] = '\0';  /* discard trailing newline */
-	SSTRCPY(p, buf);
+	if (buf[0])
+	    SSTRCPY(p, buf);
     }
     return (p); /* Yes, it's a memory leak.  So sue me! */
 }
@@ -298,17 +303,120 @@ void info(void)
     printf("\n  }\n}\n");
 }
 
+void fetchannotations(void)
+{
+    WFDB_Anninfo ai;
+
+    ai.name = annotator;
+    ai.stat = WFDB_READ;
+    if (annopen(recpath, &ai, 1) >= 0) {
+	int first = 1;
+	WFDB_Annotation annot;
+
+	iannsettime(t0);
+	printf("{ \"annotation\": [\n");
+	while (getann(0, &annot) == 0 && annot.time < tf) {
+	    if (!first) printf(",\n");
+	    else first = 0;
+	    printf("    { \"t\": \%ld,\n", annot.time);
+	    printf("      \"a\": \"%s\",\n", annstr(annot.anntyp));
+	    printf("      \"s\": %d,\n", annot.subtyp);
+	    printf("      \"c\": %d,\n", annot.chan);
+	    printf("      \"n\": %d,\n", annot.num);
+	    if (annot.aux) {
+		char *p = annot.aux + 1, *e = annot.aux + (*annot.aux);
+
+		printf("      \"x\": \"");
+		for ( ; p < e && isprint(*p); p++) {
+		    if (*p == '\"') printf("\\\"");
+		    else printf("%c", *p);
+		}
+		printf("\"");
+	    }
+	    else
+		printf("      \"x\": null");
+	    printf("\n    }");
+	}
+	printf("\n  ]\n}\n");	    
+    }
+}
+
+void fetchsignals(void)
+{
+    int first = 1, framelen, i, imax, imin, j, *m, *mp, n;
+    WFDB_Sample **sb, **sp, *sbo, *spo, *v;
+    WFDB_Time t;
+
+    /* Allocate buffers and buffer pointers for each selected signal. */
+    SUALLOC(sb, nsig, sizeof(WFDB_Sample *));
+    SUALLOC(sp, nsig, sizeof(WFDB_Sample *));
+    for (n = framelen = 0; n < nsig; framelen += s[n++].spf)
+	if (sigmap[n] >= 0) {
+	    SUALLOC(sb[n], (int)((tf-t0)*s[n].spf + 0.5), sizeof(WFDB_Sample));
+	    sp[n] = sb[n];
+	}
+    /* Allocate a frame buffer and construct the frame map. */
+    SUALLOC(v, framelen, sizeof(WFDB_Sample));  /* frame buffer */
+    SUALLOC(m, framelen, sizeof(int));	    /* frame map */
+    for (i = n = 0; n < nsig; n++) {
+	for (j = 0; j < s[n].spf; j++)
+	    m[i++] = sigmap[n];
+    }
+    for (imax = framelen-1; imax > 0 && m[imax] < 0; imax--)
+	;
+    for (imin = 0; imin < imax && m[imin] < 0; imin++)
+	;
+
+    /* Fill the buffers. */
+    isigsettime(t0);
+    for (t = t0; t < tf; t++) {
+	getframe(v);
+	for (i = imin, mp = m + imin; i <= imax; i++, mp++)
+	    if ((n = *mp) >= 0) *(sp[n]++) = v[i];
+    }
+
+    /* Generate output. */
+    printf("{ \"signal\": [\n");  
+    for (n = 0; n < nsig; n++) {
+	if (sigmap[n] >= 0) {
+	    int delta, prev = 0; 
+ 	    if (!first) printf(",\n");
+	    else first = 0;
+	    printf("    { \"name\": \"%s\",\n", s[n].desc);
+	    printf("      \"samp\": [ ");
+	    for (sbo = sb[n], spo = sp[n]-1; sbo < spo; sbo++) {
+#if 1
+		printf("%d,", *sbo);
+#else
+		delta = *sbo - prev;
+		printf("%s%d", delta < 0 ? "" : " ", delta);
+		prev = *sbo;
+#endif
+	    }
+	    printf("%d ]", *sbo - prev);
+	}
+    }
+    printf("\n    }\n}\n");
+}
+
+void fetch(void)
+{
+    if (nosig) fetchsignals();
+    if (annotator) fetchannotations();
+}
+
 void retrieve(void)
 {
     int n, no;
     WFDB_Time t;
 
+    SUALLOC(v, nsig, sizeof(WFDB_Sample));
     printf("<hr>\n<p>\n<table>\n");
     if (nosig) {
 	printf("<h2>Signals</h2>\n<p>\n");
 	printf("<table><tr><td>Time</td>");
 	for (n = no = 0; no < nosig && n < nsig; n++) {
-	    if (sigmap[n]) {
+	    if (sigmap[n] >= 0) {
 		no++;
 		printf("<td>%s", s[n].desc);
 		if (s[n].units) printf(" [%s]", s[n].units);
@@ -321,7 +429,7 @@ void retrieve(void)
 	    getvec(v);
 	    printf("<tr><td>%s</td>", mstimstr(t));
 	    for (n = no = 0; no < nosig && n < nsig; n++) {
-		if (sigmap[n]) {
+		if (sigmap[n] >= 0) {
 		    no++;
 		    printf("<td>%g</td>", aduphys(n, v[n]));
 		}

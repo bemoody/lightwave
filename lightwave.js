@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 7 December 2012  version 0.02
+//			Last revised:	 9 December 2012  version 0.03
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -88,6 +88,9 @@ function fetch() {
     dt = $('[name=dt]').val();
     if (dt) { url += '&dt=' + dt; }
     $.getJSON(url, function(data) {
+	    signal = data.signal;
+	    annotation = data.annotation;
+
 	$('#results').html('<p>Sampling frequency = ' + recinfo.signal[0].freq +
 	  ' Hz</p>\n' + data);
 	// the rest of this block is just a placeholder for the code to
@@ -130,7 +133,7 @@ function loadrlist() {
 		'<td><select name=\"annotator\">\n';
 	    for (i = 0; i < data.annotator.length; i++)
 	        alist += '<option value=\"' + data.annotator[i].name +
-		    '\">' + data.annotator[i].desc + '(' +
+		    '\">' + data.annotator[i].desc + ' (' +
 		    data.annotator[i].name + ')</option>\n';
 	    alist += '<option value=\"\">[none]\n</select></td>\n';
 	    $('#alist').html(alist);
@@ -159,7 +162,7 @@ $(document).ready(function(){
 		'<option value=\"\" selected>--Choose one--</option>\n';
 	    for (i = 0; i < data.database.length; i++)
 	        dblist += '<option value=\"' + data.database[i].name +
-		    '\">' + data.database[i].desc + '(' +
+		    '\">' + data.database[i].desc + ' (' +
 		    data.database[i].name + ')</option>\n';
 	    dblist += '</select></td>\n';
 	    $('#dblist').html(dblist);

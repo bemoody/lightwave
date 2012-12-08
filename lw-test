@@ -1,0 +1,16 @@
+cat >lw-test-params <<EOF
+fetch
+mitdb
+200
+0
+1
+
+atr
+0
+1
+EOF
+
+make lightwave
+./lightwave i <lw-test-params >lw-test-output 2>/dev/null
+
+echo Output saved in lw-test-output
