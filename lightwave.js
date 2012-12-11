@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	10 December 2012  version 0.04
+//			Last revised:	11 December 2012  version 0.05
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -78,75 +78,97 @@ function fetch() {
     });
     annotator = $('[name=annotator]').val();
     if (annotator) { url += '&annotator=' + annotator; }
-    outtype = $('[name=outtype]').val();
     t0 = $('[name=t0]').val();
     if (t0) { url += '&t0=' + t0; }
     dt = $('[name=dt]').val();
     if (dt) { url += '&dt=' + dt; }
     tf = t0 + dt;
     $.getJSON(url, function(data) {
-	$('#results').empty();
-	ann = data.fetch[0].annotation;
-	sig = data.fetch[1].signal;
+	ann = data.fetch.annotation;
+	sig = data.fetch.signal;
 	ts0 = t0 * tfreq;
 	tsf = ts0 + dt * tfreq;
 	if (ts0 >= tsf) tsf = ts0 + 1;
 
-	if (out_format == 'text') {
-	    atext = '<h3>Annotations</h3>\n';
-	    atext += 'Number of annotations: ' + ann.length + '<br>';
-	    atext += '<p><table>\n<tr><th>Time</th><th>Type</th>';
-	    atext += '<th>Sub</th><th>Ch</th><th>Num</th><th>Aux</th></tr>\n';
-	    for (i = 0; i < ann.length; i++) {
-		atext += '<tr><td>' + timstr(ann[i].t) + '</td><td>' +
-		    ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
-		    ann[i].c + '</td><td>' + ann[i].n + '</td><td>';
-		if (ann[i].x) { atext += ann[i].x; }
-		atext +=  '</td></tr>\n';
-	    }
-	    atext += '</table>\n<p>\n';
-	    $('#results').html(atext);
-	
-	    stext = '<h3>Signals</h3>\n';
-	    stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
-	    stext += '<p><table>\n<tr><th>Time</th>';
-	    for (i = 0; i < sig.length; i++)
-		stext += '<th>' + sig[i].name + '</th>';
-	    stext += '\n<tr><th></th>';
+	if (sig) {
 	    for (i = 0; i < sig.length; i++) {
-		u = sig[i].units;
-		if (!u) u = '[mV]';
-		stext += '<th><i>(' + u + ')</i></th>';
+	    len = sig[i].samp.length;
+	    v = sig[i].samp;
+	    for (j = p = 0; j < len; j++)
+		p = v[j] += p;
 	    }
-	    for (t = ts0, i = 0; t < tsf; i++, t++) {
-		stext += '</tr>\n<tr><td>' + timstr(t);
-		for (j = 0; j < sig.length; j++) {
-		    stext += '</td><td>';
-		    if (t%sig[j].tps == 0) {
-			v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/sig[j].gain;
-			stext += v.toFixed(3);
-		    }
+	}
+
+	if (out_format == 'text') {
+	    $('#textdata').show();
+	    $('#plotdata').hide();
+	    atext = '';
+	    if (ann) {
+		atext += '<h3>Annotations</h3>\n';
+		atext += 'Number of annotations: ' + ann.length + '<br>';
+		atext += '<p><table>\n<tr><th>Time</th><th>Type</th>';
+		atext += '<th>Sub</th><th>Ch</th>';
+		atext += '<th>Num</th><th>Aux</th></tr>\n';
+		for (i = 0; i < ann.length; i++) {
+		    atext += '<tr><td>' + timstr(ann[i].t) + '</td><td>' +
+			ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
+			ann[i].c + '</td><td>' + ann[i].n + '</td><td>';
+		    if (ann[i].x) { atext += ann[i].x; }
+		    atext +=  '</td></tr>\n';
 		}
-		stext += '</td>';
+		atext += '</table>\n<p>\n';
 	    }
-	    stext += '</tr>\n</table>\n';
-	    $('#results').append(stext);
+	    $('#textdata').html(atext);
+	
+	    stext = '';
+	    if (sig) {
+		stext = '<h3>Signals</h3>\n';
+		stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
+		stext += '<p><table>\n<tr><th>Time</th>';
+		for (i = 0; i < sig.length; i++)
+		    stext += '<th>' + sig[i].name + '</th>';
+		stext += '\n<tr><th></th>';
+		for (i = 0; i < sig.length; i++) {
+		    u = sig[i].units;
+		    if (!u) u = '[mV]';
+		    stext += '<th><i>(' + u + ')</i></th>';
+		}
+		for (t = ts0, i = 0; t < tsf; i++, t++) {
+		    stext += '</tr>\n<tr><td>' + timstr(t);
+		    for (j = 0; j < sig.length; j++) {
+			stext += '</td><td>';
+			if (t%sig[j].tps == 0) {
+			    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
+				sig[j].gain;
+			    stext += v.toFixed(3);
+			}
+		    }
+		    stext += '</td>';
+		}
+		stext += '</tr>\n</table>\n';
+	    }
+	    $('#textdata').append(stext);
 	}
 	else if (out_format == 'plot') {
+	    $('#textdata').hide();
+	    $('#plotdata').show();
 	    svg000 = '';
-	    for (j = 0; j < sig.length; j++) {
-		v = Math.round((sig[j].samp[0]-sig[j].base)*10/
-			       sig[j].gain + 50*(j+1));
-		svg000 += 'M0,' + v + ' L';
-		for (t = ts0 + 1, i = 1; t < tsf; i++, t++) {
-		    if (t%(sig[j].tps) == 0) {
-			v = Math.round((sig[j].samp[i/sig[j].tps]-sig[j].base)
-				       *10/sig[j].gain + 50*(j+1));
-			svg000 += ' ' + i/4 + ',' + v;
-			$('.s000').attr('d', svg000);
+	    if (sig) {
+		for (j = 0; j < sig.length; j++) {
+		    v = Math.round((sig[j].samp[0]-sig[j].base)*10/
+				   sig[j].gain + 50*(j+1));
+		    svg000 += 'M0,' + v + ' L';
+		    for (t = ts0 + 1, i = 1; t < tsf; i++, t++) {
+			if (t%(sig[j].tps) == 0) {
+			    v = Math.round((sig[j].samp[i/sig[j].tps]
+					    -sig[j].base)*(-10/sig[j].gain)
+					   + 50*(j+1));
+			    svg000 += ' ' + i/4 + ',' + v;
+			}
 		    }
 		}
 	    }
+	    $('.s000').attr('d', svg000);
 	}
     });
 };
@@ -169,9 +191,11 @@ function loadslist() {
     record = $('[name=record]').val();
     request = '/cgi-bin/lightwave?action=info&db=' + db + '&record=' + record;
     $.getJSON(request, function(data) {
-	    recinfo = data.info;
-	    tfreq = recinfo.tfreq;
-	    slist = '<td align="right">Signals:</td>\n<td>\n';
+	recinfo = data.info;
+	tfreq = recinfo.tfreq;
+	slist = '';
+	if (recinfo.signal) {
+	    slist += '<td align="right">Signals:</td>\n<td>\n';
 	    if (recinfo.signal.length > 5)
 	        slist += '<div class="container">\n';
 	    for (i = 0; i < recinfo.signal.length; i++)
@@ -180,7 +204,8 @@ function loadslist() {
 	    if (recinfo.signal.length > 5)
 	        slist += '</div>\n';
             slist += '</td>\n';
-	    $('#slist').html(slist);
+	}
+	$('#slist').html(slist);
     });
 };
 
@@ -191,27 +216,33 @@ function loadrlist() {
     $('#slist').empty();
     $('#info').empty();
     $.getJSON('/cgi-bin/lightwave?action=alist&db=' + db, function(data) {
-	    alist = '<td align=right>Annotator:</td>' + 
+	alist = '';
+	if (data.annotator) {
+	    alist += '<td align=right>Annotator:</td>' + 
 		'<td><select name=\"annotator\">\n';
 	    for (i = 0; i < data.annotator.length; i++)
-	        alist += '<option value=\"' + data.annotator[i].name +
-		    '\">' + data.annotator[i].desc + ' (' +
-		    data.annotator[i].name + ')</option>\n';
+		alist += '<option value=\"' + data.annotator[i].name +
+		'\">' + data.annotator[i].desc + ' (' +
+		data.annotator[i].name + ')</option>\n';
 	    alist += '<option value=\"\">[none]\n</select></td>\n';
-	    $('#alist').html(alist);
-	});
+	}
+	$('#alist').html(alist);
+    });
     $.getJSON('/cgi-bin/lightwave?action=rlist&db=' + db, function(data) {
-	    rlist = '<td align=right>Record:</td>' + 
+	rlist = '';
+	if (data.record) {
+	    rlist += '<td align=right>Record:</td>' + 
 		'<td><select name=\"record\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
 	    for (i = 0; i < data.record.length; i++)
 	        rlist += '<option value=\"' + data.record[i] +
 		    '\">' + data.record[i] + '</option>\n';
 	    rlist += '</select></td>\n';
-	    $('#rlist').html(rlist);
-	    // fetch the list of signals when the user selects a record
-	    $('[name=record]').on("change", loadslist);
-	});
+	}
+	$('#rlist').html(rlist);
+	// fetch the list of signals when the user selects a record
+	$('[name=record]').on("change", loadslist);
+    });
 };
 
 
@@ -219,6 +250,7 @@ function loadrlist() {
 // and set up event handlers for database selection and form submission.
 $(document).ready(function(){
     $.getJSON('/cgi-bin/lightwave?action=dblist', function(data) {
+	if (data.database) {
 	    dblist = '<td align=right>Database:</td>' + 
 		'<td><select name=\"db\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
@@ -227,10 +259,15 @@ $(document).ready(function(){
 		    '\">' + data.database[i].desc + ' (' +
 		    data.database[i].name + ')</option>\n';
 	    dblist += '</select></td>\n';
-	    $('#dblist').html(dblist);
-	    $('[name=db]').on("change", loadrlist);
-	});
+	}
+	else {
+	    dblist = "<td colspan=2><b>Sorry, the database list is temporarily"
+		+ " unavailable.  Please try again later.</b></td>";
+	}
+	$('#dblist').html(dblist);
+	$('[name=db]').on("change", loadrlist);
+    });
     $('#lwform').on("submit", false);      // disable form submission
-    $('#fplot').on("click", fetch_plot); // get results using ajax instead
-    $('#ftext').on("click", fetch_text); // get results using ajax instead
+    $('#fplot').on("click", fetch_plot);   // get data and plot them
+    $('#ftext').on("click", fetch_text);   // get data and print them
 });

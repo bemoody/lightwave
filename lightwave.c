@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	10 December 2012  version 0.04
+			Last revised:	11 December 2012  version 0.05
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -110,8 +110,6 @@ int main(int argc, char **argv)
 	/* Discover the number of signals defined in the header, allocate
 	   memory for their signal information structures, open the signals. */
 	if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
-	    setgvmode(WFDB_LOWRES);
-	    ffreq = sampfreq(NULL);
 	    SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
 	    nsig = isigopen(recpath, s, nsig);
 	} 
@@ -124,7 +122,9 @@ int main(int argc, char **argv)
 	   frame.  The for loop below sets the "tick" frequency tfreq to the
 	   number of instants in each second when at least one sample is
 	   acquired. */
-	for (i = 1, tfreq = ffreq * s[0].spf; i < nsig; i++)
+	setgvmode(WFDB_LOWRES);
+	ffreq = sampfreq(NULL);
+	for (i = 0, tfreq = ffreq; i < nsig; i++)
 	    tfreq = approx_LCM(ffreq * s[i].spf, tfreq);
 
 	if (strcmp(action, "info") == 0)
@@ -343,7 +343,7 @@ void fetchannotations(void)
 	WFDB_Annotation annot;
 
 	iannsettime(t0);
-	printf("{ \"annotation\": [\n");
+	printf("\"annotation\": [\n");
 	while (getann(0, &annot) == 0 && annot.time < tf) {
 	    if (!first) printf(",\n");
 	    else first = 0;
@@ -366,7 +366,7 @@ void fetchannotations(void)
 		printf("      \"x\": null");
 	    printf("\n    }");
 	}
-	printf("\n  ]\n}\n");	    
+	printf("\n  ]\n");	    
     }
 }
 
@@ -403,10 +403,10 @@ void fetchsignals(void)
 	    if ((n = *mp) >= 0) *(sp[n]++) = v[i];
 
     /* Generate output. */
-    printf("{ \"signal\": [\n");  
+    printf("\"signal\": [\n");  
     for (n = 0; n < nsig; n++) {
 	if (sigmap[n] >= 0) {
-	    int delta, prev = 0; 
+	    int delta, prev; 
  	    if (!first) printf(",\n");
 	    else first = 0;
 	    printf("    { \"name\": \"%s\",\n", s[n].desc);
@@ -418,26 +418,24 @@ void fetchsignals(void)
 	    printf("      \"base\": %d,\n", s[n].baseline);
 	    printf("      \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
 	    printf("      \"samp\": [ ");
-	    for (sbo = sb[n], spo = sp[n]-1; sbo < spo; sbo++) {
-#if 1
-		printf("%d,", *sbo);
-#else
+	    for (sbo = sb[n], prev = 0, spo = sp[n]-1; sbo < spo; sbo++) {
 		delta = *sbo - prev;
-		printf("%s%d", delta < 0 ? "" : " ", delta);
+		printf("%d,", delta);
 		prev = *sbo;
-#endif
 	    }
 	    printf("%d ] }", *sbo - prev);
 	}
     }
-    printf("\n    ]\n}\n");
+    printf("\n    ]\n");
 }
 
 void fetch(void)
 {
-    printf("{ \"fetch\": [\n");
-    if (annotator) fetchannotations();
-    printf(",\n");
+    printf("{ \"fetch\": {\n");
+    if (annotator) {
+	fetchannotations();
+	if (nosig) printf(",\n");
+    }
     if (nosig) fetchsignals();
-    printf("] }\n");
+    printf("  }\n}\n");
 }
