@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	10 December 2012  version 0.04
+//			Last revised:	 9 December 2012  version 0.03
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -36,36 +36,40 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
+
 var recinfo;  // metadata for the selected record, initialized by loadslist()
-var tfreq;    // ticks per second (LCM of sampling frequencies of signals in Hz)
-var ann = []; // annotation array, initialized by fetch()
-var sig = []; // signal array, initialized by fetch()
-var out_format; // 'plot' or 'text', set by button handler functions
 
-// Convert argument (in samples) to a string in HH:MM:SS.mmm format.
-function timstr(t) {
-    var mmm = Math.floor(1000*t/tfreq);
-    var ss  = Math.floor(mmm/1000); mmm %= 1000;
-    if (mmm < 10) mmm = '00' + mmm;
-    else if (mmm < 100) mmm = '0' + mmm;
-    mmm = '.' + mmm;
-    var mm  = Math.floor(ss/60);    ss %= 60;
-    if (ss < 10) ss = '0' + ss;
-    ss = ':' + ss;
-    var hh  = Math.floor(mm/60);    mm %= 60;
-    if (mm < 10) mm = '0' + mm;
-    mm = ':' + mm;
-    if (hh > 23) {
-	dd = hh%24; hh %= 24;
-	if (hh < 10) hh = '0' + hh;
-	hh = dd + 'd' + hh;
-    }
-    var tstring = hh + mm + ss + mmm;
-    return tstring;
-}
+// retrieve the selected data as HTML and load them into the page
+function fetchdata() {
+    db = $('[name=db]').val();
+    if (!db) { alert('Choose a database'); return false; }
+    record = $('[name=record]').val();
+    if (!record) { alert('Choose a record'); return false; }
+    url = '/cgi-bin/lightwave?action=Retrieve&db=' + db
+	+ '&record=' + record;
+    $('[name=signal]').each(function() {
+	if (this.checked) { url += '&signal=' + $(this).val(); }
+    });
+    annotator = $('[name=annotator]').val();
+    if (annotator) { url += '&annotator=' + annotator; }
+    t0 = $('[name=t0]').val();
+    if (t0) { url += '&t0=' + t0; }
+    dt = $('[name=dt]').val();
+    if (dt) { url += '&dt=' + dt; }
+    $.get(url, function(data) {
+	$('#results').html('<p>Sampling frequency = ' + recinfo.signal[0].freq +
+	  ' Hz</p>\n' + data);
+	// the rest of this block is just a placeholder for the code to
+	// generate the graphical output (not yet implemented)
+	svg000 = "M 0,100 l 10,10 10,30 10,50 10,-90, 10,-10, 10,0";
+	$('.s000').attr('d', svg000);
+	svg001 = "M 0,100 l 10,-10 10,30 10,0 10,-40, 10,10, 10,0";
+	$('.s001').attr('transform', 'translate(0,-30)')
+	    .attr('stroke','blue').attr('d', svg001);
+    });
+};
 
-// Fetch the selected data as JSON and load them into the page, either as an
-// SVG plot or as text.
+// fetch the selected data as JSON and load them into the page
 function fetch() {
     db = $('[name=db]').val();
     if (!db) { alert('Choose a database'); return false; }
@@ -83,94 +87,28 @@ function fetch() {
     if (t0) { url += '&t0=' + t0; }
     dt = $('[name=dt]').val();
     if (dt) { url += '&dt=' + dt; }
-    tf = t0 + dt;
     $.getJSON(url, function(data) {
-	$('#results').empty();
-	ann = data.fetch[0].annotation;
-	sig = data.fetch[1].signal;
-	ts0 = t0 * tfreq;
-	tsf = ts0 + dt * tfreq;
-	if (ts0 >= tsf) tsf = ts0 + 1;
+	    signal = data.signal;
+	    annotation = data.annotation;
 
-	if (out_format == 'text') {
-	    atext = '<h3>Annotations</h3>\n';
-	    atext += 'Number of annotations: ' + ann.length + '<br>';
-	    atext += '<p><table>\n<tr><th>Time</th><th>Type</th>';
-	    atext += '<th>Sub</th><th>Ch</th><th>Num</th><th>Aux</th></tr>\n';
-	    for (i = 0; i < ann.length; i++) {
-		atext += '<tr><td>' + timstr(ann[i].t) + '</td><td>' +
-		    ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
-		    ann[i].c + '</td><td>' + ann[i].n + '</td><td>';
-		if (ann[i].x) { atext += ann[i].x; }
-		atext +=  '</td></tr>\n';
-	    }
-	    atext += '</table>\n<p>\n';
-	    $('#results').html(atext);
-	
-	    stext = '<h3>Signals</h3>\n';
-	    stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
-	    stext += '<p><table>\n<tr><th>Time</th>';
-	    for (i = 0; i < sig.length; i++)
-		stext += '<th>' + sig[i].name + '</th>';
-	    stext += '\n<tr><th></th>';
-	    for (i = 0; i < sig.length; i++) {
-		u = sig[i].units;
-		if (!u) u = '[mV]';
-		stext += '<th><i>(' + u + ')</i></th>';
-	    }
-	    for (t = ts0, i = 0; t < tsf; i++, t++) {
-		stext += '</tr>\n<tr><td>' + timstr(t);
-		for (j = 0; j < sig.length; j++) {
-		    stext += '</td><td>';
-		    if (t%sig[j].tps == 0) {
-			v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/sig[j].gain;
-			stext += v.toFixed(3);
-		    }
-		}
-		stext += '</td>';
-	    }
-	    stext += '</tr>\n</table>\n';
-	    $('#results').append(stext);
-	}
-	else if (out_format == 'plot') {
-	    svg000 = '';
-	    for (j = 0; j < sig.length; j++) {
-		v = Math.round((sig[j].samp[0]-sig[j].base)*10/
-			       sig[j].gain + 50*(j+1));
-		svg000 += 'M0,' + v + ' L';
-		for (t = ts0 + 1, i = 1; t < tsf; i++, t++) {
-		    if (t%(sig[j].tps) == 0) {
-			v = Math.round((sig[j].samp[i/sig[j].tps]-sig[j].base)
-				       *10/sig[j].gain + 50*(j+1));
-			svg000 += ' ' + i/4 + ',' + v;
-			$('.s000').attr('d', svg000);
-		    }
-		}
-	    }
-	}
+	$('#results').html('<p>Sampling frequency = ' + recinfo.signal[0].freq +
+	  ' Hz</p>\n' + data);
+	// the rest of this block is just a placeholder for the code to
+	// generate the graphical output (not yet implemented)
+	svg000 = "M 0,100 l 10,10 10,30 10,50 10,-90, 10,-10, 10,0";
+	$('.s000').attr('d', svg000);
+	svg001 = "M 0,100 l 10,-10 10,30 10,0 10,-40, 10,10, 10,0";
+	$('.s001').attr('transform', 'translate(0,-30)')
+	    .attr('stroke','blue').attr('d', svg001);
     });
 };
 
-// Button handlers
-function fetch_plot() {
-    out_format = 'plot';
-    fetch();
-}
-
-function fetch_text() {
-    out_format = 'text';
-    fetch();
-}
-
-// Load the list of signals for the selected record and show them with
-// checkboxes.
 function loadslist() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
     request = '/cgi-bin/lightwave?action=info&db=' + db + '&record=' + record;
     $.getJSON(request, function(data) {
 	    recinfo = data.info;
-	    tfreq = recinfo.tfreq;
 	    slist = '<td align="right">Signals:</td>\n<td>\n';
 	    if (recinfo.signal.length > 5)
 	        slist += '<div class="container">\n';
@@ -184,8 +122,8 @@ function loadslist() {
     });
 };
 
-// Fetch the lists of records and annotators in the selected database, load them
-// into the page, and set up an event handler for record selection.
+// fetch the lists of records and annotators in the selected database, load them
+// into the page, and set up an event handler for record selection
 function loadrlist() {
     db = $('[name=db]').val();
     $('#slist').empty();
@@ -215,8 +153,8 @@ function loadrlist() {
 };
 
 
-// When the page is loaded, fetch the list of databases, load it into the page,
-// and set up event handlers for database selection and form submission.
+// when the page is loaded, fetch the list of databases, load it into the page,
+// and set up event handlers for database selection and form submission
 $(document).ready(function(){
     $.getJSON('/cgi-bin/lightwave?action=dblist', function(data) {
 	    dblist = '<td align=right>Database:</td>' + 
@@ -231,6 +169,5 @@ $(document).ready(function(){
 	    $('[name=db]').on("change", loadrlist);
 	});
     $('#lwform').on("submit", false);      // disable form submission
-    $('#fplot').on("click", fetch_plot); // get results using ajax instead
-    $('#ftext').on("click", fetch_text); // get results using ajax instead
+    $('#retrieve').on("click", fetchdata); // get results using ajax instead
 });

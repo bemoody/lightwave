@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	 9 December 2012  version 0.03
+			Last revised:	10 December 2012  version 0.04
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -48,20 +48,25 @@ _______________________________________________________________________________
 #define BUFSIZE 1024	/* bytes read at a time */
 #endif
 
+#define TOL	0.001	/* tolerance for error in approximate equality */
+
 static char *action, *annotator, buf[BUFSIZE], *db, *record, *recpath;
 static int interactive, nsig, nosig, *sigmap;
 WFDB_FILE *ifile;
-WFDB_Frequency sps;
+WFDB_Frequency ffreq, tfreq;
 WFDB_Sample *v;
 WFDB_Siginfo *s;
 WFDB_Time t0, tf, dt;
 
 char *get_param(char *name), *get_param_multiple(char *name);
+double approx_LCM(double x, double y);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
     fetch(void), retrieve(void), print_file(char *filename);
 
 int main(int argc, char **argv)
 {
+    int i;
+
     if (argc < 2) {  /* normal operation as a CGI application */
         cgi_init();
 	atexit(cgi_end);
@@ -106,15 +111,26 @@ int main(int argc, char **argv)
 	   memory for their signal information structures, open the signals. */
 	if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
 	    setgvmode(WFDB_LOWRES);
-	    sps = sampfreq(NULL);
+	    ffreq = sampfreq(NULL);
 	    SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
 	    nsig = isigopen(recpath, s, nsig);
 	} 
 
+	/* Find the least common multiple of the sampling frequencies (which
+	   may not be exactly expressible as floating-point numbers).  In
+	   WFDB-compatible records, all signals are sampled at the same
+	   frequency or at a multiple of the frame frequency, but (especially
+	   in EDF records) there may be many samples of each signal in each
+	   frame.  The for loop below sets the "tick" frequency tfreq to the
+	   number of instants in each second when at least one sample is
+	   acquired. */
+	for (i = 1, tfreq = ffreq * s[0].spf; i < nsig; i++)
+	    tfreq = approx_LCM(ffreq * s[i].spf, tfreq);
+
 	if (strcmp(action, "info") == 0)
 	    info();
 
-	else if (strcmp(action, "Retrieve")==0 || strcmp(action, "fetch")==0) {
+	else if (strcmp(action, "fetch")==0) {
 	    char *p;
 	    int n;
 
@@ -131,13 +147,10 @@ int main(int argc, char **argv)
 	    if ((p = get_param("t0")) == NULL) p = "0";
 	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
 	    if ((p = get_param("dt")) == NULL) p = "1";
-	    if ((dt = strtim(p)) < 1L) dt = (dt < 0L) ? -dt : 1L;
+	    if ((dt = atoi(p) * ffreq) < 1) dt = 1;
 	    tf = t0 + dt;
 
-	    if (strcmp(action, "Retrieve") == 0)
-	        retrieve();
-	    else
-	        fetch();
+	    fetch();
 
 	    if (nsig > 0) {
 		SFREE(sigmap);
@@ -152,6 +165,21 @@ int main(int argc, char **argv)
     SFREE(recpath);
 
     exit(0);
+}
+
+/* Find the (approximate) least common multiple of two positive numbers
+   (which are not necessarily integers). */
+double approx_LCM(double x, double y)
+{
+    double x0 = x, y0 = y, z;
+
+    if (x <= 0. || y <= 0.) return (0.);	/* this shouldn't happen! */
+    while (-TOL > (z = x/y - 1) || z > TOL) {
+	if (x < y) x+= x0;
+	else y += y0;
+	/* when x and y are nearly equal, z is close to zero */
+    }
+    return (x);
 }
 
 /* Prompt for input, read a line from stdin, save it, return a pointer to it. */
@@ -274,6 +302,7 @@ void info(void)
     printf("{ \"info\":\n");
     printf("  { \"db\": \"%s\",\n", db);
     printf("    \"record\": \"%s\",\n", record);
+    printf("    \"tfreq\": %g,\n", tfreq);
     p = timstr(0);
     if (*p == '[') {
         printf("    \"start\": \"%s\",\n", mstimstr(0L));
@@ -289,7 +318,7 @@ void info(void)
     if (nsig > 0) printf(",\n    \"signal\": [\n", record);
     for (i = 0; i < nsig; i++) {
         printf("      { \"desc\": \"%s\",\n", s[i].desc);
-	printf("        \"freq\": %g,\n", sps * s[i].spf);
+	printf("        \"tps\": %g,\n", tfreq/(ffreq*s[i].spf));
 	if (s[i].units)
 	    printf("        \"units\": \"%s\",\n", s[i].units);
 	else
@@ -369,11 +398,9 @@ void fetchsignals(void)
 
     /* Fill the buffers. */
     isigsettime(t0);
-    for (t = t0; t < tf; t++) {
-	getframe(v);
+    for (t = t0; t < tf && getframe(v) > 0; t++)
 	for (i = imin, mp = m + imin; i <= imax; i++, mp++)
 	    if ((n = *mp) >= 0) *(sp[n]++) = v[i];
-    }
 
     /* Generate output. */
     printf("{ \"signal\": [\n");  
@@ -383,6 +410,13 @@ void fetchsignals(void)
  	    if (!first) printf(",\n");
 	    else first = 0;
 	    printf("    { \"name\": \"%s\",\n", s[n].desc);
+	    printf("      \"units\": \"%s\",\n",
+		   s[n].units ? s[n].units : "mV [assumed]");
+	    printf("      \"t0\": %d,\n", t0);
+	    printf("      \"tf\": %d,\n", tf);
+	    printf("      \"gain\": %g,\n", s[n].gain);
+	    printf("      \"base\": %d,\n", s[n].baseline);
+	    printf("      \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
 	    printf("      \"samp\": [ ");
 	    for (sbo = sb[n], spo = sp[n]-1; sbo < spo; sbo++) {
 #if 1
@@ -393,76 +427,17 @@ void fetchsignals(void)
 		prev = *sbo;
 #endif
 	    }
-	    printf("%d ]", *sbo - prev);
+	    printf("%d ] }", *sbo - prev);
 	}
     }
-    printf("\n    }\n}\n");
+    printf("\n    ]\n}\n");
 }
 
 void fetch(void)
 {
-    if (nosig) fetchsignals();
+    printf("{ \"fetch\": [\n");
     if (annotator) fetchannotations();
-}
-
-void retrieve(void)
-{
-    int n, no;
-    WFDB_Time t;
-
-    SUALLOC(v, nsig, sizeof(WFDB_Sample));
-    printf("<hr>\n<p>\n<table>\n");
-    if (nosig) {
-	printf("<h2>Signals</h2>\n<p>\n");
-	printf("<table><tr><td>Time</td>");
-	for (n = no = 0; no < nosig && n < nsig; n++) {
-	    if (sigmap[n] >= 0) {
-		no++;
-		printf("<td>%s", s[n].desc);
-		if (s[n].units) printf(" [%s]", s[n].units);
-		printf("</td>");
-	    }
-	}
-	printf("</tr>\n");
-	isigsettime(t0);
-	for (t = t0; t < tf; t++) {
-	    getvec(v);
-	    printf("<tr><td>%s</td>", mstimstr(t));
-	    for (n = no = 0; no < nosig && n < nsig; n++) {
-		if (sigmap[n] >= 0) {
-		    no++;
-		    printf("<td>%g</td>", aduphys(n, v[n]));
-		}
-	    }
-	    printf("</tr>\n");
-	}
-	printf("</table>");
-    }
-
-    if (annotator) {
-	WFDB_Anninfo ai;
-	WFDB_Annotation annot;
-
-	ai.name = annotator;
-	ai.stat = WFDB_READ;
-	if (annopen(recpath, &ai, 1) >= 0) {
-
-	  printf("<h2>Annotations (%s)</h2>\n<p>\n", annotator);
-	  printf("<table>\n<tr>"
-		 "<td>Time</td><td>Type</td><td>Sub/Chan/Num</td><td>Aux</td>"
-		 "</tr>\n");
-	  
-	  iannsettime(t0);
-	  while (getann(0, &annot) == 0 && annot.time < tf) {
-	    printf("<td>%s</td>", mstimstr(annot.time));
-	    printf("<td>%s</td>", annstr(annot.anntyp));
-	    printf("<td>%d/%d/%d</td><td>",
-		   annot.subtyp, annot.chan, annot.num);
-	    if (annot.aux)
-	      printf("%s", annot.aux + 1);
-	    printf("</td></tr>\n");
-	  }
-	  printf("</table>");
-	}
-    }
+    printf(",\n");
+    if (nosig) fetchsignals();
+    printf("] }\n");
 }

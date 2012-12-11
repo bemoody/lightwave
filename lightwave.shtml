@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	 9 December 2012  version 0.03
+			Last revised:	10 December 2012  version 0.04
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.
 
@@ -73,15 +73,20 @@ provides some of the functions of LightWAVE without Javascript.
   </select></td></tr>
 
   <tr><td>&nbsp;</td></tr>
-  <tr id="retrieve"><td colspan=2 valign=bottom align=center>
-      <button id="retrieve">Fetch</button>
-      <input type="submit" name="action" value="Retrieve">
-  </td></tr>
+  <tr id="buttons">
+    <td colspan=2 valign=bottom align=center>
+      <button id="fplot">Plot</button>&nbsp;
+      <button id="ftext">Text</button></td>
+  </tr>
 </table>
 </form>
 
 <p>
 <hr>
+<div id="results">
+</div>
+
+
 <div id="s000">
 <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http:/www.w3.org/1999/xlink'
      width="100%" height="100%" viewBox="0 0 1000 200"
@@ -113,11 +118,11 @@ provides some of the functions of LightWAVE without Javascript.
       fill="url(#gridPattern)" /> 
 
 <!-- signals -->
-<path stroke="black" stroke-width="1" fill="none" class="s000" d="" />
-<path stroke="black" stroke-width="1" fill="none" class="s001" d="" />
-<path stroke="black" stroke-width="1" fill="none" class="s002" d="" />
-<path stroke="black" stroke-width="1" fill="none" class="s003" d="" />
-<path stroke="black" stroke-width="1" fill="none" class="s004" d="" />
+<path stroke="black" stroke-width="1" fill="none" class="s000" d="M0,0" />
+<path stroke="black" stroke-width="1" fill="none" class="s001" d="M0,0" />
+<path stroke="black" stroke-width="1" fill="none" class="s002" d="M0,0" />
+<path stroke="black" stroke-width="1" fill="none" class="s003" d="M0,0" />
+<path stroke="black" stroke-width="1" fill="none" class="s004" d="M0,0" />
 
 <!--
 <path transform="translate(160,0)"
@@ -134,12 +139,7 @@ provides some of the functions of LightWAVE without Javascript.
 </svg>
 </div>
 
-<pre>
 <div id="info">
-</div>
-</pre>
-
-<div id="results">
 </div>
 
 </div>

@@ -98,7 +98,7 @@ $(BINDIR)/lightwave:	lightwave
 	cp -p lightwave $(BINDIR)
 
 # Compile the lightwave web application.
-lightwave:
+lightwave:	lightwave.c
 	$(CC) $(CFLAGS) lightwave.c -o lightwave $(LDFLAGS)
 
 # Install the lightwave HTML and CSS files.
