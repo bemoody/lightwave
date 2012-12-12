@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	11 December 2012  version 0.05
+			Last revised:	11 December 2012  version 0.06
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -412,8 +412,8 @@ void fetchsignals(void)
 	    printf("    { \"name\": \"%s\",\n", s[n].desc);
 	    printf("      \"units\": \"%s\",\n",
 		   s[n].units ? s[n].units : "mV [assumed]");
-	    printf("      \"t0\": %d,\n", t0);
-	    printf("      \"tf\": %d,\n", tf);
+	    printf("      \"t0\": %ld,\n", (long)t0);
+	    printf("      \"tf\": %ld,\n", (long)tf);
 	    printf("      \"gain\": %g,\n", s[n].gain);
 	    printf("      \"base\": %d,\n", s[n].baseline);
 	    printf("      \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));

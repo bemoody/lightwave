@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	11 December 2012  version 0.05
+//			Last revised:	11 December 2012  version 0.06
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -152,25 +152,63 @@ function fetch() {
 	else if (out_format == 'plot') {
 	    $('#textdata').hide();
 	    $('#plotdata').show();
-	    svg000 = '';
+	    svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
+		+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
+		+ ' width="100%" height="100%" viewBox="0 0 1000 400"'
+		+ ' preserveAspectRatio="xMidYMid meet">\n';
+	    svg += '<defs>\n'
+		+ ' <pattern id="gridPattern" width="10" height="10"'
+		+ ' patternUnits="userSpaceOnUse">\n'
+		+ ' <path d="M10,0 H0 V10" fill="none" stroke="gray"'
+		+ ' stroke-width=".5"/>\n</pattern>\n';
+	    svg += '</defs>\n';
+
+	    // background grid
+	    svg += '<rect id="grid" width="100%" height="100%" stroke="gray"'
+		+ ' stroke-width=".5" fill="url(#gridPattern)" />\n'; 
+
+	    // signals
 	    if (sig) {
+		svg += '<path stroke="blue" stroke-width="1" fill="none" d="';
 		for (j = 0; j < sig.length; j++) {
 		    v = Math.round((sig[j].samp[0]-sig[j].base)*10/
 				   sig[j].gain + 50*(j+1));
-		    svg000 += 'M0,' + v + ' L';
+		    svg += 'M0,' + v + ' L';
 		    for (t = ts0 + 1, i = 1; t < tsf; i++, t++) {
 			if (t%(sig[j].tps) == 0) {
 			    v = Math.round((sig[j].samp[i/sig[j].tps]
 					    -sig[j].base)*(-10/sig[j].gain)
 					   + 50*(j+1));
-			    svg000 += ' ' + i/4 + ',' + v;
+			    svg += ' ' + i/4 + ',' + v;
 			}
 		    }
 		}
+		svg += '" />\n';
 	    }
-	    $('.s000').attr('d', svg000);
+
+	    // annotations
+	    if (ann) {
+		for (i = 0; i < ann.length; i++) {
+		    x = Math.round((ann[i].t - ts0)/4);
+		    if (ann[i].x) {
+			if (ann[i].a == '+') y = 180;
+			else y = 220;
+			txt = ann[i].x;
+		    }
+		    else {
+			y = 200;
+			txt = ann[i].a;
+		    }
+		    svg += '<text x="' + x + '" y="' + y + '" fill="green">'
+			+ txt + '</text>\n'; 
+		}
+	    }
+
+	    svg += '</svg>\n';
+	    $('#plotdata').html(svg);
+	    //	    $('.s000').attr('d', svg000);
 	}
-    });
+	});
 };
 
 // Button handlers
@@ -244,7 +282,6 @@ function loadrlist() {
 	$('[name=record]').on("change", loadslist);
     });
 };
-
 
 // When the page is loaded, fetch the list of databases, load it into the page,
 // and set up event handlers for database selection and form submission.
