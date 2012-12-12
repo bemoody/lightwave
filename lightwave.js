@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	11 December 2012  version 0.06
+//			Last revised:	12 December 2012  version 0.07
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -41,6 +41,15 @@ var tfreq;    // ticks per second (LCM of sampling frequencies of signals in Hz)
 var ann = []; // annotation array, initialized by fetch()
 var sig = []; // signal array, initialized by fetch()
 var out_format; // 'plot' or 'text', set by button handler functions
+var dpi_x, dpi_y;
+
+// Determine the display resolution.
+function getdpi() {
+    dpi_x = document.getElementById('calibrate-display').offsetWidth;
+    dpi_y = document.getElementById('calibrate-display').offsetHeight;
+    alert('Display resolution: ' + dpi_x + ' dpi (horizontal) by ' + dpi_y +
+	  ' dpi (vertical)');
+}
 
 // Convert argument (in samples) to a string in HH:MM:SS.mmm format.
 function timstr(t) {
@@ -64,6 +73,20 @@ function timstr(t) {
     return tstring;
 }
 
+function strtim(s) {
+    var regexp = /\D/g;	// non-digits
+    var ss = s.replace(regexp, ":");
+    var c = ss.split(":");
+    switch (c.length) {
+      case 1: t = c[0] * tfreq; break;
+      case 2: t = (60*c[0] + +c[1]) * tfreq; break;
+      case 3: t = (3600*c[0] + 60*c[1] + +c[2]) * tfreq; break;
+      case 4: t = (86400*c[0] + 3600*c[1] + 60*c[2] + +c[3]) * tfreq; break;
+      default: t = 0;
+    }
+    return t;
+}
+
 // Fetch the selected data as JSON and load them into the page, either as an
 // SVG plot or as text.
 function fetch() {
@@ -82,13 +105,18 @@ function fetch() {
     if (t0) { url += '&t0=' + t0; }
     dt = $('[name=dt]').val();
     if (dt) { url += '&dt=' + dt; }
-    tf = t0 + dt;
+    ts0 = strtim(t0);
+    tsf = ts0 + dt * tfreq;
+    if (ts0 >= tsf) tsf = ts0 + 1;
     $.getJSON(url, function(data) {
+	if (!data) {
+	    error = 'Sorry, the data you requested are not available.';
+	    $('#textdata').html(error).show();
+	    $('#plotdata').hide();
+	    return;
+	}
 	ann = data.fetch.annotation;
 	sig = data.fetch.signal;
-	ts0 = t0 * tfreq;
-	tsf = ts0 + dt * tfreq;
-	if (ts0 >= tsf) tsf = ts0 + 1;
 
 	if (sig) {
 	    for (i = 0; i < sig.length; i++) {
@@ -190,10 +218,10 @@ function fetch() {
 	    if (ann) {
 		for (i = 0; i < ann.length; i++) {
 		    x = Math.round((ann[i].t - ts0)/4);
-		    if (ann[i].x) {
+		    if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
 			if (ann[i].a == '+') y = 180;
 			else y = 220;
-			txt = ann[i].x;
+			txt = '' + ann[i].x;
 		    }
 		    else {
 			y = 200;
@@ -208,7 +236,7 @@ function fetch() {
 	    $('#plotdata').html(svg);
 	    //	    $('.s000').attr('d', svg000);
 	}
-	});
+    });
 };
 
 // Button handlers
@@ -227,21 +255,29 @@ function fetch_text() {
 function loadslist() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
+    title = 'LightWAVE: ' + db + '/' + record;
+    annotator = $('[name=annotator]').val();
+    if (annotator) title += '(' + annotator + ')';
+    $('title').text(title);
+
     request = '/cgi-bin/lightwave?action=info&db=' + db + '&record=' + record;
     $.getJSON(request, function(data) {
-	recinfo = data.info;
-	tfreq = recinfo.tfreq;
 	slist = '';
-	if (recinfo.signal) {
-	    slist += '<td align="right">Signals:</td>\n<td>\n';
-	    if (recinfo.signal.length > 5)
-	        slist += '<div class="container">\n';
-	    for (i = 0; i < recinfo.signal.length; i++)
-	        slist += '<input type="checkbox" checked="checked" value="' + i
-		    + '" name="signal">' + recinfo.signal[i].desc + '<br>\n';
-	    if (recinfo.signal.length > 5)
-	        slist += '</div>\n';
-            slist += '</td>\n';
+	if (data) {
+	    recinfo = data.info;
+	    tfreq = recinfo.tfreq;
+	    if (recinfo.signal) {
+		slist += '<td align="right">Signals:</td>\n<td>\n';
+		if (recinfo.signal.length > 5)
+	            slist += '<div class="container">\n';
+		for (i = 0; i < recinfo.signal.length; i++)
+	            slist += '<input type="checkbox" checked="checked" value="'
+		    + i + '" name="signal">' + recinfo.signal[i].desc
+		    + '<br>\n';
+		if (recinfo.signal.length > 5)
+	            slist += '</div>\n';
+		slist += '</td>\n';
+	    }
 	}
 	$('#slist').html(slist);
     });
@@ -251,11 +287,17 @@ function loadslist() {
 // into the page, and set up an event handler for record selection.
 function loadrlist() {
     db = $('[name=db]').val();
+    title = 'LightWAVE: ' + db;
+    $('title').text(title);
+    $('#alist').empty();
+    $('#rlist').empty();
     $('#slist').empty();
     $('#info').empty();
+    $('#textdata').empty();
+    $('#plotdata').empty();
     $.getJSON('/cgi-bin/lightwave?action=alist&db=' + db, function(data) {
 	alist = '';
-	if (data.annotator) {
+	if (data) {
 	    alist += '<td align=right>Annotator:</td>' + 
 		'<td><select name=\"annotator\">\n';
 	    for (i = 0; i < data.annotator.length; i++)
@@ -268,7 +310,7 @@ function loadrlist() {
     });
     $.getJSON('/cgi-bin/lightwave?action=rlist&db=' + db, function(data) {
 	rlist = '';
-	if (data.record) {
+	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
 		'<td><select name=\"record\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
@@ -287,7 +329,7 @@ function loadrlist() {
 // and set up event handlers for database selection and form submission.
 $(document).ready(function(){
     $.getJSON('/cgi-bin/lightwave?action=dblist', function(data) {
-	if (data.database) {
+	if (data) {
 	    dblist = '<td align=right>Database:</td>' + 
 		'<td><select name=\"db\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
@@ -307,4 +349,5 @@ $(document).ready(function(){
     $('#lwform').on("submit", false);      // disable form submission
     $('#fplot').on("click", fetch_plot);   // get data and plot them
     $('#ftext').on("click", fetch_text);   // get data and print them
+    getdpi();
 });

@@ -81,6 +81,8 @@ provides some of the functions of LightWAVE without Javascript.
 <div id="info">
 </div>
 
+<div id="calibrate-display" style='height: 1in; left: -100%; position: absolute;
+     top: -100%; width: 1in;'></div>
 </div>
 </body>
 </html>

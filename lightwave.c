@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	11 December 2012  version 0.06
+			Last revised:	12 December 2012  version 0.07
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -58,10 +58,11 @@ WFDB_Sample *v;
 WFDB_Siginfo *s;
 WFDB_Time t0, tf, dt;
 
-char *get_param(char *name), *get_param_multiple(char *name);
+char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
+int fetchannotations(void);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
-    fetch(void), retrieve(void), print_file(char *filename);
+    fetch(void), fetchsignals(void), retrieve(void), print_file(char *filename);
 
 int main(int argc, char **argv)
 {
@@ -124,6 +125,7 @@ int main(int argc, char **argv)
 	   acquired. */
 	setgvmode(WFDB_LOWRES);
 	ffreq = sampfreq(NULL);
+	if (ffreq <= 0.) ffreq = WFDB_DEFFREQ;
 	for (i = 0, tfreq = ffreq; i < nsig; i++)
 	    tfreq = approx_LCM(ffreq * s[i].spf, tfreq);
 
@@ -212,6 +214,37 @@ char *get_param_multiple(char *name)
     else return cgi_param_multiple(name);
 }
 
+/* Convert a string to a JSON quoted string.  Note that newlines and other
+control characters that cannot appear in JSON strings are converted to
+spaces. */
+char *strjson(char *s)
+{
+    char *js;
+    int i, imax, j, q;
+
+    /* Get the length of the input string and count the characters that must
+       be escaped in it. */
+    for (i = q = 0; s[i]; i++) {
+	if (s[i] == '"' || s[i] == '\\') q++;
+	else if (s[i] < ' ') s[i] = ' ';
+    }    
+    imax = i;
+
+    /* Allocate memory for the output string. */
+    SUALLOC(js, i+q+3, sizeof(char));
+
+    /* Wrap the input string with '"' characters and escape any '"' characters
+       embedded within it. */
+    js[0] = '"';
+    for (i = 0, j = 1; i < imax; i++, j++) {
+	if (s[i] == '"' || s[i] == '\\') js[j++] = '\\';
+	js[j] = s[i];
+    }
+    js[j++] = '"';
+    js[j] = '\0';
+    return (js);
+}
+
 void print_file(char *filename)
 {
     FILE *ifile = fopen(filename, "r");
@@ -231,7 +264,7 @@ void dblist(void)
         int first = 1;
         printf("{ \"database\": [\n");
 	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
-	    char *p;
+	    char *p, *name, *desc;
 
 	    for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
 		;
@@ -242,8 +275,12 @@ void dblist(void)
 	    p[strlen(p)-1] = '\0';
 	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    { \"name\": \"%s\",\n      \"desc\": \"%s\"\n    }",
-		   buf, p);
+	    name = strjson(buf);
+	    desc = strjson(p);
+	    printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
+		   name, desc);
+	    SFREE(desc);
+	    SFREE(name);
 	}
 	printf("\n  ]\n}\n");
 	wfdb_fclose(ifile);
@@ -254,6 +291,7 @@ void rlist(void)
 {
     sprintf(buf, "%s/RECORDS", db);
     if (ifile = wfdb_open(buf, NULL, WFDB_READ)) {
+	char *p;
         int first = 1;
 
         printf("{ \"record\": [\n");
@@ -261,7 +299,8 @@ void rlist(void)
 	    buf[strlen(buf)-1] = '\0';
 	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    \"%s\"", buf);
+	    printf("    %s", p = strjson(buf));
+	    SFREE(p);
 	}
 	printf("\n  ]\n}\n");
 	wfdb_fclose(ifile);
@@ -275,7 +314,7 @@ void alist(void)
         int first = 1;
         printf("{ \"annotator\": [\n");
 	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
-	    char *p;
+	    char *p, *name, *desc;
 
 	    for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
 		;
@@ -286,8 +325,12 @@ void alist(void)
 	    p[strlen(p)-1] = '\0';
 	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    { \"name\": \"%s\",\n      \"desc\": \"%s\"\n    }",
-		   buf, p);
+	    name = strjson(buf);
+	    desc = strjson(p);
+	    printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
+		   name, desc);
+	    SFREE(desc);
+	    SFREE(name);
 	}
 	printf("\n  ]\n}\n");
 	wfdb_fclose(ifile);
@@ -300,8 +343,8 @@ void info(void)
     int i;
 
     printf("{ \"info\":\n");
-    printf("  { \"db\": \"%s\",\n", db);
-    printf("    \"record\": \"%s\",\n", record);
+    printf("  { \"db\": %s,\n", p = strjson(db)); SFREE(p);
+    printf("    \"record\": %s,\n", p = strjson(record)); SFREE(p);
     printf("    \"tfreq\": %g,\n", tfreq);
     p = timstr(0);
     if (*p == '[') {
@@ -315,15 +358,17 @@ void info(void)
     p = mstimstr(strtim("e"));
     while (*p == ' ') p++;
     printf("    \"duration\": \"%s\"", p);
-    if (nsig > 0) printf(",\n    \"signal\": [\n", record);
+    if (nsig > 0) printf(",\n    \"signal\": [\n");
     for (i = 0; i < nsig; i++) {
-        printf("      { \"desc\": \"%s\",\n", s[i].desc);
+        printf("      { \"desc\": %s,\n", p = strjson(s[i].desc)); SFREE(p);
 	printf("        \"tps\": %g,\n", tfreq/(ffreq*s[i].spf));
-	if (s[i].units)
-	    printf("        \"units\": \"%s\",\n", s[i].units);
+	if (s[i].units) {
+	    printf("        \"units\": %s,\n", p = strjson(s[i].units));
+	    SFREE(p);
+	}
 	else
 	    printf("        \"units\": null,\n");
-	printf("        \"gain\": %g,\n", s[i].gain);
+	printf("        \"gain\": %g,\n", s[i].gain ? s[i].gain : WFDB_DEFGAIN);
 	printf("        \"adcres\": %d,\n", s[i].adcres);
 	printf("        \"adczero\": %d,\n", s[i].adczero);
 	printf("        \"baseline\": %d\n", s[i].baseline);
@@ -332,42 +377,41 @@ void info(void)
     printf("\n  }\n}\n");
 }
 
-void fetchannotations(void)
+int fetchannotations(void)
 {
     WFDB_Anninfo ai;
 
     ai.name = annotator;
     ai.stat = WFDB_READ;
-    if (annopen(recpath, &ai, 1) >= 0) {
+    if (annotator && annopen(recpath, &ai, 1) >= 0) {
+	char *p;
 	int first = 1;
 	WFDB_Annotation annot;
 
-	iannsettime(t0);
+	if (t0 > 0L) iannsettime(t0);
 	printf("\"annotation\": [\n");
 	while (getann(0, &annot) == 0 && annot.time < tf) {
 	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    { \"t\": \%ld,\n", annot.time);
-	    printf("      \"a\": \"%s\",\n", annstr(annot.anntyp));
+	    printf("    { \"t\": \%ld,\n", (long)(annot.time * tfreq / ffreq));
+	    printf("      \"a\": %s,\n", p = strjson(annstr(annot.anntyp)));
+	    SFREE(p);
 	    printf("      \"s\": %d,\n", annot.subtyp);
 	    printf("      \"c\": %d,\n", annot.chan);
 	    printf("      \"n\": %d,\n", annot.num);
-	    if (annot.aux) {
-		char *p = annot.aux + 1, *e = annot.aux + (*annot.aux);
-
-		printf("      \"x\": \"");
-		for ( ; p < e && isprint(*p); p++) {
-		    if (*p == '\"') printf("\\\"");
-		    else printf("%c", *p);
-		}
-		printf("\"");
+	    if (annot.aux && *(annot.aux)) {
+		printf("      \"x\": %s", p = strjson(annot.aux+1));
+		SFREE(p);
 	    }
 	    else
 		printf("      \"x\": null");
 	    printf("\n    }");
 	}
 	printf("\n  ]\n");	    
+	return (1);
     }
+    else
+	return (0);  /* no output:  annotation file could not be opened */
 }
 
 void fetchsignals(void)
@@ -375,6 +419,9 @@ void fetchsignals(void)
     int first = 1, framelen, i, imax, imin, j, *m, *mp, n;
     WFDB_Sample **sb, **sp, *sbo, *spo, *v;
     WFDB_Time t;
+
+    /* Do nothing unless one or more signals were requested. */ 
+    if (nosig < 1) return;
 
     /* Allocate buffers and buffer pointers for each selected signal. */
     SUALLOC(sb, nsig, sizeof(WFDB_Sample *));
@@ -406,15 +453,22 @@ void fetchsignals(void)
     printf("\"signal\": [\n");  
     for (n = 0; n < nsig; n++) {
 	if (sigmap[n] >= 0) {
+	    char *p;
 	    int delta, prev; 
+
  	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    { \"name\": \"%s\",\n", s[n].desc);
-	    printf("      \"units\": \"%s\",\n",
-		   s[n].units ? s[n].units : "mV [assumed]");
+	    printf("    { \"name\": %s,\n", p = strjson(s[n].desc)); SFREE(p);
+	    if (s[n].units) {
+		printf("      \"units\": %s,\n", p = strjson(s[n].units));
+		SFREE(p);
+	    }
+	    else
+		printf("      \"units\": \"mV [assumed]\",\n");
 	    printf("      \"t0\": %ld,\n", (long)t0);
 	    printf("      \"tf\": %ld,\n", (long)tf);
-	    printf("      \"gain\": %g,\n", s[n].gain);
+	    printf("      \"gain\": %g,\n",
+		   s[n].gain ? s[n].gain : WFDB_DEFGAIN);
 	    printf("      \"base\": %d,\n", s[n].baseline);
 	    printf("      \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
 	    printf("      \"samp\": [ ");
@@ -432,10 +486,8 @@ void fetchsignals(void)
 void fetch(void)
 {
     printf("{ \"fetch\": {\n");
-    if (annotator) {
-	fetchannotations();
-	if (nosig) printf(",\n");
-    }
-    if (nosig) fetchsignals();
+    if (fetchannotations() && nosig)
+	printf(",\n");
+    fetchsignals();
     printf("  }\n}\n");
 }
