@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	11 December 2012  version 0.06
+			Last revised:	13 December 2012  version 0.08
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.
 
@@ -19,7 +19,7 @@ low-latency interaction with the user).
 <html>
 <head>
 <meta http-equiv='content-type' content='text/html; charset=utf-8'>
-<title>LightWAVE</title>
+<title>LightWAVE 0.08</title>
 <link rel="stylesheet" href="/lightwave/lightwave.css">
 <script src="/js/jquery.min.js"></script>
 <script src="/js/lightwave.js"></script>
@@ -27,7 +27,7 @@ low-latency interaction with the user).
 </head>
 <body bgcolor='#fff'>
 
-<h1>LightWAVE</h1>
+<h1>LightWAVE 0.08</h1>
 
 <noscript>
 <p>LightWAVE requires a Javascript-enabled browser.
@@ -36,10 +36,8 @@ provides some of the functions of LightWAVE without Javascript.
 </noscript>
 
 <div class="js">
-<b>Select the data to be retrieved</b>
 
 <form action="/cgi-bin/lightwave" id="lwform" method="get">
-
 <p>
 <table>
   <tr id="dblist"><td colspan=2>Loading list of databases ...</td></tr>
@@ -57,15 +55,17 @@ provides some of the functions of LightWAVE without Javascript.
   <tr id="duration"><td align=right>Duration:</td>
     <td><select name="dt">
 	<option value="1">1 second</option>
-	<option value="10">10 seconds</option>
+	<option value="10" selected>10 seconds</option>
         <option value="60">1 minute</option>
   </select></td></tr>
 
   <tr><td>&nbsp;</td></tr>
   <tr id="buttons">
     <td colspan=2 valign=bottom align=center>
+      <button id="rev" title="previous window">&lt;</button>&nbsp;
+      <button id="ftext">Text</button>&nbsp;
       <button id="fplot">Plot</button>&nbsp;
-      <button id="ftext">Text</button></td>
+      <button id="fwd" title="next window">&gt;</button></td>
   </tr>
 </table>
 </form>

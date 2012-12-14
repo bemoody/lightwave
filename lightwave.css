@@ -1,6 +1,8 @@
 /* file: lightwave.css	G. Moody	18 November 2012
 */
 
+body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+       color: #444; font-size: 100%; background: #fff; margin: 0 1em; }
 .container { border:2px solid #ccc; width:300px; height: 100px;
              overflow-y: scroll; }
 .signalwindow { width: 90%; height: 90%; border: 3px solid grey; margin: 3%; }

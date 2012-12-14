@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	12 December 2012  version 0.07
+			Last revised:	13 December 2012  version 0.08
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -60,9 +60,9 @@ WFDB_Time t0, tf, dt;
 
 char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
-int fetchannotations(void);
+int fetchannotations(void), fetchsignals(void);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
-    fetch(void), fetchsignals(void), retrieve(void), print_file(char *filename);
+    fetch(void), print_file(char *filename);
 
 int main(int argc, char **argv)
 {
@@ -103,8 +103,8 @@ int main(int argc, char **argv)
         exit(0);	/* early exit if no record chosen */
 
     else {
-      // FIXME: uncomment the next line to work around a WFDB library bug
-      //   setwfdb("/usr/local/database");
+	// FIXME: uncomment the next line to work around a WFDB library bug
+	//   setwfdb("/usr/local/database");
         SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
         sprintf(recpath, "%s/%s", db, record);
 
@@ -383,17 +383,23 @@ int fetchannotations(void)
 
     ai.name = annotator;
     ai.stat = WFDB_READ;
+ 
+    setgvmode(WFDB_HIGHRES);
     if (annotator && annopen(recpath, &ai, 1) >= 0) {
 	char *p;
 	int first = 1;
 	WFDB_Annotation annot;
 
+	if (tfreq != ffreq) {
+	    t0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
+	    tf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
+	}
 	if (t0 > 0L) iannsettime(t0);
 	printf("\"annotation\": [\n");
 	while (getann(0, &annot) == 0 && annot.time < tf) {
 	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    { \"t\": \%ld,\n", (long)(annot.time * tfreq / ffreq));
+	    printf("    { \"t\": %ld,\n", (long)(annot.time));
 	    printf("      \"a\": %s,\n", p = strjson(annstr(annot.anntyp)));
 	    SFREE(p);
 	    printf("      \"s\": %d,\n", annot.subtyp);
@@ -414,14 +420,18 @@ int fetchannotations(void)
 	return (0);  /* no output:  annotation file could not be opened */
 }
 
-void fetchsignals(void)
+int fetchsignals(void)
 {
     int first = 1, framelen, i, imax, imin, j, *m, *mp, n;
+    WFDB_Calinfo cal;
     WFDB_Sample **sb, **sp, *sbo, *spo, *v;
     WFDB_Time t;
 
     /* Do nothing unless one or more signals were requested. */ 
-    if (nosig < 1) return;
+    if (nosig < 1) return (0);	/* no output */
+
+    /* Open the signal calibration database. */
+    (void)calopen("wfdbcal");
 
     /* Allocate buffers and buffer pointers for each selected signal. */
     SUALLOC(sb, nsig, sizeof(WFDB_Sample *));
@@ -471,6 +481,10 @@ void fetchsignals(void)
 		   s[n].gain ? s[n].gain : WFDB_DEFGAIN);
 	    printf("      \"base\": %d,\n", s[n].baseline);
 	    printf("      \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
+	    if (getcal(s[n].desc, s[n].units, &cal) == 0)
+		printf("      \"scale\": %g,\n", cal.scale);
+	    else
+		printf("      \"scale\": 1,\n");
 	    printf("      \"samp\": [ ");
 	    for (sbo = sb[n], prev = 0, spo = sp[n]-1; sbo < spo; sbo++) {
 		delta = *sbo - prev;
@@ -481,13 +495,15 @@ void fetchsignals(void)
 	}
     }
     printf("\n    ]\n");
+    flushcal();
+    return (1);	/* output was written */
 }
 
 void fetch(void)
 {
     printf("{ \"fetch\": {\n");
-    if (fetchannotations() && nosig)
+    if (fetchsignals() && annotator)
 	printf(",\n");
-    fetchsignals();
+    fetchannotations();
     printf("  }\n}\n");
 }

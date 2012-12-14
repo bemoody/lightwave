@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	12 December 2012  version 0.07
+//			Last revised:	13 December 2012  version 0.08
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -47,8 +47,8 @@ var dpi_x, dpi_y;
 function getdpi() {
     dpi_x = document.getElementById('calibrate-display').offsetWidth;
     dpi_y = document.getElementById('calibrate-display').offsetHeight;
-    alert('Display resolution: ' + dpi_x + ' dpi (horizontal) by ' + dpi_y +
-	  ' dpi (vertical)');
+//    alert('Display resolution: ' + dpi_x + ' dpi (horizontal) by ' + dpi_y +
+//	  ' dpi (vertical)');
 }
 
 // Convert argument (in samples) to a string in HH:MM:SS.mmm format.
@@ -99,8 +99,14 @@ function fetch() {
     $('[name=signal]').each(function() {
 	if (this.checked) { url += '&signal=' + $(this).val(); }
     });
+    title = 'LightWAVE: ' + db + '/' + record;
     annotator = $('[name=annotator]').val();
-    if (annotator) { url += '&annotator=' + annotator; }
+    if (annotator) {
+	url += '&annotator=' + annotator;
+	title += '(' + annotator + ')';
+    }
+    $('title').text(title);
+
     t0 = $('[name=t0]').val();
     if (t0) { url += '&t0=' + t0; }
     dt = $('[name=dt]').val();
@@ -182,12 +188,12 @@ function fetch() {
 	    $('#plotdata').show();
 	    svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
 		+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
-		+ ' width="100%" height="100%" viewBox="0 0 1000 400"'
+		+ ' width="100%" height="100%" viewBox="0 0 1000 500"'
 		+ ' preserveAspectRatio="xMidYMid meet">\n';
 	    svg += '<defs>\n'
-		+ ' <pattern id="gridPattern" width="10" height="10"'
+		+ ' <pattern id="gridPattern" width="20" height="20"'
 		+ ' patternUnits="userSpaceOnUse">\n'
-		+ ' <path d="M10,0 H0 V10" fill="none" stroke="gray"'
+		+ ' <path d="M20,0 H0 V20" fill="none" stroke="gray"'
 		+ ' stroke-width=".5"/>\n</pattern>\n';
 	    svg += '</defs>\n';
 
@@ -195,46 +201,59 @@ function fetch() {
 	    svg += '<rect id="grid" width="100%" height="100%" stroke="gray"'
 		+ ' stroke-width=".5" fill="url(#gridPattern)" />\n'; 
 
-	    // signals
-	    if (sig) {
-		svg += '<path stroke="blue" stroke-width="1" fill="none" d="';
-		for (j = 0; j < sig.length; j++) {
-		    v = Math.round((sig[j].samp[0]-sig[j].base)*10/
-				   sig[j].gain + 50*(j+1));
-		    svg += 'M0,' + v + ' L';
-		    for (t = ts0 + 1, i = 1; t < tsf; i++, t++) {
-			if (t%(sig[j].tps) == 0) {
-			    v = Math.round((sig[j].samp[i/sig[j].tps]
-					    -sig[j].base)*(-10/sig[j].gain)
-					   + 50*(j+1));
-			    svg += ' ' + i/4 + ',' + v;
-			}
-		    }
-		}
-		svg += '" />\n';
-	    }
-
 	    // annotations
 	    if (ann) {
 		for (i = 0; i < ann.length; i++) {
-		    x = Math.round((ann[i].t - ts0)/4);
+		    x = Math.round((ann[i].t - ts0)*100/tfreq);
 		    if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
-			if (ann[i].a == '+') y = 180;
-			else y = 220;
+			if (ann[i].a == '+') y = 220;
+			else y = 180;
 			txt = '' + ann[i].x;
 		    }
 		    else {
 			y = 200;
 			txt = ann[i].a;
 		    }
-		    svg += '<text x="' + x + '" y="' + y + '" fill="green">'
+		    y1 = y - 15;
+		    svg += '<path stroke="green" stroke-width="1" fill="none"'
+			+ ' d="M' + x + ',10 V' + y1 + ' m0,30 V475" />\n'
+			+ '<text x="' + x + '" y="' + y + '" fill="green">'
 			+ txt + '</text>\n'; 
 		}
+	    }
+	    // signals
+	    if (sig) {
+		svg += '<path stroke="blue" stroke-width="1" fill="none" d="';
+		for (j = 0; j < sig.length; j++) {
+		    s = sig[j];
+		    g = (-40/(s.scale*s.gain));
+		    zero = s.base*g - 480*(1+j)/(1+sig.length);
+		    v = Math.round(g*s.samp[0] - zero);
+		    svg += 'M0,' + v + ' L';
+		    for (t = ts0 + 1, i = 1; t < tsf; i++, t++) {
+			if (t%(s.tps) == 0) {
+			    v = Math.round(g*s.samp[i/s.tps] - zero);
+			    svg += ' ' + i*100/tfreq + ',' + v;
+			}
+		    }
+		}
+		svg += '" />\n';
+	    }
+
+	    // timestamps
+	    t = ts0;
+	    tickint = Math.round(dt/5);
+	    for (x = 1; x < 1000; x += 200) {
+		svg += '<path stroke="black" stroke-width="1" d="M'
+		    + x + ',480 l 0,20" />\n';
+		svg += '<text x="' + (x+2)
+		    + '" y="500" font-size="10" fill="black"> '
+		    + timstr(t) + '</text>\n';
+		t += tickint*tfreq;
 	    }
 
 	    svg += '</svg>\n';
 	    $('#plotdata').html(svg);
-	    //	    $('.s000').attr('d', svg000);
 	}
     });
 };
@@ -248,6 +267,24 @@ function fetch_plot() {
 function fetch_text() {
     out_format = 'text';
     fetch();
+}
+
+function gofwd() {
+    t0 = $('[name=t0]').val();
+    dt = $('[name=dt]').val();
+    t = Number(t0) + Number(dt);
+    t0 = $('[name=t0]').val(t);
+    fetch();
+}
+
+function gorev() {
+    t0 = $('[name=t0]').val();
+    if (t0 > 0) {
+	dt = $('[name=dt]').val();
+	t = Number(t0) - Number(dt);
+	t0 = $('[name=t0]').val(t);
+	fetch();
+    }
 }
 
 // Load the list of signals for the selected record and show them with
@@ -349,5 +386,7 @@ $(document).ready(function(){
     $('#lwform').on("submit", false);      // disable form submission
     $('#fplot').on("click", fetch_plot);   // get data and plot them
     $('#ftext').on("click", fetch_text);   // get data and print them
+    $('#fwd').on("click", gofwd);	   // advance by dt and plot or print
+    $('#rev').on("click", gorev);	   // go back by dt and plot or print
     getdpi();
 });
