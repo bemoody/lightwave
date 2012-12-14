@@ -102,9 +102,9 @@ lightwave:	lightwave.c
 	$(CC) $(CFLAGS) lightwave.c -o lightwave $(LDFLAGS)
 
 # Install the lightwave HTML and CSS files.
-$(LWDIR)/index.shtml:	lightwave.shtml lightwave.css about.shtml
+$(LWDIR)/index.shtml:	lightwave.shtml lightwave.css about.shtml about.html
 	mkdir -p $(LWDIR)
-	cp about.shtml lightwave.css $(LWDIR)
+	cp about.shtml about.html lightwave.css $(LWDIR)
 	cp lightwave.shtml $(LWDIR)/index.shtml
 
 # Install lightwave's Javascript code.

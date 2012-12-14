@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	13 December 2012  version 0.08
+			Last revised:	14 December 2012  version 0.09
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.
 
@@ -19,7 +19,7 @@ low-latency interaction with the user).
 <html>
 <head>
 <meta http-equiv='content-type' content='text/html; charset=utf-8'>
-<title>LightWAVE 0.08</title>
+<title>LightWAVE 0.09</title>
 <link rel="stylesheet" href="/lightwave/lightwave.css">
 <script src="/js/jquery.min.js"></script>
 <script src="/js/lightwave.js"></script>
@@ -27,7 +27,7 @@ low-latency interaction with the user).
 </head>
 <body bgcolor='#fff'>
 
-<h1>LightWAVE 0.08</h1>
+<h1>LightWAVE 0.09</h1>
 
 <noscript>
 <p>LightWAVE requires a Javascript-enabled browser.
@@ -38,6 +38,7 @@ provides some of the functions of LightWAVE without Javascript.
 <div class="js">
 
 <form action="/cgi-bin/lightwave" id="lwform" method="get">
+
 <p>
 <table>
   <tr id="dblist"><td colspan=2>Loading list of databases ...</td></tr>
@@ -61,7 +62,8 @@ provides some of the functions of LightWAVE without Javascript.
 
   <tr><td>&nbsp;</td></tr>
   <tr id="buttons">
-    <td colspan=2 valign=bottom align=center>
+    <td valign=bottom><button id="helpbutton">Help</button></td>
+    <td valign=bottom align=center>
       <button id="rev" title="previous window">&lt;</button>&nbsp;
       <button id="ftext">Text</button>&nbsp;
       <button id="fplot">Plot</button>&nbsp;
@@ -72,11 +74,24 @@ provides some of the functions of LightWAVE without Javascript.
 
 <p>
 <hr>
+
+<div id="help" hidden>
+<iframe id="helpframe" src="" width="100%" height="300"></iframe>
+</div>
+
 <div id="textdata">
 </div>
 
 <div id="plotdata">
 </div>
+<!--[if lt IE 9]>
+<p>
+MSIE versions 8 and earlier do not support SVG graphics.  You may be able
+to use them to view LightWAVE's graphics if you install an SVG plugin, but
+this has not been tested.  Please let me know how you did it if you find
+a solution that works.  Browsers such as Chrome, Firefox, Opera,
+Safari, and MSIE 9+ have built-in support for SVG and work well with LightWAVE.
+<![endif]-->
 
 <div id="info">
 </div>
