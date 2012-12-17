@@ -1,0 +1,454 @@
+<h2>The LightWAVE Server Protocol</h2>
+
+<p>
+LightWAVE is a lightweight waveform and annotation viewer and editor.  The
+LightWAVE client runs within the user's web browser, communicating with the
+LightWAVE server, <tt>lightwave</tt>, to obtain raw data that the client
+formats and presents to the user.  This technical note describes the protocol
+used for communicating with <tt>lightwave</tt>.  It will be of interest to
+developers wishing to create custom clients and standalone applications that
+make use of <tt>lightwave</tt>.
+
+<p style="color: red">
+This note describes only the parts of the protocol that have been
+implemented to date.  At this time, LightWAVE's annotation editing capabilities
+have not yet been implemented, so this note does not describe any mechanism
+for a client to transmit annotations to the LightWAVE server;  extensions
+to support this function will be described in a future revision of this
+note.</p>
+
+<p>
+The LightWAVE server returns data in <a href="http://www.json.org/">JSON</a>
+format in response to well-formed requests from any client (not limited to the
+standard LightWAVE client). A public server is available at
+<a href="http://physionet.org/cgi-bin/lightwave">http://physionet.org/cgi-bin/lightwave</a>;
+it provides access to all of the 
+<a href="http://physionet.org/faq.shtml#physiobank-formats">WFDB-compatible</a>
+content in <a href="http://physionet.org/physiobank/database">PhysioBank</a>.
+
+<p>
+The C-language source code for the server is available from the 
+<a href="https://physionet.org/works/LightWAVE">LightWAVE</a>
+project on PhysioNetWorks (free registration and login required).  The
+server can be installed as a
+<a href="http://en.wikipedia.org/wiki/Common_Gateway_Interface">CGI</a>
+application on a web server such
+as <a href="http://httpd.apache.org/">Apache</a>, or it can be run as a
+command-line application.  For information about installing the
+server, see the comments in the <tt>Makefile</tt> for the LightWAVE project.
+
+<p>
+Note that <tt>lightwave</tt> is not limited to serving data hosted by
+the machine on which it's running, since it reads the data using
+the <a href="http://physionet.org/physiotools/wfdb.shtml">WFDB
+library</a>, allowing it to fetch data from other web servers as
+needed.  A standard installation of <tt>lightwave</tt> retrieves data
+from the server's local storage if available, or from PhysioNet otherwise.
+
+<h3>Requests</h3>
+
+<p>
+When accessed via HTTP, requests are passed to <tt>lightwave</tt> in
+<a href="http://en.wikipedia.org/wiki/Query_string">URL query
+strings</a>, as for other CGI applications.  For example,
+the <tt>dblist</tt> request can be sent to the public server by
+opening
+<pre>
+    http://physionet.org/cgi-bin/<tt>lightwave</tt>?action=dblist
+</pre>
+with an HTTP client such as <tt>curl</tt>, <tt>wget</tt>, or any web browser.
+More interesting examples appear below.
+
+<p> To use <tt>lightwave</tt> as a command-line application, copy it into a
+directory in your <a
+href="http://en.wikipedia.org/wiki/PATH_%28variable%29">PATH</a>, then supply
+an argument when you run it.  Any argument is acceptable, so these commands are
+all equivalent:
+
+<pre>
+     lightwave -i
+     lightwave hello
+     lightwave I-want-a-pizza-to-go-with-no-anchovies
+</pre>
+
+In command-line mode, <tt>lightwave</tt> prompts for parameters as needed,
+beginning with <tt>action</tt> (see below).  Type the value of each parameter,
+ending your answer with a newline (press 'Enter').  For parameters that can
+have multiple values (such as <tt>signal</tt>, see below) you will given
+multiple prompts; enter one value at each prompt, and indicate the end of the
+set of values by entering a newline only.
+
+<p>
+To use <tt>lightwave</tt> within a script, make an interactive test run and
+keep track of what you need to type in response to <tt>lightwave</tt>'s
+prompts in order to obtain the data your script will require.  Then create a
+plain text file containing your responses in the correct order, and use your
+script to supply the contents of this file to <tt>lightwave</tt> via its
+standard input; see the
+<tt>lw-test</tt> script in the source directory for an example.
+
+<p>
+<b>Parameters</b>
+
+<p>
+When interacting with <tt>lightwave</tt>, the <tt>action</tt> parameter
+(see the next section) specifies the request type.  Depending on the
+<tt>action</tt>, one or more of these parameters may be needed to specify the
+data of interest:
+
+<dl>
+<dt>db</dt>
+<dd>The (short form) name of the data collection (database), such as
+<tt>edb</tt> (the short form name for the European ST-T Database).
+Short form names of all of the PhysioBank databases are given in the
+first column of
+<a href="http://physionet.org/physiobank/database/DBS">http://physionet.org/physiobank/database/DBS</a>.
+</dd>
+
+<dt>record</dt>
+<dd>The record name.</dd>
+
+<dt>signal</dt>
+<dd>A signal number.  Signals are numbered 0, 1, 2 ... in each record.</dd>
+
+<dt>annotator</dt>
+<dd>An annotator name.</dd>
+
+<dt>t0</dt>
+<dd>The starting time (the time interval from the beginning of the record to
+the first sample or annotation of interest).  The value of this parameter can
+be given in seconds, or as a string in H:M:S format.  For records longer than
+24 hours, the string may be written as DdH:M:S, where D is the number of days.
+Examples: 100 (1 minute 40 seconds); 30:25 (30 minutes 25 seconds); 10:15:20
+(10 hours 15 minutes 20 seconds); 3d02:01:00 (3 days 2 hours 1 minute).</dd>
+
+<dt>dt</dt>
+<dd>The duration of the time interval of interest.  As for t0, this parameter
+can be given in seconds or as a string.  Avoid specifying a duration longer
+than 1 minute, however, when using the public <tt>lightwave</tt> server.</dd>
+</dl>
+
+<p>
+<b>Request types</b>
+
+<p>
+The request type is passed as the value of <tt>action</tt>, and must be
+one of:
+
+<dl>
+<dt>dblist</dt>
+<dd>Get the list of databases (data collections).  Any other parameters
+passed in the same request are ignored.
+</dd>
+
+<dt>rlist</dt>
+<dd>Get the list of records within a database specified by the <tt>db</tt>
+parameter.</dd>
+
+<dt>alist</dt>
+<dd>Get the list of annotators within a database specified by the <tt>db</tt>
+parameter.</dd>
+
+<dt>info</dt>
+<dd>Get the metadata, including signal names, gains, and sampling
+frequencies, for a record specified by the <tt>db</tt> and <tt>record</tt>
+parameters.</dd>
+
+<dt>fetch</dt> <dd>Retrieve data from a record specified by the
+<tt>db</tt> and <tt>record</tt> parameters.  Specify the signal(s) and
+annotator(s) of interest using the <tt>signal</tt> and
+<tt>annotator</tt> parameters, and specify the time interval of
+interest using the <tt>t0</tt> (starting time) parameter and the
+<tt>dt</tt> (duration) parameter.
+
+<p style="color: red">
+In the current version, at most one <tt>annotator</tt> may be specified;
+the second, third, etc. <tt>annotator</tt>s are ignored.</p>
+
+</dd>
+</dl>
+
+<b>Examples of requests</b>
+
+<ul>
+
+<li>To request the list of databases available via the public
+<tt>lightwave</tt> server, use the URL
+
+<pre>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=dblist">http://physionet.org/cgi-bin/lightwave?action=dblist</a>
+</pre>
+The server responds with
+<pre>
+{ "database": [
+    { "name": "adfecgdb",
+      "desc": "Abdominal and Direct Fetal ECG Database"
+    },
+    { "name": "aftdb",
+      "desc": "AF Termination Challenge Database"
+    },
+    { "name": "aami-ec13",
+      "desc": "ANSI/AAMI EC13 Test Waveforms"
+    },
+    <div style="color: blue"><em>... {more databases} ...</em></div>
+    { "name": "ucddb",
+      "desc": "UCD Sleep Apnea Database"
+    },
+    { "name": "mimic2db",
+      "desc": "MIMIC II Waveform DB, v2 [deprecated, use v3]"
+    },
+    { "name": "mimic2db/numerics",
+      "desc": "MIMIC II Waveform DB, v2 Numerics [deprecated, use v3]"
+    }
+  ]
+}
+</pre>
+<p>The <tt>name</tt> fields are the short-format names that can be used as
+values of the <tt>db</tt> parameter.</p>
+
+<li> To request the list of records in the MIT-BIH Arrhythmia Database from the
+public <tt>lightwave</tt> server, use the URL
+
+<pre>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=rlist&db=mitdb">http://physionet.org/cgi-bin/lightwave?action=rlist&amp;db=mitdb</a>
+</pre>
+The server responds with
+<pre>
+{ "record": [
+    "100",
+    "101",
+    <div style="color: blue"><em>... {more records} ...</em></div>
+    "233",
+    "234"
+  ]
+}
+</pre>
+
+<li>To request the list of annotators in the QT Database from the public
+<tt>lightwave</tt> server, use the URL
+
+<pre>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=alist&db=qtdb">http://physionet.org/cgi-bin/lightwave?action=alist&amp;db=qtdb</a>
+</pre>
+The server responds with
+<pre>
+{ "annotator": [
+    { "name": "atr",
+      "desc": "reference beat annotations"
+    },
+    { "name": "man",
+      "desc": "reference beat annotations for selected beats only"
+    },
+    <div style="color: blue"><em>... {more annotators} ...</em></div>
+    { "name": "pu0",
+      "desc": "automatically determined boundaries (based on signal 0 only)"
+    },
+    { "name": "pu1",
+      "desc": "automatically determined boundaries (based on signal 1 only)"
+    }
+  ]
+}
+</pre>
+
+<p>The <tt>name</tt> fields can be used as values of the <tt>annotator</tt>
+parameter.</p>
+
+<li>To request the metadata for record <tt>slp67x</tt> of the MIT-BIH
+Polysomnographic Database, use the URL
+
+<pre>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=info&db=slpdb&record=slp67x">http://physionet.org/cgi-bin/lightwave?action=info&amp;db=slpdb&amp;record=slp67x</a>
+</pre>
+The server responds with
+<pre>
+{ "info":
+  { "db": "slpdb",
+    "record": "slp67x",
+    "tfreq": 250,
+    "start": "[01:06:00.000]",
+    "end": "[02:23:00.000]",
+    "duration": "1:17:00.000",
+    "signal": [
+      { "desc": "ECG",
+        "tps": 1,
+        "units": null,
+        "gain": 500,
+        "adcres": 12,
+        "adczero": 0,
+        "baseline": 0
+      },
+      { "desc": "BP",
+        "tps": 1,
+        "units": "mmHg",
+        "gain": 7.72857,
+        "adcres": 12,
+        "adczero": 0,
+        "baseline": -1147
+      },
+    <div style="color: blue"><em>... {more signals} ...</em></div>
+      { "desc": "SO2",
+        "tps": 1,
+        "units": "%",
+        "gain": 17.5,
+        "adcres": 12,
+        "adczero": 0,
+        "baseline": -808
+      }
+    ]
+  }
+}
+</pre>
+
+<p>The <tt>treq</tt> field indicates the number of clock ticks per second,
+which is the least common multiple of the sampling frequency of the signals
+included in the record.  In most records, all signals are sampled at
+<tt>tfreq</tt>, and the <tt>tps</tt> (ticks per sample) field is 1 for each
+signal.  In multifrequency records, including most EDF-format records, one or
+more signals is sampled at a lower frequency, and <tt>tps</tt> is greater than
+1 for these signals.</p>
+
+<p>If the <tt>start</tt> and <tt>end</tt> times are bracketed, as in the example
+above, they indicate the times of day when the recording began and ended.  For
+many recordings, this information is unavailable, and in such cases
+<tt>start</tt> and <tt>end</tt> are <tt>null</tt>.</p>
+
+<p>The <tt>units</tt> field is a string that indicates the physical units of
+the signal, if known (or <tt>null</tt> if unknown).  The <tt>base</tt> is the
+value (in raw units) that corresponds to 0 physical units, and the <tt>gain</tt>
+is the number of raw units per physical units.  (See the next example.)
+
+<p>The <tt>adcres</tt> and <tt>adczero</tt> fields specify the number of significant bits per sample (the analog-to-digital converter resolution) and the
+center of the range (typically zero except for offset binary converters).
+
+<p style="color: red">For consistency, the <tt>desc</tt> field of the
+<tt>signal</tt> object will become <tt>name</tt> in a future revision.</p>
+
+<li>To request samples of signals 0, 3, and 4, and annotator <tt>ari</tt>
+from record mgh015 of the MGH/MF Waveform Database, for a 10-second interval
+starting 30 minutes after the beginning of the record, use the URL
+
+<pre>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=fetch&db=mghdb&record=mgh015&signal=0&signal=3&signal=4&annotator=ari&t0=30:0&dt=10">http://physionet.org/cgi-bin/lightwave?action=fetch&amp;db=mghdb&amp;record=mgh015&amp;signal=0&amp;signal=3&amp;signal=4&amp;annotator=ari&amp;t0=30:0&amp;dt=10</a>
+</pre>
+The server responds with
+<pre>
+{ "fetch": {
+"signal": [
+    { "name": "ECG Lead I",
+      "units": "mV",
+      "t0": 648000,
+      "tf": 651600,
+      "gain": 1185,
+      "base": -100,
+      "tps": 1,
+      "scale": 1,
+      "samp": [ -323,18,12,-10,-24,-14,8, <span style="color: blue"><em>... {more samples} ...</em></span> -22,-10,8 ] },
+    { "name": "ART ",
+      "units": "mmHg",
+      "t0": 648000,
+      "tf": 651600,
+      "gain": 12.03,
+      "base": -1282,
+      "tps": 1,
+      "scale": 50,
+      "samp": [ 96,-36,-35,-33,-34,-35,-35, <span style="color: blue"><em>... {more samples} ...</em></span> -1,1,0 ] },
+    { "name": "PAP",
+      "units": "mmHg",
+      "t0": 648000,
+      "tf": 651600,
+      "gain": 30.42,
+      "base": -1150,
+      "tps": 1,
+      "scale": 25,
+      "samp": [ -717,-19,-16,-12,-11,-11,-8, <span style="color: blue"><em>... {more samples} ...</em></span> -3,-1,1 ] }
+    ]
+,
+"annotation": [
+    { "t": 648127,
+      "a": "N",
+      "s": 0,
+      "c": 0,
+      "n": 0,
+      "x": "DATA OFF"
+    },
+    { "t": 648357,
+      "a": "N",
+      "s": 0,
+      "c": 0,
+      "n": 0,
+      "x": "DATA OFF"
+    },
+    { "t": 648574,
+      "a": "N",
+      "s": 0,
+      "c": 0,
+      "n": 0,
+      "x": "DATA OFF"
+    },
+    <div style="color: blue"><em>... {more annotations} ...</em></div>
+    { "t": 651253,
+      "a": "N",
+      "s": 0,
+      "c": 0,
+      "n": 0,
+      "x": "DATA OFF"
+    }
+  ]
+  }
+}
+</pre>
+
+<p>The arrays of <tt>signal</tt> and <tt>annotation</tt> objects will be
+omitted if no signals or annotators are requested.
+
+<p style="color: red">In order to support multiple annotators, the
+<tt>annotation</tt> objects will be nested within <tt>annotator</tt>
+objects in a future revision.</p>
+
+<p>In the <tt>signal</tt> objects, the <tt>units</tt>, <tt>gain</tt>,
+<tt>base</tt>, and <tt>tps</tt> fields are as described in the previous
+example, and the <tt>name</tt> field matches the <tt>desc</tt> field in
+the previous example.  The <tt>t0</tt> and <tt>tf</tt> fields indicate
+the sequence number of the first sample in the <tt>samp</tt> array and
+the sequence number of the sample that follows the last sample in the
+array;  sequence numbers begin with 0.  The <tt>scale</tt> field indicates
+the conventional display scale for the signal in physical units per cm.
+The first element of each <tt>samp</tt> array is the amplitude of sample
+<tt>t0</tt> of the signal in raw units;  the remaining elements are the
+first differences (i.e., the amplitude of sample <tt>t0</tt>+<em>n</em> is
+the sum of the first <em>n+1</em> elements).
+
+<blockquote> <em>In the example above, the first few elements of the second
+<tt>samp</tt> array are 96, -36, -35, and -33.  The reconstructed raw samples
+are 96, 60 (96 - 36), 25 (60 -35), and -8 (25 - 33).  To convert these raw
+amplitudes into arterial blood pressure ("ART") measurements in physical units
+("mmHg"), subtract the <tt>base</tt> (-1282) and multiply by the <tt>gain</tt>
+(12.03) to get 114.55 ([96-(-1282)]*12.03), 111.55 ([60-(-1282)]*1203), 108.65
+([25-(-1282)]*12.03), and 105.90 ([(-8)-(-1282)]*12.03).
+
+<p>To determine the times of these samples, first note that the requested start
+time (30 minutes following the start of the record) matches <tt>t0</tt>
+(648000), and that <tt>tps</tt> is 1 for the ART signal (as it is for the other
+signals); thus the sampling frequency of the ART signal is 648000/(30*60), or
+360 samples per second, and the times of the four samples are 30:00, 30:00.002,
+30:00.005, and 30:00.008 (to the nearest millisecond).</em> </blockquote>
+
+<p>Although the use of raw
+amplitude units and sampling intervals requires a modest amount of computation
+by the client to recover physical units, data in raw units can be transmitted 2
+to 5 times faster than data in scaled units and, more significantly, this
+method does not introduce floating-point errors that may accumulate in
+client-side digital signal processing such as filtering and power spectral
+analysis.
+
+<p> In the <tt>annotation</tt> objects, the <tt>t</tt>, <tt>a</tt>, <tt>s</tt>,
+<tt>c</tt>, <tt>n</tt>, and <tt>x</tt> fields are the time, annotation type
+(mnemonic), subtype, "chan", "num", and "aux" fields of the WFDB annotation
+structures.  See the section titled <em>Annotation Structures</em> in the <a
+href="http://physionet.org/physiotools/wpg/">WFDB Programmer's Guide</a> for
+definitions of these fields.  The standard annotation type mnemonics are
+defined in <a
+href="http://physionet.org/physiobank/annotations.shtml">PhysioBank
+Annotations</a>.
+
+</ul>
