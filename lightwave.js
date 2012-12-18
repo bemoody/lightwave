@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	14 December 2012  version 0.09
+//			Last revised:	18 December 2012  version 0.11
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -111,7 +111,7 @@ function fetch() {
 	    $('#plotdata').hide();
 	    return;
 	}
-	ann = data.fetch.annotation;
+	ann = data.fetch.annotator[0].annotation;
 	sig = data.fetch.signal;
 	if (sig) {
 	    var i, j, len, p, v;
@@ -183,17 +183,8 @@ function fetch() {
 		+ ' width="' + width + '" height="' + height
 		+ '" viewBox="0 0 10001 5001"'
 		+ ' preserveAspectRatio="xMidYMid meet">\n';
-	    svg += '<defs>\n'
-		+ ' <pattern id="gridPattern" width="20" height="20"'
-		+ ' patternUnits="userSpaceOnUse">\n'
-		+ ' <path d="M20,0 H0 V20" fill="none" stroke="gray"'
-		+ ' stroke-width="5"/>\n</pattern>\n';
-	    svg += '</defs>\n';
 
 	    // background grid
-//	    svg += '<rect id="grid" width="100%" height="100%" stroke="gray"'
-//		+ ' stroke-width=".5" fill="url(#gridPattern)" />\n'; 
-
 	    svg += '<path stroke="rgb(200,200,240)" stroke-width="4"'
 		+ 'd="M1,1 ';
 	    for (var x = 0; x <= 10000; x += 200)
@@ -202,7 +193,8 @@ function fetch() {
 	    for (var y = 0; y < 5000; y += 200)
 		svg += 'l10000,0 m-10000,200 ';
 	    svg += '" />/n';
-	    // annotations
+
+	    // annotations (first set only, others ignored in this version)
 	    if (ann) {
 		for (var i = 0; i < ann.length; i++) {
 		    var x = Math.round((ann[i].t - ts0)*1000/tfreq), y, y1, txt;
@@ -322,7 +314,7 @@ function loadslist() {
 	            slist += '<div class="container">\n';
 		for (var i = 0; i < recinfo.signal.length; i++)
 	            slist += '<input type="checkbox" checked="checked" value="'
-		    + i + '" name="signal">' + recinfo.signal[i].desc
+		    + i + '" name="signal">' + recinfo.signal[i].name
 		    + '<br>\n';
 		if (recinfo.signal.length > 5)
 	            slist += '</div>\n';

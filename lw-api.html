@@ -161,10 +161,6 @@ annotator(s) of interest using the <tt>signal</tt> and
 interest using the <tt>t0</tt> (starting time) parameter and the
 <tt>dt</tt> (duration) parameter.
 
-<p style="color: red">
-In the current version, at most one <tt>annotator</tt> may be specified;
-the second, third, etc. <tt>annotator</tt>s are ignored.</p>
-
 </dd>
 </dl>
 
@@ -269,7 +265,7 @@ The server responds with
     "end": "[02:23:00.000]",
     "duration": "1:17:00.000",
     "signal": [
-      { "desc": "ECG",
+      { "name": "ECG",
         "tps": 1,
         "units": null,
         "gain": 500,
@@ -277,7 +273,7 @@ The server responds with
         "adczero": 0,
         "baseline": 0
       },
-      { "desc": "BP",
+      { "name": "BP",
         "tps": 1,
         "units": "mmHg",
         "gain": 7.72857,
@@ -286,7 +282,7 @@ The server responds with
         "baseline": -1147
       },
     <div style="color: blue"><em>... {more signals} ...</em></div>
-      { "desc": "SO2",
+      { "name": "SO2",
         "tps": 1,
         "units": "%",
         "gain": 17.5,
@@ -320,135 +316,141 @@ is the number of raw units per physical units.  (See the next example.)
 <p>The <tt>adcres</tt> and <tt>adczero</tt> fields specify the number of significant bits per sample (the analog-to-digital converter resolution) and the
 center of the range (typically zero except for offset binary converters).
 
-<p style="color: red">For consistency, the <tt>desc</tt> field of the
-<tt>signal</tt> object will become <tt>name</tt> in a future revision.</p>
-
-<li>To request samples of signals 0, 3, and 4, and annotator <tt>ari</tt>
-from record mgh015 of the MGH/MF Waveform Database, for a 10-second interval
-starting 30 minutes after the beginning of the record, use the URL
+<li>To request samples of signals 0 and 1, and annotations from annotators
+<tt>ecg</tt> and <tt>st</tt> from record slp67x of the MIT-BIH Polysomnographic
+Database, for a 10-second interval starting 15 minutes after the beginning of the record, use the URL
 
 <pre>
-    <a href="http://physionet.org/cgi-bin/lightwave?action=fetch&db=mghdb&record=mgh015&signal=0&signal=3&signal=4&annotator=ari&t0=30:0&dt=10">http://physionet.org/cgi-bin/lightwave?action=fetch&amp;db=mghdb&amp;record=mgh015&amp;signal=0&amp;signal=3&amp;signal=4&amp;annotator=ari&amp;t0=30:0&amp;dt=10</a>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=fetch&db=slpdb&record=slp67x&signal=0&signal=1&annotator=ecg&annotator=st&t0=15:0&dt=10">http://physionet.org/cgi-bin/lightwave?action=fetch&amp;db=slpdb&amp;record=slp67x&amp;signal=0&amp;signal=1&amp;annotator=ecg&amp;annotator=st&amp;t0=15:0&amp;dt=10</a>
 </pre>
 The server responds with
 <pre>
-{ "fetch": {
-"signal": [
-    { "name": "ECG Lead I",
-      "units": "mV",
-      "t0": 648000,
-      "tf": 651600,
-      "gain": 1185,
-      "base": -100,
-      "tps": 1,
-      "scale": 1,
-      "samp": [ -323,18,12,-10,-24,-14,8, <span style="color: blue"><em>... {more samples} ...</em></span> -22,-10,8 ] },
-    { "name": "ART ",
-      "units": "mmHg",
-      "t0": 648000,
-      "tf": 651600,
-      "gain": 12.03,
-      "base": -1282,
-      "tps": 1,
-      "scale": 50,
-      "samp": [ 96,-36,-35,-33,-34,-35,-35, <span style="color: blue"><em>... {more samples} ...</em></span> -1,1,0 ] },
-    { "name": "PAP",
-      "units": "mmHg",
-      "t0": 648000,
-      "tf": 651600,
-      "gain": 30.42,
-      "base": -1150,
-      "tps": 1,
-      "scale": 25,
-      "samp": [ -717,-19,-16,-12,-11,-11,-8, <span style="color: blue"><em>... {more samples} ...</em></span> -3,-1,1 ] }
+{ "fetch":
+  { "signal":
+    [
+      { "name": "ECG",
+        "units": "mV [assumed]",
+        "t0": 225000,
+        "tf": 227500,
+        "gain": 500,
+        "base": 0,
+        "tps": 1,
+        "scale": 1,
+        "samp": [ -20,2,4,-6,1,5 <span style="color: blue"><em>... {more samples} ...</em></span> 0,0,-1 ]
+      },
+      { "name": "BP",
+        "units": "mmHg",
+        "t0": 225000,
+        "tf": 227500,
+        "gain": 7.72857,
+        "base": -1147,
+        "tps": 1,
+        "scale": 100,
+        "samp": [ -515,0,0,1,0,-2 <span style="color: blue"><em>... {more samples} ...</em></span> -9,-11,-12 ]
+      }
+    ],
+    "annotator":
+    [
+      { "name": "ecg",
+        "annotation":
+        [
+          { "t": 225051,
+            "a": "N",
+            "s": 0,
+            "c": 0,
+            "n": 0,
+            "x": null
+          },
+          { "t": 225226,
+            "a": "N",
+            "s": 0,
+            "c": 0,
+            "n": 0,
+            "x": null
+          },
+          <em style="color: blue">... {more annotations} ...</em>
+          { "t": 227399,
+            "a": "N",
+            "s": 0,
+            "c": 0,
+            "n": 0,
+            "x": null
+          }
+        ]
+      },
+      { "name": "st",
+        "annotation":
+        [
+          { "t": 225000,
+            "a": "\"",
+            "s": 0,
+            "c": 0,
+            "n": 0,
+            "x": "W"
+          }
+        ]
+      }
     ]
-,
-"annotation": [
-    { "t": 648127,
-      "a": "N",
-      "s": 0,
-      "c": 0,
-      "n": 0,
-      "x": "DATA OFF"
-    },
-    { "t": 648357,
-      "a": "N",
-      "s": 0,
-      "c": 0,
-      "n": 0,
-      "x": "DATA OFF"
-    },
-    { "t": 648574,
-      "a": "N",
-      "s": 0,
-      "c": 0,
-      "n": 0,
-      "x": "DATA OFF"
-    },
-    <div style="color: blue"><em>... {more annotations} ...</em></div>
-    { "t": 651253,
-      "a": "N",
-      "s": 0,
-      "c": 0,
-      "n": 0,
-      "x": "DATA OFF"
-    }
-  ]
   }
 }
 </pre>
 
-<p>The arrays of <tt>signal</tt> and <tt>annotation</tt> objects will be
+<p>The arrays of <tt>signal</tt> and <tt>annotator</tt> objects will be
 omitted if no signals or annotators are requested.
 
-<p style="color: red">In order to support multiple annotators, the
-<tt>annotation</tt> objects will be nested within <tt>annotator</tt>
-objects in a future revision.</p>
-
-<p>In the <tt>signal</tt> objects, the <tt>units</tt>, <tt>gain</tt>,
-<tt>base</tt>, and <tt>tps</tt> fields are as described in the previous
-example, and the <tt>name</tt> field matches the <tt>desc</tt> field in
-the previous example.  The <tt>t0</tt> and <tt>tf</tt> fields indicate
-the sequence number of the first sample in the <tt>samp</tt> array and
-the sequence number of the sample that follows the last sample in the
-array;  sequence numbers begin with 0.  The <tt>scale</tt> field indicates
-the conventional display scale for the signal in physical units per cm.
-The first element of each <tt>samp</tt> array is the amplitude of sample
-<tt>t0</tt> of the signal in raw units;  the remaining elements are the
-first differences (i.e., the amplitude of sample <tt>t0</tt>+<em>n</em> is
-the sum of the first <em>n+1</em> elements).
+<p>In the <tt>signal</tt> objects, the <tt>name</tt>, <tt>units</tt>,
+<tt>gain</tt>, <tt>base</tt>, and <tt>tps</tt> fields are as described in the
+previous example.  The <tt>t0</tt> and <tt>tf</tt> fields indicate the sequence
+number of the first sample in the <tt>samp</tt> array and the sequence number
+of the sample that follows the last sample in the array; sequence numbers begin
+with 0.  The <tt>scale</tt> field indicates the conventional display scale for
+the signal in physical units per cm.  The first element of each <tt>samp</tt>
+array is the amplitude of sample <tt>t0</tt> of the signal in raw units; the
+remaining elements are the first differences (i.e., the amplitude of sample
+<tt>t0</tt>+<em>n</em> is the sum of the first <em>n+1</em> elements).
 
 <blockquote> <em>In the example above, the first few elements of the second
-<tt>samp</tt> array are 96, -36, -35, and -33.  The reconstructed raw samples
-are 96, 60 (96 - 36), 25 (60 -35), and -8 (25 - 33).  To convert these raw
+<tt>samp</tt> array are -515, 0, 0, 1, 0, and -2.  The reconstructed raw samples
+are -515, -515, -515, -514, -514, and -516.  To convert these raw
 amplitudes into arterial blood pressure ("ART") measurements in physical units
-("mmHg"), subtract the <tt>base</tt> (-1282) and multiply by the <tt>gain</tt>
-(12.03) to get 114.55 ([96-(-1282)]*12.03), 111.55 ([60-(-1282)]*1203), 108.65
-([25-(-1282)]*12.03), and 105.90 ([(-8)-(-1282)]*12.03).
+("mmHg"), subtract the <tt>base</tt> (-1147) and divide by the <tt>gain</tt>
+(7.72857) to get 81.775 ([(-512)-(-1147)]*7.72857), 81.775, 81.775, 81.904,
+81.904, and 81.645.
 
 <p>To determine the times of these samples, first note that the requested start
-time (30 minutes following the start of the record) matches <tt>t0</tt>
-(648000), and that <tt>tps</tt> is 1 for the ART signal (as it is for the other
-signals); thus the sampling frequency of the ART signal is 648000/(30*60), or
-360 samples per second, and the times of the four samples are 30:00, 30:00.002,
-30:00.005, and 30:00.008 (to the nearest millisecond).</em> </blockquote>
+time (15 minutes following the start of the record) matches <tt>t0</tt>
+(225000), and that <tt>tps</tt> is 1 for the BP signal (as it is for the other
+signals); thus the sampling frequency of the BP signal is 225000/(15*60), or
+250 samples per second, and the times of the six samples are 15:00, 15:00.004,
+15:00.008, 15:00.012, 15:00.016, and 15:00.020.</em> </blockquote>
 
-<p>Although the use of raw
-amplitude units and sampling intervals requires a modest amount of computation
-by the client to recover physical units, data in raw units can be transmitted 2
-to 5 times faster than data in scaled units and, more significantly, this
-method does not introduce floating-point errors that may accumulate in
-client-side digital signal processing such as filtering and power spectral
-analysis.
+<p>Although passing samples as first differences in raw amplitude units
+requires a modest amount of computation by the client to convert to physical
+units, difference data in (integer) raw units can be transmitted 2 to 5 times
+faster than data in scaled units and, more significantly, this method does not
+introduce floating-point errors that may accumulate in client-side digital
+signal processing such as filtering and power spectral analysis.
 
-<p> In the <tt>annotation</tt> objects, the <tt>t</tt>, <tt>a</tt>, <tt>s</tt>,
-<tt>c</tt>, <tt>n</tt>, and <tt>x</tt> fields are the time, annotation type
-(mnemonic), subtype, "chan", "num", and "aux" fields of the WFDB annotation
-structures.  See the section titled <em>Annotation Structures</em> in the <a
-href="http://physionet.org/physiotools/wpg/">WFDB Programmer's Guide</a> for
-definitions of these fields.  The standard annotation type mnemonics are
-defined in <a
-href="http://physionet.org/physiobank/annotations.shtml">PhysioBank
-Annotations</a>.
+<p> In the <tt>annotator</tt> objects, the <tt>name</tt> field specifies the
+annotator name, and the <tt>annotation</tt> array contains the individual
+annotations associated with that annotator.  In the annotations,
+the <tt>t</tt>, <tt>a</tt>, <tt>s</tt>, <tt>c</tt>, <tt>n</tt>, and <tt>x</tt>
+fields are the time, annotation type (mnemonic), subtype, "chan", "num", and
+"aux" fields of the WFDB annotation structures.  See the section
+titled <em>Annotation Structures</em> in
+the <a href="http://physionet.org/physiotools/wpg/">WFDB Programmer's Guide</a>
+for definitions of these fields.  The standard annotation type mnemonics are
+defined
+in <a href="http://physionet.org/physiobank/annotations.shtml">PhysioBank
+Annotations</a>;  non-standard types are described on the home pages of the
+databases in which they are found.
+
+<blockquote><em>In the example above, the three annotations belonging to
+annotator <tt>ecg</tt> are all of type '<tt>N</tt>', representing normal QRS
+complexes in the ECG.  The home page for the MIT-BIH Polysomnographic Database
+notes that annotator <tt>st</tt> contains sleep stage annotations of type
+'<tt>"</tt>' (in JSON notation, shown as <tt>"\""</tt>), with a sleep stage
+mnemonic in the <tt>x</tt> field (<tt>W</tt> in the example, signifying
+wakefulness).</em></blockquote>
 
 </ul>

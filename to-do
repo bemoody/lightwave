@@ -1,4 +1,4 @@
-LightWAVE to-do list
+LightWAVE to-do list		Last revised: 18 Dec 2012 (0.11)
 __________________________________________________________________
 
 Client to-do:
@@ -6,6 +6,10 @@ Client to-do:
 Most of these items are features that can be implemented in lightwave.js:
 
 - tabbed interface
+- checkboxes for annotators, allow selection/display of multiple annotators
+- toggle signal and annotator checkboxes
+- drag-and-drop/highlight signals, annotators
+- "levels" popup as in WAVE
 - detect small screen (e.g. smart phone) and switch to alternate UI
 - alternate UI for smart phones, etc.
 - read and keep entire annotation file(s)
@@ -13,10 +17,7 @@ Most of these items are features that can be implemented in lightwave.js:
 - caching
 - scrolling - Google maps style
 - zooming (time/amplitude/both) - animated using SMIL or jQuery animation?
-- drag-and-drop signals, annotators
 - user-adjustable filtering for visual noise reduction
-- checkboxes for annotators, allow selection/display of multiple annotators
-- toggle signal and annotator checkboxes
 - display metadata ('info' request)
 - include segments in info and generate clickable record maps as in ATM
 - persistent annotations (rhythms, signal quality, ...)
@@ -59,8 +60,9 @@ Most of these items are features that can be implemented in lightwave.js:
 - nonlinear display?  scrollable "perspective" display with time-compressed
   data at left and right edges of the signal window -- via SVG transform?
 
-------------------------------------------------------------------
-Test browser and platform compatibility:
+__________________________________________________________________
+
+Tests of browser and platform compatibility:
 
 The LightWAVE client runs in a web browser and does not require
 any platform-specific components.  The browser must be JavaScript-
@@ -74,15 +76,15 @@ Android	    no SVG	n/a      n/a	  n/a 	 	n/a
 
 Chrome	    no SVG	?      	 works	  works		works
 
-Firefox	    works	?     	 works	  works		works
+Firefox	    works	n/a    	 works	  works		works
 
 MSIE 7 & 8  n/a	      	n/a	 n/a	  n/a		no SVG
 
 MSIE 9 	    n/a	      	n/a	 n/a	  n/a		works
 
-Opera	    ?	      	?	 works	  ?		?
+Opera	    works      	?	 works	  works		works
 
-Safari	    n/a	      	?	 n/a	  works		works
+Safari	    n/a	      	works	 n/a	  works		works
 __________________________________________________________________
 
 Server to-do:
@@ -90,15 +92,15 @@ Server to-do:
 These tasks will be implemented in lightwave.c.  Tasks noted
 with (*) will require coordinated client-side changes.
 
-* multiple annotators
-* change info.signal.desc -> info.signal.name
 * handler for receiving and storing annotations from clients
   - save in user's personal PNW workspace, with mechanism for submitting
     to curator/project owner when ready
 - authenticated access to PhysioNetWorks data
 - test web server/platform compatibility
 - investigate repackaging as an Apache module or as a FastCGI app
-- would caching help?
+- would server-side caching help?
+- task dispatcher (e.g., accept requests to run a QRS detector and load
+  its annotations)
 __________________________________________________________________
 
 Documentation to-do:

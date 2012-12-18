@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	13 December 2012  version 0.08
+			Last revised:	18 December 2012  version 0.11
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -48,10 +48,12 @@ _______________________________________________________________________________
 #define BUFSIZE 1024	/* bytes read at a time */
 #endif
 
+#define NAMAX	16	/* maximum number of simultaneously open annotators */
+
 #define TOL	0.001	/* tolerance for error in approximate equality */
 
-static char *action, *annotator, buf[BUFSIZE], *db, *record, *recpath;
-static int interactive, nsig, nosig, *sigmap;
+static char *action, *annotator[NAMAX], buf[BUFSIZE], *db, *record, *recpath;
+static int interactive, nann, nsig, nosig, *sigmap;
 WFDB_FILE *ifile;
 WFDB_Frequency ffreq, tfreq;
 WFDB_Sample *v;
@@ -60,9 +62,9 @@ WFDB_Time t0, tf, dt;
 
 char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
-int fetchannotations(void), fetchsignals(void);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
-    fetch(void), print_file(char *filename);
+    fetchannotations(void), fetchsignals(void), fetch(void),
+    print_file(char *filename);
 
 int main(int argc, char **argv)
 {
@@ -145,7 +147,10 @@ int main(int argc, char **argv)
 			sigmap[n] = n; n++; nosig++;
 		    }
 	    }
-	    annotator = get_param("annotator");
+	    while (nann < NAMAX && (p = get_param_multiple("annotator"))) {
+		SSTRCPY(annotator[nann], p);
+		nann++;
+	    }
 	    if ((p = get_param("t0")) == NULL) p = "0";
 	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
 	    if ((p = get_param("dt")) == NULL) p = "1";
@@ -360,7 +365,7 @@ void info(void)
     printf("    \"duration\": \"%s\"", p);
     if (nsig > 0) printf(",\n    \"signal\": [\n");
     for (i = 0; i < nsig; i++) {
-        printf("      { \"desc\": %s,\n", p = strjson(s[i].desc)); SFREE(p);
+        printf("      { \"name\": %s,\n", p = strjson(s[i].desc)); SFREE(p);
 	printf("        \"tps\": %g,\n", tfreq/(ffreq*s[i].spf));
 	if (s[i].units) {
 	    printf("        \"units\": %s,\n", p = strjson(s[i].units));
@@ -377,50 +382,58 @@ void info(void)
     printf("\n  }\n}\n");
 }
 
-int fetchannotations(void)
+void fetchannotations(void)
 {
+    int afirst = 1, i;
     WFDB_Anninfo ai;
 
-    ai.name = annotator;
-    ai.stat = WFDB_READ;
- 
-    setgvmode(WFDB_HIGHRES);
-    if (annotator && annopen(recpath, &ai, 1) >= 0) {
-	char *p;
-	int first = 1;
-	WFDB_Annotation annot;
-
-	if (tfreq != ffreq) {
-	    t0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
-	    tf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
-	}
-	if (t0 > 0L) iannsettime(t0);
-	printf("\"annotation\": [\n");
-	while (getann(0, &annot) == 0 && annot.time < tf) {
-	    if (!first) printf(",\n");
-	    else first = 0;
-	    printf("    { \"t\": %ld,\n", (long)(annot.time));
-	    printf("      \"a\": %s,\n", p = strjson(annstr(annot.anntyp)));
-	    SFREE(p);
-	    printf("      \"s\": %d,\n", annot.subtyp);
-	    printf("      \"c\": %d,\n", annot.chan);
-	    printf("      \"n\": %d,\n", annot.num);
-	    if (annot.aux && *(annot.aux)) {
-		printf("      \"x\": %s", p = strjson(annot.aux+1));
-		SFREE(p);
-	    }
-	    else
-		printf("      \"x\": null");
-	    printf("\n    }");
-	}
-	printf("\n  ]\n");	    
-	return (1);
+    if (nann < 1) return;
+    if (tfreq != ffreq) {
+	t0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
+	tf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
     }
-    else
-	return (0);  /* no output:  annotation file could not be opened */
+
+    printf("  %c \"annotator\":\n    [", nosig > 0 ? ' ' : '{');  
+    setgvmode(WFDB_HIGHRES);
+    for (i = 0; i < nann; i++) {
+	ai.name = annotator[i];
+	ai.stat = WFDB_READ;
+	if (annopen(recpath, &ai, 1) >= 0) {
+	    char *p;
+	    int first = 1;
+	    WFDB_Annotation annot;
+
+	    if (t0 > 0L) iannsettime(t0);
+	    if (!afirst) printf(",");
+	    else afirst = 0;
+	    printf("\n      { \"name\": \"%s\",\n", annotator[i]);
+	    printf("        \"annotation\":\n");
+	    printf("        [");
+	    while (getann(0, &annot) == 0 && annot.time < tf) {
+		if (!first) printf(",");
+		else first = 0;
+		printf("\n          { \"t\": %ld,\n", (long)(annot.time));
+		printf("            \"a\": %s,\n",
+		       p = strjson(annstr(annot.anntyp)));
+		SFREE(p);
+		printf("            \"s\": %d,\n", annot.subtyp);
+		printf("            \"c\": %d,\n", annot.chan);
+		printf("            \"n\": %d,\n", annot.num);
+		if (annot.aux && *(annot.aux)) {
+		    printf("            \"x\": %s\n", p = strjson(annot.aux+1));
+		    SFREE(p);
+		}
+		else
+		    printf("            \"x\": null\n");
+		printf("          }");
+	    }
+	    printf("\n        ]\n      }");	    
+	}
+    }
+    printf("\n    ]\n  }\n");
 }
 
-int fetchsignals(void)
+void fetchsignals(void)
 {
     int first = 1, framelen, i, imax, imin, j, *m, *mp, n;
     WFDB_Calinfo cal;
@@ -428,7 +441,7 @@ int fetchsignals(void)
     WFDB_Time t;
 
     /* Do nothing unless one or more signals were requested. */ 
-    if (nosig < 1) return (0);	/* no output */
+    if (nosig < 1) return;
 
     /* Open the signal calibration database. */
     (void)calopen("wfdbcal");
@@ -460,7 +473,7 @@ int fetchsignals(void)
 	    if ((n = *mp) >= 0) *(sp[n]++) = v[i];
 
     /* Generate output. */
-    printf("\"signal\": [\n");  
+    printf("  { \"signal\":\n    [\n");  
     for (n = 0; n < nsig; n++) {
 	if (sigmap[n] >= 0) {
 	    char *p;
@@ -468,42 +481,41 @@ int fetchsignals(void)
 
  	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("    { \"name\": %s,\n", p = strjson(s[n].desc)); SFREE(p);
+	    printf("      { \"name\": %s,\n", p = strjson(s[n].desc)); SFREE(p);
 	    if (s[n].units) {
-		printf("      \"units\": %s,\n", p = strjson(s[n].units));
+		printf("        \"units\": %s,\n", p = strjson(s[n].units));
 		SFREE(p);
 	    }
 	    else
-		printf("      \"units\": \"mV [assumed]\",\n");
-	    printf("      \"t0\": %ld,\n", (long)t0);
-	    printf("      \"tf\": %ld,\n", (long)tf);
-	    printf("      \"gain\": %g,\n",
+		printf("        \"units\": \"mV [assumed]\",\n");
+	    printf("        \"t0\": %ld,\n", (long)t0);
+	    printf("        \"tf\": %ld,\n", (long)tf);
+	    printf("        \"gain\": %g,\n",
 		   s[n].gain ? s[n].gain : WFDB_DEFGAIN);
-	    printf("      \"base\": %d,\n", s[n].baseline);
-	    printf("      \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
+	    printf("        \"base\": %d,\n", s[n].baseline);
+	    printf("        \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
 	    if (getcal(s[n].desc, s[n].units, &cal) == 0)
-		printf("      \"scale\": %g,\n", cal.scale);
+		printf("        \"scale\": %g,\n", cal.scale);
 	    else
-		printf("      \"scale\": 1,\n");
-	    printf("      \"samp\": [ ");
+		printf("        \"scale\": 1,\n");
+	    printf("        \"samp\": [ ");
 	    for (sbo = sb[n], prev = 0, spo = sp[n]-1; sbo < spo; sbo++) {
 		delta = *sbo - prev;
 		printf("%d,", delta);
 		prev = *sbo;
 	    }
-	    printf("%d ] }", *sbo - prev);
+	    printf("%d ]\n      }", *sbo - prev);
 	}
     }
-    printf("\n    ]\n");
+    printf("\n    ]%s", nann ? ",\n" : "\n  }\n");
     flushcal();
-    return (1);	/* output was written */
+    return;	/* output was written */
 }
 
 void fetch(void)
 {
-    printf("{ \"fetch\": {\n");
-    if (fetchsignals() && annotator)
-	printf(",\n");
+    printf("{ \"fetch\":\n");
+    fetchsignals();
     fetchannotations();
-    printf("  }\n}\n");
+    printf("}\n");
 }
