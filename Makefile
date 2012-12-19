@@ -1,6 +1,6 @@
-LWVERSION = 0.11
+LWVERSION = 0.12
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	17 December 2012 (version 0.11)
+#			Last revised:	18 December 2012 (version 0.12)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -17,9 +17,9 @@ LWVERSION = 0.11
 # connection to physionet.org is slow or intermittent, or if you want
 # to use LightWAVE to work with local files.
 #
-# Prerequisites:
+# Prerequisites for building and using the LightWAVE server:
 #  httpd	 (a properly configured web server, such as Apache)
-#  jquery.min.js (from http://jquery.com/download/)
+#  jquery.min.js (from http://jquery.com/download/, or use the copy provided)
 #  libcgi	 (from http://libcgi.sourceforge.net/)
 #  libwfdb	 (from http://physionet.org/physiotools/wfdb.shtml)
 #  libcurl	 (from http://curl.haxx.se/libcurl/)
@@ -83,33 +83,41 @@ CFLAGS = -g -DLWDIR=\"$(LWDIR)\"
 # LDFLAGS is a set of options for the linker.
 LDFLAGS = -lcgi -lwfdb
 
-# TARGETS is a list of files to be built and installed.
-TARGETS = $(BINDIR)/lightwave $(LWDIR)/index.shtml $(JSDIR)/lightwave.js
-
-install:	$(TARGETS)
+# Install both the lightwave server and client on this machine.
+install:	server client
 	@echo "LightWAVE has been installed.  If an HTTP server is running,"
 	@echo "use LightWAVE by opening your web browser and visiting"
 	@echo "    http://HOST/lightwave/"
 	@echo "(replacing HOST by the hostname of this server, or by localhost"
 	@echo "or 0.0.0.0 to run without a network connection)."
 
-# Install the lightwave web application.
-$(BINDIR)/lightwave:	lightwave
+# Install the lightwave client only on this machine, configured to use the
+# public server on PhysioNet.
+clientinstall:
+	mkdir -p $(LWDIR)/js
+	sed s+/cgi-bin/+http://physionet.org/cgi-bin/+ <lightwave.js \
+	 >$(LWDIR)/js/lightwave.js
+	cp -p jquery.min.js $(LWDIR)/js
+	cp about.shtml about.html client-install.html lw-api.html \
+	 lightwave.css $(LWDIR)
+	sed "s/LWVERSION/$(LWVERSION) \[local\]/g" <lightwave.shtml | \
+	 sed s+/js/+$(LWDIR)/js/+ >$(LWDIR)/lwlocal.shtml
+
+# Install the lightwave server.
+server:	lightwave
 	mkdir -p $(BINDIR)
 	cp -p lightwave $(BINDIR)
 
-# Compile the lightwave web application.
+# Compile the lightwave server.
 lightwave:	lightwave.c
 	$(CC) $(CFLAGS) lightwave.c -o lightwave $(LDFLAGS)
 
-# Install the lightwave HTML and CSS files.
-$(LWDIR)/index.shtml:	lightwave.shtml lightwave.css about.shtml about.html
+# Install the lightwave client's HTML, CSS, and JavaScript files.
+client:
 	mkdir -p $(LWDIR)
-	cp about.shtml about.html lw-api.html lightwave.css $(LWDIR)
+	cp about.shtml about.html client-install.html lw-api.html \
+	 lightwave.css $(LWDIR)
 	sed s/LWVERSION/$(LWVERSION)/g <lightwave.shtml >$(LWDIR)/index.shtml
-
-# Install lightwave's Javascript code.
-$(JSDIR)/lightwave.js:	 lightwave.js
 	mkdir -p $(JSDIR)
 	cp lightwave.js $(JSDIR)
 

@@ -454,3 +454,21 @@ mnemonic in the <tt>x</tt> field (<tt>W</tt> in the example, signifying
 wakefulness).</em></blockquote>
 
 </ul>
+
+<h3>JSONP</h3>
+
+<p>
+The LightWAVE server looks in its parameter list for a <tt>callback</tt>
+parameter.  If present, the server takes the value of <tt>callback</tt>
+as the name of a function, and "wraps" its JSON output within an invocation
+of the function.  Thus, if the value of <tt>callback</tt> were <tt>foo</tt>,
+the output would appear as
+<pre>
+foo(<em style="color: blue">... {JSON output} ...</em>)
+</pre>
+This form of output is called JSONP, and it is supported so that clients
+hosted on other machines can interact with the LightWAVE server.  Such
+cross-domain communication would otherwise be disallowed by modern browsers.
+See <a href="client-install.html">Installing a local copy of the LightWAVE
+client</a> for information about setting up a testbed for development and
+customization without the overhead of running a local web server.

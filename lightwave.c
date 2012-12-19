@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	18 December 2012  version 0.11
+			Last revised:	19 December 2012  version 0.12
 LightWAVE CGI application
 Copyright (C) 2012 George B. Moody
 
@@ -64,10 +64,11 @@ char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
     fetchannotations(void), fetchsignals(void), fetch(void),
-    print_file(char *filename);
+    print_file(char *filename), jsonp_end(void);
 
 int main(int argc, char **argv)
 {
+    static char *callback = NULL;
     int i;
 
     if (argc < 2) {  /* normal operation as a CGI application */
@@ -80,14 +81,20 @@ int main(int argc, char **argv)
         interactive = 1;  /* interactive mode for debugging */
     wfdbquiet();	  /* suppress WFDB library error messages */
 
-    if (!(action = get_param("action")))
+    if (!(action = get_param("action"))) {
 	print_file(LWDIR "/index.shtml");
-
-    else if (strcmp(action, "dblist") == 0) {
-	dblist();
 	exit(0);
     }
 
+    if (callback = get_param("callback")) {
+	printf("%s(", callback);	/* JSONP:  "wrap" output in callback */
+	atexit(jsonp_end);	/* close the output with ")" before exiting */
+    }
+
+    if (strcmp(action, "dblist") == 0) {
+	dblist();
+	exit(0);
+    }
     else if ((db = get_param("db")) == NULL)
         exit(0);	/* early exit if no database chosen */
 
@@ -261,6 +268,12 @@ void print_file(char *filename)
     while (fgets(buf, sizeof(buf), ifile))
 	fputs(buf, stdout);
     fclose(ifile);
+}
+
+void jsonp_end(void)
+{
+    printf(")");
+    return;
 }
 
 void dblist(void)

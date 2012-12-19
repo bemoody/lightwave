@@ -1,11 +1,13 @@
 cat >lw-test-params <<EOF
 fetch
+
 mitdb
 200
 0
 1
 
 atr
+
 0
 1
 EOF

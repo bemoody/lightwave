@@ -1,4 +1,4 @@
-LightWAVE to-do list		Last revised: 18 Dec 2012 (0.11)
+LightWAVE to-do list		Last revised: 19 Dec 2012 (0.12)
 __________________________________________________________________
 
 Client to-do:
@@ -112,7 +112,6 @@ __________________________________________________________________
 
 Other:
 
-- Simplified set-up for off-line use
 - Consider producing highly compressed (turning-point compressed, or
   simply undersampled?) versions of all records for viewing as quick
   overviews of entire records or lengthy excerpts of them

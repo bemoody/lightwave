@@ -1,0 +1,104 @@
+<h2>Installing a local copy of the LightWAVE client</h2>
+
+<p>
+LightWAVE is a lightweight waveform and annotation viewer and editor.  The
+LightWAVE client runs within the user's web browser, communicating with the
+LightWAVE server, <tt>lightwave</tt>, to obtain raw data that the client
+formats and presents to the user.
+
+<p> In normal use, both the client and the server are hosted on the same
+machine, and the user visits the URL of the client in order to use LightWAVE.
+For example, PhysioNet hosts a public server (<a
+href="http://physionet.org/cgi-bin/lightwave">http://physionet.org/cgi-bin/lightwave</a>)
+and a public client (<a
+href="http://physionet.org/lightwave/">http://physionet.org/lightwave/</a>).
+
+<p>
+It is also possible for the client and the server to be hosted on different
+machines.  For example, a locally hosted LightWAVE client can make use of the
+public server on PhysioNet.  There is no difference in the capabilities,
+speed, network bandwidth, or computational requirements of the two setups,
+apart from the very brief time needed to load the client initially.  A locally
+hosted client is primarily of interest to developers wishing to create custom
+clients, since it allows them to modify the client code freely without needing
+to run a local web server, or to compile and install the LightWAVE server.
+The client does not require compiling, and it is portable across all
+popular platforms, including Android, IOS, Linux, Mac OS X, and Windows.
+
+<p>
+This technical note describes how to obtain and configure the LightWAVE client
+so that it can be hosted on your own computer while interacting with the
+public LightWAVE server on PhysioNet.
+
+<h3>Download the LightWAVE sources</h3>
+
+<p>
+The LightWAVE sources are available within the LightWAVE project on
+PhysioNetWorks.  To obtain them:
+
+<ol>
+<li>If you have not already done so, go to
+<a href="https://physionet.org/users/">https://physionet.org/users/</a> and
+create a personal PhysioNetWorks account.  It's free and the process takes
+only a minute or two.
+
+<li>Log in to your PhysioNetWorks account and look for the link to the
+LightWAVE in the <b>Projects</b> section on your home page.  Follow the
+link and look for the signup message ("Interested PhysioNetWorks members
+may obtain access to this project now by clicking here."), and click on
+the word "here" in the message to join the project.
+
+<li>From the project's archives
+(<a href="https://physionet.org/works/LightWAVE/files">https://physionet.org/works/LightWAVE/files</a>) find and download the most recent set of sources.
+Each version is available as a tarball (e.g., <tt>lightwave-0.12.tar.gz</tt>
+that can be downloaded as a single file and unpacked, or you can download
+individual files from the most recent version from the <tt>lightwave</tt>
+subdirectory.  For downloading hints, see <a href="http://physionet.org/faq.shtml#downloading-binaries">How can I download binary files?</a>;  for instructions
+on unpacking tarballs, see <a href="http://physionet.org/faq.shtml#tar-gz">How
+can I unpack a .tar.gz archive (a "tarball")?</a>.
+</ol>
+
+<h3>Configuring and installing the LightWAVE client</h3>
+
+<p>
+Choose a location for your working copy of the client.  (You may wish to make
+a directory (folder) for this purpose.)
+
+<p>
+Configuration and installation can be done automatically if you have
+<tt>make</tt>, <tt>mkdir</tt>, <tt>sed</tt>, and <tt>cp</tt> (POSIX
+developer's tools that are standard on Linux and Mac OS X, and available as
+components of <a href="http://cygwin.com/">Cygwin</a> on Windows).  If you
+have them, edit the text file called <tt>Makefile</tt> to change LWDIR to
+match the location you wish to use for your working copy, then run the command
+<pre>
+    make clientinstall
+</pre>
+
+<p> If you don't have the necessary tools, you'll have to edit
+<tt>lightwave.js</tt> and <tt>lightwave.shtml</tt>.  In <tt>lightwave.js</tt>,
+find all occurrences of the string <tt>/cgi-bin/</tt>, and change them to
+<tt>http://physionet.org/cgi-bin/</tt>.  In <tt>lightwave.shtml</tt>, insert
+the name of the working directory you have chosen immediately before each
+occurrence of the string <tt>/js/</tt>.  You may also wish to replace the
+string <tt>LWVERSION</tt> with the LightWAVE version number, but this is not
+necessary for correct function.  Rename the edited file as
+<tt>lwlocal.shtml</tt>.  Copy <tt>lwlocal.shtml</tt>, as well as
+<tt>lightwave.css</tt> and the other <tt>*html</tt> files, into your chosen
+working directory.  Finally, make a <tt>js</tt> subdirectory there and copy the
+edited <tt>lightwave.js</tt> there, as well as any other <tt>.js</tt> files in
+the LightWAVE source directory, such as <tt>jquery.min.js</tt>.
+
+<h3>Testing the LightWAVE client</h3>
+
+<p>
+Use a Javascript-enabled web browser that supports SVG, such as
+Chrome, Firefox, MSIE 9, Opera, or Safari to
+open <tt>lwlocal.shtml</tt>.  (The Android native browser, and MSIE 8
+and earlier, don't support SVG, and cannot be used to view the
+LightWAVE client's graphical outputs.)
+
+<p>
+If the client does not function correctly, check to be sure that its
+JavaScript (<tt>.js</tt>) files are installed where the browser can
+find them.

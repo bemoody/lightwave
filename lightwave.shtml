@@ -37,7 +37,7 @@ provides some of the functions of LightWAVE without Javascript.
 
 <div class="js">
 
-<form action="/cgi-bin/lightwave" id="lwform" method="get">
+<form id="lwform">
 
 <p>
 <table>

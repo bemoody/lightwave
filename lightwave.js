@@ -101,6 +101,7 @@ function fetch() {
     if (t0) { url += '&t0=' + t0; }
     var dt = $('[name=dt]').val();
     if (dt) { url += '&dt=' + dt; }
+    url += '&callback=?';
     var ts0 = strtim(t0);
     var tsf = ts0 + dt * tfreq;
     if (ts0 >= tsf) tsf = ts0 + 1;
@@ -302,7 +303,7 @@ function loadslist() {
     if (annotator) title += '(' + annotator + ')';
     document.title = title;
     var request = '/cgi-bin/lightwave?action=info&db='
-	+ db + '&record=' + record;
+	+ db + '&record=' + record + '&callback=?';
     $.getJSON(request, function(data) {
 	var slist = '';
 	if (data) {
@@ -337,7 +338,8 @@ function loadrlist() {
     $('#info').empty();
     $('#textdata').empty();
     $('#plotdata').empty();
-    $.getJSON('/cgi-bin/lightwave?action=alist&db=' + db, function(data) {
+    $.getJSON('/cgi-bin/lightwave?action=alist&callback=?&db=' + db,
+     function(data) {
 	var alist = '';
 	if (data) {
 	    alist += '<td align=right>Annotator:</td>' + 
@@ -350,7 +352,8 @@ function loadrlist() {
 	}
 	$('#alist').html(alist);
     });
-    $.getJSON('/cgi-bin/lightwave?action=rlist&db=' + db, function(data) {
+    $.getJSON('/cgi-bin/lightwave?action=rlist&callback=?&db=' + db,
+     function(data) {
 	var rlist = '';
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
@@ -371,7 +374,7 @@ function loadrlist() {
 // and set up event handlers for database selection and form submission.
 $(document).ready(function(){
     var dblist;
-    $.getJSON('/cgi-bin/lightwave?action=dblist', function(data) {
+    $.getJSON('/cgi-bin/lightwave?action=dblist&callback=?', function(data) {
 	if (data) {
 	    dblist = '<td align=right>Database:</td>' + 
 		'<td><select name=\"db\">\n' +
