@@ -1,10 +1,11 @@
-LWVERSION = 0.12
+LWVERSION = 0.13
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	18 December 2012 (version 0.12)
+#			Last revised:	20 December 2012 (version 0.13)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
-# *** Point your browser to http://physionet.org/lightwave/ to do so.
+# *** Point your browser to http://physionet.org/lightwave/ to do so,
+# *** or use it to open lightwave.html (in the 'client' directory).
 #
 # LightWAVE is a lightweight waveform and annotation viewer and editor.
 #
@@ -19,18 +20,16 @@ LWVERSION = 0.12
 #
 # Prerequisites for building and using the LightWAVE server:
 #  httpd	 (a properly configured web server, such as Apache)
-#  jquery.min.js (from http://jquery.com/download/, or use the copy provided)
 #  libcgi	 (from http://libcgi.sourceforge.net/)
 #  libwfdb	 (from http://physionet.org/physiotools/wfdb.shtml)
 #  libcurl	 (from http://curl.haxx.se/libcurl/)
 #
-# To build and install successfully using this Makefile, you will also need
+# To build and install LightWAVE using this Makefile, you will also need
 # a few standard POSIX tools including 'gcc' (or another ANSI/ISO compiler)
 # and 'make' (standard on Linux and Mac OS X, components of Cygwin on Windows).
 #
-# Install jquery.min.js in JSDIR (see below), and install the three libraries
-# where the compiler/linker will find them (on Linux or MacOS X, /usr/lib is
-# usually the best choice).
+# Install the three libraries where the compiler/linker will find them (on
+# Linux or MacOS X, /usr/lib is usually the best choice).
 #
 # If you are using Apache, make sure that the values of DocumentRoot
 # and ScriptAlias below match those given in your Apache configuration
@@ -52,9 +51,6 @@ LWVERSION = 0.12
 # on a standalone computer without a network connection, use the URL
 # http://0.0.0.0/lightwave/ or http://localhost/lightwave/ .
 
-# CC is the default C compiler
-CC = gcc
-
 # DocumentRoot is the web server's top-level directory of (HTML) content.
 # The values below and in your Apache configuration file should match.
 DocumentRoot = /home/physionet/html
@@ -69,13 +65,12 @@ ScriptAlias = /cgi-bin/
 # file.
 BINDIR = /home/physionet/cgi-bin
 
-# LWDIR is the directory containing lightwave's HTML and CSS
-# files.  It should be within the web server's main html directory.
+# LWDIR is the directory containing the LightWAVE client.  It should be
+# within DocumentRoot.
 LWDIR = $(DocumentRoot)/lightwave
 
-# JSDIR is the directory containing lightwave's JavaScript files.
-# Warning: index.shtml must be updated if JSDIR is changed!
-JSDIR = $(DocumentRoot)/js
+# CC is the default C compiler
+CC = gcc
 
 # CFLAGS is a set of options for the C compiler.
 CFLAGS = -g -DLWDIR=\"$(LWDIR)\"
@@ -91,17 +86,15 @@ install:	server client
 	@echo "(replacing HOST by the hostname of this server, or by localhost"
 	@echo "or 0.0.0.0 to run without a network connection)."
 
-# Install the lightwave client only on this machine, configured to use the
-# public server on PhysioNet.
-clientinstall:
-	mkdir -p $(LWDIR)/js
-	sed s+/cgi-bin/+http://physionet.org/cgi-bin/+ <lightwave.js \
-	 >$(LWDIR)/js/lightwave.js
-	cp -p jquery.min.js $(LWDIR)/js
-	cp about.shtml about.html client-install.html lw-api.html \
-	 lightwave.css $(LWDIR)
-	sed "s/LWVERSION/$(LWVERSION) \[local\]/g" <lightwave.shtml | \
-	 sed s+/js/+$(LWDIR)/js/+ >$(LWDIR)/lwlocal.shtml
+# Install the lightwave client.
+client:	  clean FORCE
+	mkdir -p $(LWDIR)
+	mv client/lightwave.html .
+	cp -pr client/* $(LWDIR)
+	sed s+http://physionet.org/cgi-bin/+$(ScriptAlias)+ \
+	 <client/js/lightwave.js >$(LWDIR)/js/lightwave.js
+	sed "s/\[local\]/$(LWVERSION)/" <lightwave.html >$(LWDIR)/index.html
+	mv lightwave.html client
 
 # Install the lightwave server.
 server:	lightwave
@@ -109,22 +102,15 @@ server:	lightwave
 	cp -p lightwave $(BINDIR)
 
 # Compile the lightwave server.
-lightwave:	lightwave.c
-	$(CC) $(CFLAGS) lightwave.c -o lightwave $(LDFLAGS)
-
-# Install the lightwave client's HTML, CSS, and JavaScript files.
-client:
-	mkdir -p $(LWDIR)
-	cp about.shtml about.html client-install.html lw-api.html \
-	 lightwave.css $(LWDIR)
-	sed s/LWVERSION/$(LWVERSION)/g <lightwave.shtml >$(LWDIR)/index.shtml
-	mkdir -p $(JSDIR)
-	cp lightwave.js $(JSDIR)
+lightwave:	server/lightwave.c
+	$(CC) $(CFLAGS) server/lightwave.c -o lightwave $(LDFLAGS)
 
 # Make a tarball of sources.
-tarball:
+tarball: 	 clean
 	cd ..; tar cfvz lightwave-$(LWVERSION).tar.gz lightwave
 
-# 'make clean': Remove unneeded files from this directory.
+# 'make clean': Remove unneeded files from package.
 clean:
-	rm -f lightwave *~
+	rm -f lightwave *~ */*~ */*/*~
+
+FORCE:

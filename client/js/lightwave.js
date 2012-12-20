@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	18 December 2012  version 0.11
+//			Last revised:	20 December 2012  version 0.13
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -85,7 +85,7 @@ function fetch() {
     if (!db) { alert('Choose a database'); return false; }
     var record = $('[name=record]').val();
     if (!record) { alert('Choose a record'); return false; }
-    var url = '/cgi-bin/lightwave?action=fetch&db=' + db
+    var url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db=' + db
 	+ '&record=' + record;
     $('[name=signal]').each(function() {
 	if (this.checked) { url += '&signal=' + $(this).val(); }
@@ -289,7 +289,7 @@ function gorev() {
 }
 
 function help() {
-    $('#helpframe').attr('src', '/lightwave/about.html');
+    $('#helpframe').attr('src', 'doc/about.html');
     $('#help').toggle();
 }
 
@@ -302,7 +302,7 @@ function loadslist() {
     var annotator = $('[name=annotator]').val();
     if (annotator) title += '(' + annotator + ')';
     document.title = title;
-    var request = '/cgi-bin/lightwave?action=info&db='
+    var request = 'http://physionet.org/cgi-bin/lightwave?action=info&db='
 	+ db + '&record=' + record + '&callback=?';
     $.getJSON(request, function(data) {
 	var slist = '';
@@ -331,6 +331,7 @@ function loadslist() {
 function loadrlist() {
     var db = $('[name=db]').val();
     var title = 'LightWAVE: ' + db;
+    var url;
     document.title = title;
     $('#alist').empty();
     $('#rlist').empty();
@@ -338,8 +339,9 @@ function loadrlist() {
     $('#info').empty();
     $('#textdata').empty();
     $('#plotdata').empty();
-    $.getJSON('/cgi-bin/lightwave?action=alist&callback=?&db=' + db,
-     function(data) {
+    url = 'http://physionet.org/cgi-bin/lightwave?action=alist&callback=?&db='
+         + db;
+    $.getJSON(url, function(data) {
 	var alist = '';
 	if (data) {
 	    alist += '<td align=right>Annotator:</td>' + 
@@ -352,8 +354,10 @@ function loadrlist() {
 	}
 	$('#alist').html(alist);
     });
-    $.getJSON('/cgi-bin/lightwave?action=rlist&callback=?&db=' + db,
-     function(data) {
+
+    url = 'http://physionet.org/cgi-bin/lightwave?action=rlist&callback=?&db='
+         + db;
+    $.getJSON(url, function(data) {
 	var rlist = '';
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
@@ -374,7 +378,8 @@ function loadrlist() {
 // and set up event handlers for database selection and form submission.
 $(document).ready(function(){
     var dblist;
-    $.getJSON('/cgi-bin/lightwave?action=dblist&callback=?', function(data) {
+    $.getJSON('http://physionet.org/cgi-bin/lightwave?action=dblist&callback=?',
+     function(data) {
 	if (data) {
 	    dblist = '<td align=right>Database:</td>' + 
 		'<td><select name=\"db\">\n' +

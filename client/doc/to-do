@@ -118,3 +118,20 @@ Other:
 - Test Apache mod_filter/mod_deflate on PhysioNet servers
 - Integrate LightWAVE with PhysioBank ATM, PhysioBank Record Search,
   and PhysioNetWorks
+
+Uploading annotations
+
+What I'm planning is that anyone who wishes to send annotations to
+PhysioNet must have a PhysioNetWorks account, and that LightWAVE will
+upload annotations automatically into the user's personal workspace on
+PhysioNetWorks, where they will be accessible only to the user who
+created them.  The user will be able to access them again in future
+sessions, and may revise or add to them if desired.  When the user is
+finished with a set of annotations, he/she will be able to mark them
+as final within LightWAVE's user interface; at that time, LightWAVE
+will copy them to the PhysioNetWorks project associated with the
+record.  (For data collections under development, the project's
+members will be able to access the new annotation set using LightWAVE
+or any other interface.  There will be a single project collecting
+annotations of data collections that are already public in
+PhysioBank.)
