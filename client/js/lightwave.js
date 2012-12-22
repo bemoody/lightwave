@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	20 December 2012  version 0.13
+//			Last revised:	21 December 2012  version 0.14
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -36,11 +36,16 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
-var recinfo;  // metadata for the selected record, initialized by loadslist()
-var tfreq;    // ticks per second (LCM of sampling frequencies of signals in Hz)
-var ann = []; // annotation array, initialized by fetch()
-var sig = []; // signal array, initialized by fetch()
+var recinfo;    // metadata for the selected record, initialized by loadslist()
+var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
+var ann = [];   // annotation array, initialized by fetch()
+var sig = [];   // signal array, initialized by fetch()
 var out_format; // 'plot' or 'text', set by button handler functions
+
+var dt = 10;    // window width in seconds
+var ts0 = -1;   // time of the first sample in the signal window, in samples
+var tscale;     // signal window time scale (x-units per pixel)
+var ts0t = -1;  // time of the first sample in the table window, in samples
 
 // Convert argument (in samples) to a string in HH:MM:SS.mmm format.
 function timstr(t) {
@@ -64,18 +69,21 @@ function timstr(t) {
     return tstring;
 }
 
+// Convert string argument to time in samples.
 function strtim(s) {
-    var regexp = /\D/g;	// non-digits
-    var ss = s.replace(regexp, ":");
+    var regexp = /d/g;
+    var ss = s.replace("d", ":");
     var c = ss.split(":");
+    var t;
     switch (c.length) {
-      case 1: t = c[0] * tfreq; break;
-      case 2: t = (60*c[0] + +c[1]) * tfreq; break;
-      case 3: t = (3600*c[0] + 60*c[1] + +c[2]) * tfreq; break;
-      case 4: t = (86400*c[0] + 3600*c[1] + 60*c[2] + +c[3]) * tfreq; break;
+      case 1: if (c[0] == "") t = 0;
+	else t = +c[0]; break;
+      case 2: t = 60*c[0] + +c[1]; break;
+      case 3: t = 3600*c[0] + 60*c[1] + +c[2]; break;
+      case 4: t = 86400*c[0] + 3600*c[1] + 60*c[2] + +c[3]; break;
       default: t = 0;
     }
-    return t;
+    return t*tfreq;
 }
 
 // Fetch the selected data as JSON and load them into the page, either as an
@@ -99,10 +107,8 @@ function fetch() {
     document.title = title;
     var t0 = $('[name=t0]').val();
     if (t0) { url += '&t0=' + t0; }
-    var dt = $('[name=dt]').val();
-    if (dt) { url += '&dt=' + dt; }
-    url += '&callback=?';
-    var ts0 = strtim(t0);
+    url += '&dt=' + dt + '&callback=?';
+    ts0 = strtim(t0);
     var tsf = ts0 + dt * tfreq;
     if (ts0 >= tsf) tsf = ts0 + 1;
     $.getJSON(url, function(data) {
@@ -126,14 +132,12 @@ function fetch() {
 
 	if (out_format == 'text') {
 	    var atext = '', stext = '';
-	    $('#textdata').show();
-	    $('#plotdata').hide();
 	    if (ann) {
 		atext += '<h3>Annotations</h3>\n';
 		atext += 'Number of annotations: ' + ann.length + '<br>';
-		atext += '<p><table>\n<tr><th>Time</th><th>Type</th>';
-		atext += '<th>Sub</th><th>Ch</th>';
-		atext += '<th>Num</th><th>Aux</th></tr>\n';
+		atext += '<p><table class="dtable">\n'
+		    + '<tr><th>Time</th><th>Type</th>'
+		    + '<th>Sub</th><th>Ch</th><th>Num</th><th>Aux</th></tr>\n';
 		for (var i = 0; i < ann.length; i++) {
 		    atext += '<tr><td>' + timstr(ann[i].t) + '</td><td>' +
 			ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
@@ -148,7 +152,7 @@ function fetch() {
 	    if (sig) {
 		stext = '<h3>Signals</h3>\n';
 		stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
-		stext += '<p><table>\n<tr><th>Time</th>';
+		stext += '<p><table class="dtable">\n<tr><th>Time</th>';
 		for (i = 0; i < sig.length; i++)
 		    stext += '<th>' + sig[i].name + '</th>';
 		stext += '\n<tr><th></th>';
@@ -175,12 +179,12 @@ function fetch() {
 	    $('#textdata').append(stext);
 	}
 	else if (out_format == 'plot') {
-	    $('#textdata').hide();
-	    $('#plotdata').show();
 	    var width = $('#plotdata').width();
 	    var height = width/2;
+	    tscale = 10*tfreq/(width-1);
 	    var svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
 		+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
+		+ ' class="svgplot"'
 		+ ' width="' + width + '" height="' + height
 		+ '" viewBox="0 0 10001 5001"'
 		+ ' preserveAspectRatio="xMidYMid meet">\n';
@@ -236,7 +240,8 @@ function fetch() {
 			if (t%(s.tps) == 0) {
 			    v = Math.round(g*s.samp[i/s.tps] - zero);
 			    svg += ' ' + i*1000/tfreq + ',' + v;
-			}
+			}    var dts = Number(dt)*tfreq;
+
 		    }
 		    svg += '" />\n';
 		}
@@ -270,27 +275,44 @@ function fetch_text() {
     fetch();
 }
 
+function go_here(t) {
+    var tf = strtim(recinfo.duration); // - Number(dt)*tfreq;
+    if (t >= tf) { t = tf; $('.fwd').attr('disabled', 'disabled'); }
+    else { $('.fwd').removeAttr('disabled'); }
+    if (t <= 0) { t = 0; $('.rev').attr('disabled', 'disabled'); }
+    else { $('.rev').removeAttr('disabled'); }
+    t0 = timstr(t);
+    $('[name=t0]').val(t0);
+    if (out_format == 'text') fetch();
+    else fetch_plot();
+}
+
 function gofwd() {
     var t0 = $('[name=t0]').val();
-    var dt = $('[name=dt]').val();
-    var t = Number(t0) + Number(dt);
-    t0 = $('[name=t0]').val(t);
-    fetch();
+    var t = strtim(t0) + Number(dt)*tfreq;
+    go_here(t);
+}
+
+function go_to() {
+    var t0 = $('[name=t0]').val();
+    var t = strtim(t0);
+    go_here(t);
 }
 
 function gorev() {
     var t0 = $('[name=t0]').val();
-    if (t0 > 0) {
-	var dt = $('[name=dt]').val();
-	var t = Number(t0) - Number(dt);
-	t0 = $('[name=t0]').val(t);
-	fetch();
-    }
+    var t = strtim(t0) - Number(dt)*tfreq;
+    go_here(t);
 }
 
 function help() {
     $('#helpframe').attr('src', 'doc/about.html');
-    $('#help').toggle();
+}
+
+function show_time(x, y) {
+    var t = ts0 + (x - 12)*tscale; // 12px = margin + border
+    var ts = timstr(t);
+    $('#pointer').html(ts);
 }
 
 // Load the list of signals for the selected record and show them with
@@ -300,6 +322,9 @@ function loadslist() {
     var record = $('[name=record]').val();
     var title = 'LightWAVE: ' + db + '/' + record;
     var annotator = $('[name=annotator]').val();
+    $('#info').empty();
+    $('#textdata').empty();
+    $('#plotdata').empty();
     if (annotator) title += '(' + annotator + ')';
     document.title = title;
     var request = 'http://physionet.org/cgi-bin/lightwave?action=info&db='
@@ -323,6 +348,7 @@ function loadslist() {
 	    }
 	}
 	$('#slist').html(slist);
+	$('#tabs').tabs("enable");
     });
 };
 
@@ -333,6 +359,7 @@ function loadrlist() {
     var title = 'LightWAVE: ' + db;
     var url;
     document.title = title;
+    $('#tabs').tabs({disabled:[1,2]});
     $('#alist').empty();
     $('#rlist').empty();
     $('#slist').empty();
@@ -377,6 +404,7 @@ function loadrlist() {
 // When the page is loaded, fetch the list of databases, load it into the page,
 // and set up event handlers for database selection and form submission.
 $(document).ready(function(){
+    $('#tabs').tabs({disabled:[1,2]});
     var dblist;
     $.getJSON('http://physionet.org/cgi-bin/lightwave?action=dblist&callback=?',
      function(data) {
@@ -397,11 +425,19 @@ $(document).ready(function(){
 	$('#dblist').html(dblist);
 	$('[name=db]').on("change", loadrlist);
     });
+    help();				   // load help into the help tab
     $('#lwform').on("submit", false);      // disable form submission
     // Button handlers:
     $('#fplot').on("click", fetch_plot);   // get data and plot them
     $('#ftext').on("click", fetch_text);   // get data and print them
-    $('#fwd').on("click", gofwd);	   // advance by dt and plot or print
-    $('#rev').on("click", gorev);	   // go back by dt and plot or print
-    $('#helpbutton').on("click",help);	   // show help
+    $('.fwd').on("click", gofwd);	   // advance by dt and plot or print
+    $('[name=t0]').on("blur", go_to);      // go to selected location
+    $('.rev').on("click", gorev);	   // go back by dt and plot or print
+    // User input in the signal window:
+    $('#plotdata').mousemove(function(e){
+	var x = e.pageX - this.offsetLeft;
+	var y = e.pageY - this.offsetTop;
+
+	show_time(x, y);
+    });
 });
