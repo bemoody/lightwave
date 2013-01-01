@@ -74,7 +74,7 @@ PhysioNetWorks.  To obtain them:
 create a personal PhysioNetWorks account.  It's free and the process takes
 only a minute or two.
 
-<li>Log in to your PhysioNetWorks account and look for the link to the
+<li>Log in to your PhysioNetWorks account and look for the link to
 LightWAVE in the <b>Projects</b> section on your home page.  Follow the
 link and look for the signup message ("Interested PhysioNetWorks members
 may obtain access to this project now by clicking here.").  Click on
@@ -84,7 +84,7 @@ the word "here" in the message to join the project.
 href="https://physionet.org/works/LightWAVE/files">
 https://physionet.org/works/LightWAVE/files</a>), find and download the most
 recent set of sources.  Each version is available as a tarball (e.g.,
-<tt>lightwave-0.12.tar.gz</tt> that can be downloaded as a single file and
+<tt>lightwave-0.15.tar.gz</tt>) that can be downloaded as a single file and
 unpacked, or you can download individual files from the most recent version
 from the <tt>lightwave</tt> subdirectory.  For downloading hints, see <a
 href="http://physionet.org/faq.shtml#downloading-binaries">How can I download
@@ -92,19 +92,26 @@ binary files?</a>; for instructions on unpacking tarballs, see <a
 href="http://physionet.org/faq.shtml#tar-gz">How can I unpack a .tar.gz archive
 (a "tarball")?</a>.  If you choose to download individual files, note that you
 will need to create a complete copy of the <tt>client</tt> directory and its
-<tt>css</tt>, <tt>doc</tt>, and <tt>js</tt> subdirectories.  </ol>
+<tt>css</tt>, <tt>doc</tt>, and <tt>js</tt> subdirectories.
+
+</ol>
 
 <h3>Testing the LightWAVE client</h3>
 
-<p>
-Use a Javascript-enabled web browser that supports SVG, such as Chrome,
-Firefox, MSIE 9, Opera, or Safari to open <tt>lightwave.html</tt>.  (The
-Android native browser, and MSIE 8 and earlier, don't support SVG, and cannot
-be used to view the LightWAVE client's graphical outputs.)
+
+<p> Your local copy of the LightWAVE client is ready to use once it has been
+unpacked.  For example, if you have unpacked the tarball into
+<tt>/home/bob</tt>, point your web browser to
+<tt>file:///home/bob/lightwave/client/lightwave.html</tt> to begin using it.
+
+<p> Use a Javascript-enabled web browser that supports HTML5 and SVG. See <a
+href="browser-compatibility.html">Browsers compatible with LightWAVE</a> for
+details.
 
 <p>
 If the client does not function correctly, check to be sure that its JavaScript
-(<tt>.js</tt>) files are installed in the <tt>js</tt> subdirectory, and that
+(<tt>.js</tt>) files are installed in the <tt>js</tt> subdirectory (in the
+example above, <tt>/home/bob/lightwave/client/js/</tt>), and that
 http://physionet.org/ is accessible.
 
 <p>
@@ -120,3 +127,7 @@ replaced by any other recent versions of these files, which you can obtain from
 jquery.com and jqueryui.com.  (Be sure to select mutually compatible versions
 of jQuery and jQuery UI if you replace any of these files; see jqueryui.com for
 information about compatibility.)
+
+<p>
+[<a href="about.html">Main help</a>]
+</html>

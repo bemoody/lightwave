@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	21 December 2012  version 0.14
+//			Last revised:	31 December 2012  version 0.15
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -36,7 +36,10 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
+var db;		// name of the selected database
+var record;	// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by loadslist()
+var annotators; // annotators for the selected database, from loadrlist()
 var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
 var ann = [];   // annotation array, initialized by fetch()
 var sig = [];   // signal array, initialized by fetch()
@@ -44,6 +47,7 @@ var out_format; // 'plot' or 'text', set by button handler functions
 
 var dt = 10;    // window width in seconds
 var ts0 = -1;   // time of the first sample in the signal window, in samples
+var tsf;	// time of the first sample after the signal window, in samples
 var tscale;     // signal window time scale (x-units per pixel)
 var ts0t = -1;  // time of the first sample in the table window, in samples
 
@@ -89,27 +93,23 @@ function strtim(s) {
 // Fetch the selected data as JSON and load them into the page, either as an
 // SVG plot or as text.
 function fetch() {
-    var db = $('[name=db]').val();
-    if (!db) { alert('Choose a database'); return false; }
-    var record = $('[name=record]').val();
-    if (!record) { alert('Choose a record'); return false; }
+    db = $('[name=db]').val();
+    record = $('[name=record]').val();
     var url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db=' + db
 	+ '&record=' + record;
+    var title = 'LightWAVE: ' + db + '/' + record;
+    document.title = title;
     $('[name=signal]').each(function() {
 	if (this.checked) { url += '&signal=' + $(this).val(); }
     });
-    var title = 'LightWAVE: ' + db + '/' + record;
-    var annotator = $('[name=annotator]').val();
-    if (annotator) {
-	url += '&annotator=' + annotator;
-	title += '(' + annotator + ')';
-    }
-    document.title = title;
+    $('[name=annotator]').each(function() {
+	if (this.checked) { url += '&annotator=' + $(this).val(); }
+    });
     var t0 = $('[name=t0]').val();
     if (t0) { url += '&t0=' + t0; }
     url += '&dt=' + dt + '&callback=?';
     ts0 = strtim(t0);
-    var tsf = ts0 + dt * tfreq;
+    tsf = ts0 + dt * tfreq;
     if (ts0 >= tsf) tsf = ts0 + 1;
     $.getJSON(url, function(data) {
 	if (!data) {
@@ -118,15 +118,18 @@ function fetch() {
 	    $('#plotdata').hide();
 	    return;
 	}
-	ann = data.fetch.annotator[0].annotation;
+	if (data.fetch.annotator)
+	    ann = data.fetch.annotator[0].annotation;
+	else
+	    ann = false;
 	sig = data.fetch.signal;
 	if (sig) {
 	    var i, j, len, p, v;
 	    for (i = 0; i < sig.length; i++) {
-	    len = sig[i].samp.length;
-	    v = sig[i].samp;
-	    for (j = p = 0; j < len; j++)
-		p = v[j] += p;
+		len = sig[i].samp.length;
+		v = sig[i].samp;
+		for (j = p = 0; j < len; j++)
+		    p = v[j] += p;
 	    }
 	}
 
@@ -181,16 +184,16 @@ function fetch() {
 	else if (out_format == 'plot') {
 	    var width = $('#plotdata').width();
 	    var height = width/2;
-	    tscale = 10*tfreq/(width-1);
+	    tscale = 11.5*tfreq/(width);
 	    var svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
 		+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
 		+ ' class="svgplot"'
 		+ ' width="' + width + '" height="' + height
-		+ '" viewBox="0 0 10001 5001"'
+		+ '" viewBox="-1000 0 11501 5001"'
 		+ ' preserveAspectRatio="xMidYMid meet">\n';
 
 	    // background grid
-	    svg += '<path stroke="rgb(200,200,240)" stroke-width="4"'
+	    svg += '<path stroke="rgb(200,100,100)" stroke-width="4"'
 		+ 'd="M1,1 ';
 	    for (var x = 0; x <= 10000; x += 200)
 		svg += 'l0,4800 m200,-4800 ';
@@ -201,23 +204,31 @@ function fetch() {
 
 	    // annotations (first set only, others ignored in this version)
 	    if (ann) {
-		for (var i = 0; i < ann.length; i++) {
+		var y0 = 2500;
+		// annotator name
+		svg += '<text x="-50" y="' + y0
+		    + '" style="text-anchor: end;" font-size="120" '
+		    + 'font-style="italic" fill="rgb(0,0,200)">'
+		    + data.fetch.annotator[0].name + '</text>\n';
+		for (var i = 0; i < ann.length && ann[i].t < tsf; i++) {
 		    var x = Math.round((ann[i].t - ts0)*1000/tfreq), y, y1, txt;
 		    if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
-			if (ann[i].a == '+') y = 2200;
-			else y = 1800;
+			if (ann[i].a == '+') y = y0+120;
+			else y = y0-120;
 			txt = '' + ann[i].x;
 		    }
 		    else {
-			y = 2000;
-			txt = ann[i].a;
+			y = y0;
+			// display N annotations as bullets
+			if (ann[i].a == 'N') txt = '&bull;'
+			else txt = ann[i].a;
 		    }
 		    y1 = y - 150;
-		    svg += '<path stroke="rgb(96,255,96)" stroke-width="10"'
+		    svg += '<path stroke="rgb(0,0,200)" stroke-width="6"'
 			+ ' fill="none"'
 			+ ' d="M' + x + ',1 V' + y1 + ' m0,210 V4800" />\n'
 			+ '<text x="' + x + '" y="' + y
-			+ '" font-size="120" fill="rgb(32,255,32)">'
+			+ '" font-size="120" fill="rgb(0,0,200)">'
 			+ txt + '</text>\n'; 
 		}
 	    }
@@ -229,11 +240,12 @@ function fetch() {
 		    var g = (-400/(s.scale*s.gain));
 		    var zero = s.base*g - 4800*(1+j)/(1+sig.length);
 		    var v = Math.round(g*s.samp[0] - zero);
-		    var ly = Math.round(200 - zero);
-		    svg += '<text x="1" y="' + ly + '" fill="rgb(128,128,255)"'
+		    var ly = Math.round(0 - zero);
+		    svg += '<text x="-50" y="' + ly + '" fill="rgb(64,64,64)"'
+		        + ' " style="text-anchor: end;"'
 			+ ' font-size="100" font-style="italic">'
 			+ s.name + '</text>\n';
-		    svg += '<path stroke="blue" stroke-width="4" fill="none"'
+		    svg += '<path stroke="black" stroke-width="6" fill="none"'
 			+ 'd="M0,' + v + ' L';
 		    var t = ts0 + 1;
 		    for (var i = 1; t < tsf; i++, t++) {
@@ -248,16 +260,14 @@ function fetch() {
 	    }
 
 	    // timestamps
-	    var tickint = Math.round(dt/5), t = ts0;
-	    for (var x = 1; x < 10000; x += 2000) {
-		svg += '<path stroke="black" stroke-width="10" d="M'
-		    + x + ',4800 l 0,200" />\n';
-		svg += '<text x="' + (x+20)
-		    + '" y="5000" font-size="100" fill="black"> '
-		    + timstr(t) + '</text>\n';
-		t += tickint*tfreq;
-	    }
-
+	    svg += '<path stroke="red" stroke-width="6"'
+		+ ' d="M0,4800 l0,100" />\n<text x="0" y="5000"'
+		+ ' font-size="100" fill="red" style="text-anchor: middle;">'
+		+ timstr(ts0) + '</text>\n'
+	        + '<path stroke="red" stroke-width="6"'
+	        + ' d="M10000,4800 l0,100" />\n<text x="10000" y="5000"'
+		+ ' font-size="100" fill="red" style="text-anchor: middle;">'
+		+ timstr(tsf) + '</text>\n';
 	    svg += '</svg>\n';
 	    $('#plotdata').html(svg);
 	}
@@ -285,6 +295,7 @@ function go_here(t) {
     $('[name=t0]').val(t0);
     if (out_format == 'text') fetch();
     else fetch_plot();
+    if (tsf >= tf) { $('.fwd').attr('disabled', 'disabled'); }
 }
 
 function gofwd() {
@@ -310,23 +321,24 @@ function help() {
 }
 
 function show_time(x, y) {
-    var t = ts0 + (x - 12)*tscale; // 12px = margin + border
+    var t = ts0-tfreq+(x-11)*tscale; // Chrome; Firefox: 12px = margin+border
+    if (t < ts0) t = ts0;
+    else if (t > tsf) t = tsf;
     var ts = timstr(t);
-    $('#pointer').html(ts);
+    $('.pointer').html(ts);
 }
 
 // Load the list of signals for the selected record and show them with
 // checkboxes.
 function loadslist() {
-    var db = $('[name=db]').val();
-    var record = $('[name=record]').val();
+    db = $('[name=db]').val();
+    record = $('[name=record]').val();
     var title = 'LightWAVE: ' + db + '/' + record;
-    var annotator = $('[name=annotator]').val();
+    $('.recann').html(db + '/' + record);
+    document.title = title;
     $('#info').empty();
     $('#textdata').empty();
     $('#plotdata').empty();
-    if (annotator) title += '(' + annotator + ')';
-    document.title = title;
     var request = 'http://physionet.org/cgi-bin/lightwave?action=info&db='
 	+ db + '&record=' + record + '&callback=?';
     $.getJSON(request, function(data) {
@@ -370,14 +382,20 @@ function loadrlist() {
          + db;
     $.getJSON(url, function(data) {
 	var alist = '';
+	annotators = '';
 	if (data) {
-	    alist += '<td align=right>Annotator:</td>' + 
-		'<td><select name=\"annotator\">\n';
-	    for (i = 0; i < data.annotator.length; i++)
-		alist += '<option value=\"' + data.annotator[i].name +
-		'\">' + data.annotator[i].desc + ' (' +
-		data.annotator[i].name + ')</option>\n';
-	    alist += '<option value=\"\">[none]\n</select></td>\n';
+	    annotators = data.annotator;
+	    alist += '<td align=right>Annotators:</td>\n<td>\n';
+	    if (data.annotator.length > 5)
+	        alist += '<div class="container">\n';
+	    for (var i = 0; i < data.annotator.length; i++)
+		alist += '<input type="checkbox" checked="checked" value="'
+		+ data.annotator[i].name + '" name="annotator">'
+		+ data.annotator[i].desc + ' (' + data.annotator[i].name
+		+ ')<br>\n';
+	    if (data.annotator.length > 5)
+		alist += '</div>\n';
+	    alist += '</td>\n';
 	}
 	$('#alist').html(alist);
     });

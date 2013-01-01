@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	21 December 2012  version 0.14
+			Last revised:	31 December 2012  version 0.15
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.
 
@@ -19,6 +19,7 @@ within the browser to provide low-latency interaction with the user).
 <html>
 <head>
 <meta http-equiv='content-type' content='text/html; charset=utf-8'>
+<meta http-equiv="X-UA-Compatible" content="chrome=1">
 <title>LightWAVE [local]</title>
 <link rel="stylesheet" href="css/jquery-ui.min.css">
 <link rel="stylesheet" href="css/lightwave.css">
@@ -64,7 +65,7 @@ provides some of the functions of LightWAVE without Javascript.
 <div id="view">
  <table width="100%">
   <tr>
-    <td align=center width="80%">Go to:
+    <td align=left>Go to:
       <input type="text" name="t0" value="" tabindex="1"
 	     placeholder="HH:MM:SS" size="20">
       &nbsp;<button id="fplot" tabindex="2">Plot</button>
@@ -72,29 +73,31 @@ provides some of the functions of LightWAVE without Javascript.
 		    title="previous window">&lt;</button>
       &nbsp;<button class="fwd" tabindex="3"
 		    title="next window">&gt;</button></td>
-    <td align=right>&nbsp;<span id="pointer"></span></td>
+    <td align=right>
+      <span class="recann"></span>&nbsp;<span class="pointer"></span></td>
   </tr>
  </table>
  <div id="plotdata"></div>
  <!--[if lt IE 9]>
-  <p> MSIE versions 8 and earlier do not support SVG graphics.  You may be able
-  to use them to view LightWAVE's graphics if you install an SVG plugin, but
-  this has not been tested.  Please let me know how you did it if you find
-  a solution that works.  Browsers such as Chrome, Firefox, Opera,
-  Safari, and MSIE 9+ have built-in support for SVG and work well with
+  <p> MSIE versions 8 and earlier do not support LightWAVE's SVG graphics.
+  MSIE 6, 7, and 8 can be used to run modern web apps such as LightWAVE if you
+  install <a href="http://www.google.com/chromeframe">Google Chrome Frame</a>
+  (a free plugin).  Browsers such as Chrome, Firefox, Opera, Safari,
+  and MSIE 9+ have built-in support for SVG and work well with
   LightWAVE.
-<![endif]-->
+ <![endif]-->
 </div>
 
 <div id="tables">
- <table>
-  <tr
-    <td align=center width="80%">Go to:
+ <table width="100%">
+  <tr>
+    <td align=left>Go to:
       <input type="text" name="t0" placeholder="HH:MM:SS" size="20">
       &nbsp;<button class="rev" title="previous window">&lt;</button>
       &nbsp;<button id="ftext">Text</button>
       &nbsp;<button class="fwd" title="next window">&gt;</button></td>
-    <td align=right>&nbsp;<span id="pointer"></span></td>
+    <td align=right>
+      <span class="recann"></span>&nbsp;<span class="pointer"></span></td>
   </tr>
  </table>
  <div id="info"></div>
