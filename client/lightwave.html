@@ -69,10 +69,14 @@ provides some of the functions of LightWAVE without Javascript.
       <input type="text" name="t0" value="" tabindex="1"
 	     placeholder="HH:MM:SS" size="20">
       &nbsp;<button id="fplot" tabindex="2">Plot</button>
+      &nbsp;<button class="sor" tabindex="5"
+		    title="start of record">|&lt;</button>
       &nbsp;<button class="rev" tabindex="4"
 		    title="previous window">&lt;</button>
       &nbsp;<button class="fwd" tabindex="3"
-		    title="next window">&gt;</button></td>
+		    title="next window">&gt;</button>
+      &nbsp;<button class="eor" tabindex="6"
+		    title="end of record">&gt;|</button></td>
     <td align=right>
       <span class="recann"></span>&nbsp;<span class="pointer"></span></td>
   </tr>
@@ -93,9 +97,11 @@ provides some of the functions of LightWAVE without Javascript.
   <tr>
     <td align=left>Go to:
       <input type="text" name="t0" placeholder="HH:MM:SS" size="20">
+      &nbsp;<button class="sor" title="start of record">|&lt;</button>
       &nbsp;<button class="rev" title="previous window">&lt;</button>
       &nbsp;<button id="ftext">Text</button>
-      &nbsp;<button class="fwd" title="next window">&gt;</button></td>
+      &nbsp;<button class="fwd" title="next window">&gt;</button>
+      &nbsp;<button class="eor" title="end of record">&gt;|</button></td>
     <td align=right>
       <span class="recann"></span>&nbsp;<span class="pointer"></span></td>
   </tr>

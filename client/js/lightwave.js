@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	31 December 2012  version 0.15
+//			Last revised:	 1 January 2013  version 0.16
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -118,14 +118,19 @@ function fetch() {
 	    $('#plotdata').hide();
 	    return;
 	}
-	if (data.fetch.annotator)
+	var nsig = 0;
+	var na = 0;
+	if (data.fetch.annotator) {
+	    na = data.fetch.annotator.length;
 	    ann = data.fetch.annotator[0].annotation;
+	}
 	else
 	    ann = false;
 	sig = data.fetch.signal;
 	if (sig) {
 	    var i, j, len, p, v;
-	    for (i = 0; i < sig.length; i++) {
+	    nsig = sig.length;
+	    for (i = 0; i < nsig; i++) {
 		len = sig[i].samp.length;
 		v = sig[i].samp;
 		for (j = p = 0; j < len; j++)
@@ -202,34 +207,51 @@ function fetch() {
 		svg += 'l10000,0 m-10000,200 ';
 	    svg += '" />/n';
 
+	    // calculate baselines for signals and annotators
+	    var dy = Math.round(4800/(nsig + na + 1));
+	    var y = dy;
+	    var is = 0;
+	    var ia = 0;
+	    var y0s = [];	// signal baselines
+	    var y0a = [];	// annotator baselines
+	    while (is < nsig || ia < na) {
+		if (is < nsig) { y0s[is] = y; y += dy; is++; }
+		if (ia < na)   { y0a[ia] = y; y += dy; ia++; }
+	    }
+
 	    // annotations (first set only, others ignored in this version)
 	    if (ann) {
-		var y0 = 2500;
-		// annotator name
-		svg += '<text x="-50" y="' + y0
-		    + '" style="text-anchor: end;" font-size="120" '
-		    + 'font-style="italic" fill="rgb(0,0,200)">'
-		    + data.fetch.annotator[0].name + '</text>\n';
-		for (var i = 0; i < ann.length && ann[i].t < tsf; i++) {
-		    var x = Math.round((ann[i].t - ts0)*1000/tfreq), y, y1, txt;
-		    if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
-			if (ann[i].a == '+') y = y0+120;
-			else y = y0-120;
-			txt = '' + ann[i].x;
+		for (ia = 0; ia < na; ia++) {
+		    var y0 = y0a[ia];
+		    // annotator name
+		    svg += '<text x="-50" y="' + y0
+			+ '" style="text-anchor: end;" font-size="120" '
+			+ 'font-style="italic" fill="rgb(0,0,200)">'
+			+ data.fetch.annotator[ia].name + '</text>\n';
+		    ann = data.fetch.annotator[ia].annotation;
+		    for (var i = 0; i < ann.length && ann[i].t < tsf; i++) {
+			var x, y, y1, txt;
+			x = Math.round((ann[i].t - ts0)*1000/tfreq);
+			if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
+			    if (ann[i].a == '+') y = y0+120;
+			    else y = y0-120;
+			    txt = '' + ann[i].x;
+			}
+			else {
+			    y = y0;
+			    // display N annotations as bullets
+			    if (ann[i].a == 'N') txt = '&bull;'
+			    else txt = ann[i].a;
+			}
+			y1 = y - 150;
+			svg += '<path stroke="rgb(0,0,200)" stroke-width="6"'
+			    + ' fill="none"'
+			    + ' d="M' + x + ',1 V' + y1 + ' m0,210 V4800" />\n'
+			    + '<text x="' + x + '" y="' + y
+			    + '" style="text-anchor: middle;"'
+			    + '" font-size="120" fill="rgb(0,0,200)">'
+			    + txt + '</text>\n'; 
 		    }
-		    else {
-			y = y0;
-			// display N annotations as bullets
-			if (ann[i].a == 'N') txt = '&bull;'
-			else txt = ann[i].a;
-		    }
-		    y1 = y - 150;
-		    svg += '<path stroke="rgb(0,0,200)" stroke-width="6"'
-			+ ' fill="none"'
-			+ ' d="M' + x + ',1 V' + y1 + ' m0,210 V4800" />\n'
-			+ '<text x="' + x + '" y="' + y
-			+ '" font-size="120" fill="rgb(0,0,200)">'
-			+ txt + '</text>\n'; 
 		}
 	    }
 
@@ -238,10 +260,10 @@ function fetch() {
 		for (var j = 0; j < sig.length; j++) {
 		    var s = sig[j];
 		    var g = (-400/(s.scale*s.gain));
-		    var zero = s.base*g - 4800*(1+j)/(1+sig.length);
+		    var zero = s.base*g - y0s[j]; // 4800*(1+j)/(1+sig.length);
 		    var v = Math.round(g*s.samp[0] - zero);
-		    var ly = Math.round(0 - zero);
-		    svg += '<text x="-50" y="' + ly + '" fill="rgb(64,64,64)"'
+		    svg += '<text x="-50" y="' + y0s[j]
+			+ '" fill="rgb(64,64,64)"'
 		        + ' " style="text-anchor: end;"'
 			+ ' font-size="100" font-style="italic">'
 			+ s.name + '</text>\n';
@@ -253,7 +275,6 @@ function fetch() {
 			    v = Math.round(g*s.samp[i/s.tps] - zero);
 			    svg += ' ' + i*1000/tfreq + ',' + v;
 			}    var dts = Number(dt)*tfreq;
-
 		    }
 		    svg += '" />\n';
 		}
@@ -286,7 +307,7 @@ function fetch_text() {
 }
 
 function go_here(t) {
-    var tf = strtim(recinfo.duration); // - Number(dt)*tfreq;
+    var tf = strtim(recinfo.duration);
     if (t >= tf) { t = tf; $('.fwd').attr('disabled', 'disabled'); }
     else { $('.fwd').removeAttr('disabled'); }
     if (t <= 0) { t = 0; $('.rev').attr('disabled', 'disabled'); }
@@ -296,6 +317,15 @@ function go_here(t) {
     if (out_format == 'text') fetch();
     else fetch_plot();
     if (tsf >= tf) { $('.fwd').attr('disabled', 'disabled'); }
+}
+
+function gostart() {
+    go_here(0);
+}
+
+function goend() {
+    var t = Math.floor(strtim(recinfo.duration)/(Number(dt)*tfreq));
+    go_here(t*dt*tfreq);
 }
 
 function gofwd() {
@@ -451,6 +481,8 @@ $(document).ready(function(){
     $('.fwd').on("click", gofwd);	   // advance by dt and plot or print
     $('[name=t0]').on("blur", go_to);      // go to selected location
     $('.rev').on("click", gorev);	   // go back by dt and plot or print
+    $('.sor').on("click", gostart);
+    $('.eor').on("click", goend);
     // User input in the signal window:
     $('#plotdata').mousemove(function(e){
 	var x = e.pageX - this.offsetLeft;
