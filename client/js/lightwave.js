@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 3 January 2013  version 0.17
+//			Last revised:	 4 January 2013  version 0.18
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -58,45 +58,37 @@ var ts0t = -1;  // time of the first sample in the table window, in samples
 function timstr(t) {
     var ss = Math.floor(t/tfreq);
     var mm  = Math.floor(ss/60);    ss %= 60;
-    if (ss < 10) ss = '0' + ss;
-    ss = ':' + ss;
     var hh  = Math.floor(mm/60);    mm %= 60;
+    if (ss < 10) ss = '0' + ss;
     if (mm < 10) mm = '0' + mm;
-    mm = ':' + mm;
-    if (hh > 23) {
-	var dd = Math.floor(hh/24); hh %= 24;
-	if (hh < 10) hh = '0' + hh;
-	hh = dd + 'd' + hh;
-    }
-    var tstring = hh + mm + ss;
+    if (hh < 10) hh = '0' + hh;
+    var tstring = hh + ':' +  mm + ':' + ss;
     return tstring;
 }
 
 // Convert argument (in samples) to a string in HH:MM:SS.mmm format.
 function mstimstr(t) {
     var mmm = Math.floor(1000*t/tfreq) % 1000;
-    if (mmm < 10) mmm = '00' + mmm;
-    else if (mmm < 100) mmm = '0' + mmm;
-    mmm = '.' + mmm;
+    if (mmm < 100) {
+	if (mmm < 10) mmm = '.00' + mmm;
+	else mmm = '.0' + mmm;
+    }
+    else mmm = '.' + mmm;
     var tstring = timstr(t) + mmm;
     return tstring;
 }
 
 // Convert string argument to time in samples.
 function strtim(s) {
-    var regexp = /d/g;
-    var ss = s.replace("d", ":");
-    var c = ss.split(":");
+    var c = s.split(":");
     var t;
     switch (c.length) {
       case 1: if (c[0] == "") t = 0;
 	else t = +c[0]; break;
       case 2: t = 60*c[0] + +c[1]; break;
       case 3: t = 3600*c[0] + 60*c[1] + +c[2]; break;
-      case 4: t = 86400*c[0] + 3600*c[1] + 60*c[2] + +c[3]; break;
       default: t = 0;
     }
-//    alert("t = " + s + " (" + t*tfreq + ")  ts0 = " + ts0 + ", tsf = " + tsf);
     return t*tfreq;
 }
 

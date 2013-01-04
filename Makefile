@@ -1,4 +1,4 @@
-LWVERSION = 0.17
+LWVERSION = 0.18
 # file: Makefile	G. Moody	18 November 2012
 #			Last revised:	 1 January 2013 (version 0.16)
 # 'make' description file for building and installing LightWAVE
@@ -26,7 +26,8 @@ LWVERSION = 0.17
 #
 # To build and install LightWAVE using this Makefile, you will also need
 # a few standard POSIX tools including 'gcc' (or another ANSI/ISO compiler)
-# and 'make' (standard on Linux and Mac OS X, components of Cygwin on Windows).
+# 'make', 'cp', 'mkdir', 'mv', 'rm', 'sed', and 'tar' (standard on Linux and
+# Mac OS X, components of Cygwin on Windows).
 #
 # Install the three libraries where the compiler/linker will find them (on
 # Linux or MacOS X, /usr/lib is usually the best choice).

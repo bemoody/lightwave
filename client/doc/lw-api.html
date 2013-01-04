@@ -117,15 +117,15 @@ first column of
 <dt>t0</dt>
 <dd>The starting time (the time interval from the beginning of the record to
 the first sample or annotation of interest).  The value of this parameter can
-be given in seconds, or as a string in H:M:S format.  For records longer than
-24 hours, the string may be written as DdH:M:S, where D is the number of days.
+be given in seconds, or as a string in H:M:S format.
 Examples: 100 (1 minute 40 seconds); 30:25 (30 minutes 25 seconds); 10:15:20
-(10 hours 15 minutes 20 seconds); 3d02:01:00 (3 days 2 hours 1 minute).</dd>
+(10 hours 15 minutes 20 seconds); 74:01:00 (3 days 2 hours 1 minute).</dd>
 
 <dt>dt</dt>
 <dd>The duration of the time interval of interest.  As for t0, this parameter
 can be given in seconds or as a string.  Avoid specifying a duration longer
-than 1 minute, however, when using the public <tt>lightwave</tt> server.</dd>
+than 1 minute, however, when using the public <tt>lightwave</tt> server to
+retrieve signals.</dd>
 </dl>
 
 <p>
@@ -452,6 +452,10 @@ notes that annotator <tt>st</tt> contains sleep stage annotations of type
 '<tt>"</tt>' (in JSON notation, shown as <tt>"\""</tt>), with a sleep stage
 mnemonic in the <tt>x</tt> field (<tt>W</tt> in the example, signifying
 wakefulness).</em></blockquote>
+
+<p>As a special case, if <tt>t0</tt> and <tt>dt</tt> are 0, the server returns
+all annotations for the requested annotators, and no samples for any requested
+signals.
 
 </ul>
 

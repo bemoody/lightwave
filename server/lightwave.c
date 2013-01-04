@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	 3 January 2013  version 0.17
+			Last revised:	 4 January 2013  version 0.18
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -171,7 +171,8 @@ int main(int argc, char **argv)
 	    if ((p = get_param("t0")) == NULL) p = "0";
 	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
 	    if ((p = get_param("dt")) == NULL) p = "1";
-	    if ((dt = atoi(p) * ffreq) < 1) dt = 1;
+	    if ((dt = atoi(p)) <= 0) dt = 0;
+	    else if ((dt *= ffreq) < 1) dt = 1;
 	    tf = t0 + dt;
 
 	    fetch();
@@ -409,11 +410,16 @@ void fetchannotations(void)
 {
     int afirst = 1, i;
     WFDB_Anninfo ai;
+    WFDB_Time ta0, taf;
 
     if (nann < 1) return;
     if (tfreq != ffreq) {
-	t0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
-	tf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
+	ta0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
+	taf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
+    }
+    else {
+	ta0 = t0;
+	taf = tf;
     }
 
     printf("  %c \"annotator\":\n    [", nosig > 0 ? ' ' : '{');  
@@ -426,13 +432,13 @@ void fetchannotations(void)
 	    int first = 1;
 	    WFDB_Annotation annot;
 
-	    if (t0 > 0L) iannsettime(t0);
+	    if (ta0 > 0L) iannsettime(ta0);
 	    if (!afirst) printf(",");
 	    else afirst = 0;
 	    printf("\n      { \"name\": \"%s\",\n", annotator[i]);
 	    printf("        \"annotation\":\n");
 	    printf("        [");
-	    while (getann(0, &annot) == 0 && (tf <= 0 || annot.time < tf)) {
+	    while ((getann(0, &annot) == 0) && (taf <= 0 || annot.time < taf)) {
 		if (!first) printf(",");
 		else first = 0;
 		printf("\n          { \"t\": %ld,\n", (long)(annot.time));
@@ -463,8 +469,8 @@ void fetchsignals(void)
     WFDB_Sample **sb, **sp, *sbo, *spo, *v;
     WFDB_Time t;
 
-    /* Do nothing unless one or more signals were requested. */ 
-    if (nosig < 1) return;
+    /* Do nothing if no samples were requested. */ 
+    if (nosig < 1 || t0 >= tf) return;
 
     /* Open the signal calibration database. */
     (void)calopen("wfdbcal");
@@ -516,7 +522,7 @@ void fetchsignals(void)
 	    printf("        \"gain\": %g,\n",
 		   s[n].gain ? s[n].gain : WFDB_DEFGAIN);
 	    printf("        \"base\": %d,\n", s[n].baseline);
-	    printf("        \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf) + 0.5));
+	    printf("        \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf)+0.5));
 	    if (getcal(s[n].desc, s[n].units, &cal) == 0)
 		printf("        \"scale\": %g,\n", cal.scale);
 	    else
