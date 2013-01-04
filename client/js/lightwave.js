@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 1 January 2013  version 0.16
+//			Last revised:	 3 January 2013  version 0.17
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -40,24 +40,23 @@ var db;		// name of the selected database
 var record;	// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by loadslist()
 var annotators; // annotators for the selected database, from loadrlist()
+var annotations = [];  // annotations cached by read_annotations()
 var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
+var na = 0;	// number of annotators, initialized by fetch()
 var ann = [];   // annotation array, initialized by fetch()
+var nsig = 0;	// number of signals, initialized by fetch()
 var sig = [];   // signal array, initialized by fetch()
 var out_format; // 'plot' or 'text', set by button handler functions
-
+var url;	// request sent to server
 var dt = 10;    // window width in seconds
 var ts0 = -1;   // time of the first sample in the signal window, in samples
 var tsf;	// time of the first sample after the signal window, in samples
 var tscale;     // signal window time scale (x-units per pixel)
 var ts0t = -1;  // time of the first sample in the table window, in samples
 
-// Convert argument (in samples) to a string in HH:MM:SS.mmm format.
+// Convert argument (in samples) to a string in HH:MM:SS format.
 function timstr(t) {
-    var mmm = Math.floor(1000*t/tfreq);
-    var ss  = Math.floor(mmm/1000); mmm %= 1000;
-    if (mmm < 10) mmm = '00' + mmm;
-    else if (mmm < 100) mmm = '0' + mmm;
-    mmm = '.' + mmm;
+    var ss = Math.floor(t/tfreq);
     var mm  = Math.floor(ss/60);    ss %= 60;
     if (ss < 10) ss = '0' + ss;
     ss = ':' + ss;
@@ -65,11 +64,21 @@ function timstr(t) {
     if (mm < 10) mm = '0' + mm;
     mm = ':' + mm;
     if (hh > 23) {
-	var dd = hh%24; hh %= 24;
+	var dd = Math.floor(hh/24); hh %= 24;
 	if (hh < 10) hh = '0' + hh;
 	hh = dd + 'd' + hh;
     }
-    var tstring = hh + mm + ss + mmm;
+    var tstring = hh + mm + ss;
+    return tstring;
+}
+
+// Convert argument (in samples) to a string in HH:MM:SS.mmm format.
+function mstimstr(t) {
+    var mmm = Math.floor(1000*t/tfreq) % 1000;
+    if (mmm < 10) mmm = '00' + mmm;
+    else if (mmm < 100) mmm = '0' + mmm;
+    mmm = '.' + mmm;
+    var tstring = timstr(t) + mmm;
     return tstring;
 }
 
@@ -87,11 +96,201 @@ function strtim(s) {
       case 4: t = 86400*c[0] + 3600*c[1] + 60*c[2] + +c[3]; break;
       default: t = 0;
     }
+//    alert("t = " + s + " (" + t*tfreq + ")  ts0 = " + ts0 + ", tsf = " + tsf);
     return t*tfreq;
 }
 
-// Fetch the selected data as JSON and load them into the page, either as an
-// SVG plot or as text.
+function show_tables(data) {
+    var atext = '', stext = '';
+    if (ann) {
+	atext += '<h3>Annotations</h3>\n';
+	atext += 'Number of annotations: ' + ann.length + '<br>';
+	atext += '<p><table class="dtable">\n'
+	    + '<tr><th>Time</th><th>Type</th>'
+	    + '<th>Sub</th><th>Ch</th><th>Num</th><th>Aux</th></tr>\n';
+	for (var i = 0; i < ann.length; i++) {
+	    if (ann[i].t < ts0) continue;
+	    else if (ann[i].t > tsf) break;
+	    atext += '<tr><td>' + mstimstr(ann[i].t) + '</td><td>' +
+		ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
+		ann[i].c + '</td><td>' + ann[i].n + '</td><td>';
+	    if (ann[i].x) { atext += ann[i].x; }
+	    atext +=  '</td></tr>\n';
+	}
+	atext += '</table>\n<p>\n';
+    }
+    $('#textdata').html(atext);
+    
+    if (sig) {
+	stext = '<h3>Signals</h3>\n';
+	stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
+	stext += '<p><table class="dtable">\n<tr><th>Time</th>';
+	for (i = 0; i < sig.length; i++)
+	    stext += '<th>' + sig[i].name + '</th>';
+	stext += '\n<tr><th></th>';
+	for (i = 0; i < sig.length; i++) {
+	    u = sig[i].units;
+	    if (!u) u = '[mV]';
+	    stext += '<th><i>(' + u + ')</i></th>';
+	}
+	var t = ts0;
+	for (var i = 0; t < tsf; i++, t++) {
+	    stext += '</tr>\n<tr><td>' + mstimstr(t);
+	    for (var j = 0; j < sig.length; j++) {
+		stext += '</td><td>';
+		if (t%sig[j].tps == 0) {
+		    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
+			sig[j].gain;
+		    stext += v.toFixed(3);
+		}
+	    }
+	    stext += '</td>';
+	}
+	stext += '</tr>\n</table>\n';
+    }
+    $('#textdata').append(stext);
+}
+
+function show_plot(data) {
+    var width = $('#plotdata').width();
+    var height = width/2;
+    tscale = 11.5*tfreq/(width);
+    var svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
+	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
+	+ ' class="svgplot"'
+	+ ' width="' + width + '" height="' + height
+	+ '" viewBox="-1000 0 11501 5001"'
+	+ ' preserveAspectRatio="xMidYMid meet">\n';
+
+    // background grid
+    svg += '<path stroke="rgb(200,100,100)" stroke-width="4"'
+	+ 'd="M1,1 ';
+    for (var x = 0; x <= 10000; x += 200)
+	svg += 'l0,4800 m200,-4800 ';
+    svg += 'M1,1 '
+    for (var y = 0; y < 5000; y += 200)
+	svg += 'l10000,0 m-10000,200 ';
+    svg += '" />/n';
+    
+    // calculate baselines for signals and annotators
+    var dy = Math.round(4800/(nsig + na + 1));
+    var y = dy;
+    var is = 0;
+    var ia = 0;
+    var y0s = [];	// signal baselines
+    var y0a = [];	// annotator baselines
+    while (is < nsig || ia < na) {
+	if (is < nsig) { y0s[is] = y; y += dy; is++; }
+	if (ia < na)   { y0a[ia] = y; y += dy; ia++; }
+    }
+    
+    // annotator names and annotations
+    if (ann) {
+	for (ia = 0; ia < na; ia++) {
+	    var y0 = y0a[ia];
+	    // annotator name
+	    svg += '<text x="-50" y="' + y0
+		+ '" style="text-anchor: end;" font-size="120" '
+		+ 'font-style="italic" fill="rgb(0,0,200)">'
+		+ data.fetch.annotator[ia].name + '</text>\n';
+	    ann = data.fetch.annotator[ia].annotation;
+	    for (var i = 0; i < ann.length; i++) {
+		if (ann[i].t < ts0) continue;
+		else if (ann[i].t > tsf) break;
+		var x, y, y1, txt;
+		x = Math.round((ann[i].t - ts0)*1000/tfreq);
+		if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
+		    if (ann[i].a == '+') y = y0+120;
+		    else y = y0-120;
+		    txt = '' + ann[i].x;
+		}
+		else {
+		    y = y0;
+		    // display N annotations as bullets
+		    if (ann[i].a == 'N') txt = '&bull;'
+		    else txt = ann[i].a;
+		}
+		y1 = y - 150;
+		svg += '<path stroke="rgb(0,0,200)" stroke-width="6"'
+		    + ' fill="none"'
+		    + ' d="M' + x + ',1 V' + y1 + ' m0,210 V4800" />\n'
+		    + '<text x="' + x + '" y="' + y
+		    + '" style="text-anchor: middle;"'
+		    + '" font-size="120" fill="rgb(0,0,200)">'
+		    + txt + '</text>\n'; 
+	    }
+	}
+    }
+
+    // signal names and traces
+    if (sig) {
+	for (var j = 0; j < sig.length; j++) {
+	    var s = sig[j];
+	    var g = (-400/(s.scale*s.gain));
+	    var zero = s.base*g - y0s[j];
+	    var v = Math.round(g*s.samp[0] - zero);
+	    // signal name
+	    svg += '<text x="-50" y="' + y0s[j]
+		+ '" fill="rgb(64,64,64)"'
+		+ ' " style="text-anchor: end;"'
+		+ ' font-size="100" font-style="italic">'
+		+ s.name + '</text>\n';
+	    // move to start of trace
+	    svg += '<path stroke="black" stroke-width="6" fill="none"'
+		+ 'd="M0,' + v + ' L';
+	    var t = 0;
+	    var tmax = s.samp.length * s.tps;
+	    if (tmax > dt * tfreq) tmax = dt * tfreq;
+	    // add remaining samples to the trace
+	    for (var i = 0; t < tmax; i++, t += s.tps) {
+		v = Math.round(g*s.samp[i] - zero);
+		svg += ' ' + t*1000/tfreq + ',' + v;
+	    }
+	    svg += '" />\n';
+	}
+    }
+    
+    // timestamps
+    svg += '<path stroke="red" stroke-width="6"'
+	+ ' d="M0,4800 l0,100" />\n<text x="0" y="5000"'
+	+ ' font-size="100" fill="red" style="text-anchor: middle;">'
+	+ timstr(ts0) + '</text>\n'
+	+ '<path stroke="red" stroke-width="6"'
+	+ ' d="M10000,4800 l0,100" />\n<text x="10000" y="5000"'
+	+ ' font-size="100" fill="red" style="text-anchor: middle;">'
+	+ timstr(tsf) + '</text>\n';
+    svg += '</svg>\n';
+    $('#plotdata').html(svg);
+}
+
+// Retrieve one or more complete annotation files for the selected record.
+// (This function is not currently used!)
+function read_annotations() {
+    var annreq = false;
+    $('[name=annotator]').each(function() {
+	if (this.checked) {
+	    for (i = 0; i < na; i++) {
+		if (annotator[i].name == $(this).val())
+		    break;
+	    }
+	    if (i >= na)
+		annreq += '&annotator=' + $(this).val();
+	}
+    });
+    if (annreq) {
+	url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db=' + db
+	    + '&record=' + record + annreq + '&callback=?';
+	$.getJSON(url, function(data) {
+	    for (i = 0; i < data.fetch.annotator.length; i++, na++)
+		annotations[na] = data.fetch.annotator[i];
+	    annotations_read = true;
+	});
+    }
+}
+
+// Handle a request for data to display as a plot or tables.  Retrieve any
+// samples or annotations needed to fill the request, load them into 'data',
+// then invoke the proper output function (show_plot or show_tables).
 function fetch() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
@@ -111,6 +310,7 @@ function fetch() {
     ts0 = strtim(t0);
     tsf = ts0 + dt * tfreq;
     if (ts0 >= tsf) tsf = ts0 + 1;
+    var fetch_data = '';
     $.getJSON(url, function(data) {
 	if (!data) {
 	    var error = 'Sorry, the data you requested are not available.';
@@ -118,8 +318,8 @@ function fetch() {
 	    $('#plotdata').hide();
 	    return;
 	}
-	var nsig = 0;
-	var na = 0;
+	nsig = 0;
+	na = 0;
 	if (data.fetch.annotator) {
 	    na = data.fetch.annotator.length;
 	    ann = data.fetch.annotator[0].annotation;
@@ -137,163 +337,14 @@ function fetch() {
 		    p = v[j] += p;
 	    }
 	}
-
-	if (out_format == 'text') {
-	    var atext = '', stext = '';
-	    if (ann) {
-		atext += '<h3>Annotations</h3>\n';
-		atext += 'Number of annotations: ' + ann.length + '<br>';
-		atext += '<p><table class="dtable">\n'
-		    + '<tr><th>Time</th><th>Type</th>'
-		    + '<th>Sub</th><th>Ch</th><th>Num</th><th>Aux</th></tr>\n';
-		for (var i = 0; i < ann.length; i++) {
-		    atext += '<tr><td>' + timstr(ann[i].t) + '</td><td>' +
-			ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
-			ann[i].c + '</td><td>' + ann[i].n + '</td><td>';
-		    if (ann[i].x) { atext += ann[i].x; }
-		    atext +=  '</td></tr>\n';
-		}
-		atext += '</table>\n<p>\n';
-	    }
-	    $('#textdata').html(atext);
-	
-	    if (sig) {
-		stext = '<h3>Signals</h3>\n';
-		stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
-		stext += '<p><table class="dtable">\n<tr><th>Time</th>';
-		for (i = 0; i < sig.length; i++)
-		    stext += '<th>' + sig[i].name + '</th>';
-		stext += '\n<tr><th></th>';
-		for (i = 0; i < sig.length; i++) {
-		    u = sig[i].units;
-		    if (!u) u = '[mV]';
-		    stext += '<th><i>(' + u + ')</i></th>';
-		}
-		var t = ts0;
-		for (var i = 0; t < tsf; i++, t++) {
-		    stext += '</tr>\n<tr><td>' + timstr(t);
-		    for (var j = 0; j < sig.length; j++) {
-			stext += '</td><td>';
-			if (t%sig[j].tps == 0) {
-			    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
-				sig[j].gain;
-			    stext += v.toFixed(3);
-			}
-		    }
-		    stext += '</td>';
-		}
-		stext += '</tr>\n</table>\n';
-	    }
-	    $('#textdata').append(stext);
+	if (out_format == 'plot') {
+	    show_plot(data);
 	}
-	else if (out_format == 'plot') {
-	    var width = $('#plotdata').width();
-	    var height = width/2;
-	    tscale = 11.5*tfreq/(width);
-	    var svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
-		+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
-		+ ' class="svgplot"'
-		+ ' width="' + width + '" height="' + height
-		+ '" viewBox="-1000 0 11501 5001"'
-		+ ' preserveAspectRatio="xMidYMid meet">\n';
-
-	    // background grid
-	    svg += '<path stroke="rgb(200,100,100)" stroke-width="4"'
-		+ 'd="M1,1 ';
-	    for (var x = 0; x <= 10000; x += 200)
-		svg += 'l0,4800 m200,-4800 ';
-	    svg += 'M1,1 '
-	    for (var y = 0; y < 5000; y += 200)
-		svg += 'l10000,0 m-10000,200 ';
-	    svg += '" />/n';
-
-	    // calculate baselines for signals and annotators
-	    var dy = Math.round(4800/(nsig + na + 1));
-	    var y = dy;
-	    var is = 0;
-	    var ia = 0;
-	    var y0s = [];	// signal baselines
-	    var y0a = [];	// annotator baselines
-	    while (is < nsig || ia < na) {
-		if (is < nsig) { y0s[is] = y; y += dy; is++; }
-		if (ia < na)   { y0a[ia] = y; y += dy; ia++; }
-	    }
-
-	    // annotations (first set only, others ignored in this version)
-	    if (ann) {
-		for (ia = 0; ia < na; ia++) {
-		    var y0 = y0a[ia];
-		    // annotator name
-		    svg += '<text x="-50" y="' + y0
-			+ '" style="text-anchor: end;" font-size="120" '
-			+ 'font-style="italic" fill="rgb(0,0,200)">'
-			+ data.fetch.annotator[ia].name + '</text>\n';
-		    ann = data.fetch.annotator[ia].annotation;
-		    for (var i = 0; i < ann.length && ann[i].t < tsf; i++) {
-			var x, y, y1, txt;
-			x = Math.round((ann[i].t - ts0)*1000/tfreq);
-			if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
-			    if (ann[i].a == '+') y = y0+120;
-			    else y = y0-120;
-			    txt = '' + ann[i].x;
-			}
-			else {
-			    y = y0;
-			    // display N annotations as bullets
-			    if (ann[i].a == 'N') txt = '&bull;'
-			    else txt = ann[i].a;
-			}
-			y1 = y - 150;
-			svg += '<path stroke="rgb(0,0,200)" stroke-width="6"'
-			    + ' fill="none"'
-			    + ' d="M' + x + ',1 V' + y1 + ' m0,210 V4800" />\n'
-			    + '<text x="' + x + '" y="' + y
-			    + '" style="text-anchor: middle;"'
-			    + '" font-size="120" fill="rgb(0,0,200)">'
-			    + txt + '</text>\n'; 
-		    }
-		}
-	    }
-
-	    // signal names and traces
-	    if (sig) {
-		for (var j = 0; j < sig.length; j++) {
-		    var s = sig[j];
-		    var g = (-400/(s.scale*s.gain));
-		    var zero = s.base*g - y0s[j]; // 4800*(1+j)/(1+sig.length);
-		    var v = Math.round(g*s.samp[0] - zero);
-		    svg += '<text x="-50" y="' + y0s[j]
-			+ '" fill="rgb(64,64,64)"'
-		        + ' " style="text-anchor: end;"'
-			+ ' font-size="100" font-style="italic">'
-			+ s.name + '</text>\n';
-		    svg += '<path stroke="black" stroke-width="6" fill="none"'
-			+ 'd="M0,' + v + ' L';
-		    var t = ts0 + 1;
-		    for (var i = 1; t < tsf; i++, t++) {
-			if (t%(s.tps) == 0) {
-			    v = Math.round(g*s.samp[i/s.tps] - zero);
-			    svg += ' ' + i*1000/tfreq + ',' + v;
-			}    var dts = Number(dt)*tfreq;
-		    }
-		    svg += '" />\n';
-		}
-	    }
-
-	    // timestamps
-	    svg += '<path stroke="red" stroke-width="6"'
-		+ ' d="M0,4800 l0,100" />\n<text x="0" y="5000"'
-		+ ' font-size="100" fill="red" style="text-anchor: middle;">'
-		+ timstr(ts0) + '</text>\n'
-	        + '<path stroke="red" stroke-width="6"'
-	        + ' d="M10000,4800 l0,100" />\n<text x="10000" y="5000"'
-		+ ' font-size="100" fill="red" style="text-anchor: middle;">'
-		+ timstr(tsf) + '</text>\n';
-	    svg += '</svg>\n';
-	    $('#plotdata').html(svg);
+	else if (out_format == 'text') {
+	    show_tables(data);
 	}
     });
-};
+}
 
 // Button handlers
 function fetch_plot() {
@@ -323,14 +374,9 @@ function gostart() {
     go_here(0);
 }
 
-function goend() {
-    var t = Math.floor(strtim(recinfo.duration)/(Number(dt)*tfreq));
-    go_here(t*dt*tfreq);
-}
-
-function gofwd() {
+function gorev() {
     var t0 = $('[name=t0]').val();
-    var t = strtim(t0) + Number(dt)*tfreq;
+    var t = strtim(t0) - Number(dt)*tfreq;
     go_here(t);
 }
 
@@ -340,10 +386,15 @@ function go_to() {
     go_here(t);
 }
 
-function gorev() {
+function gofwd() {
     var t0 = $('[name=t0]').val();
-    var t = strtim(t0) - Number(dt)*tfreq;
+    var t = strtim(t0) + Number(dt)*tfreq;
     go_here(t);
+}
+
+function goend() {
+    var t = Math.floor(strtim(recinfo.duration)/(Number(dt)*tfreq));
+    go_here(t*dt*tfreq);
 }
 
 function help() {
@@ -354,13 +405,12 @@ function show_time(x, y) {
     var t = ts0-tfreq+(x-11)*tscale; // Chrome; Firefox: 12px = margin+border
     if (t < ts0) t = ts0;
     else if (t > tsf) t = tsf;
-    var ts = timstr(t);
+    var ts = mstimstr(t);
     $('.pointer').html(ts);
 }
 
-// Load the list of signals for the selected record and show them with
-// checkboxes.
-function loadslist() {
+// Load the list of signals for the selected record.
+function slist() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
     var title = 'LightWAVE: ' + db + '/' + record;
@@ -394,20 +444,8 @@ function loadslist() {
     });
 };
 
-// Fetch the lists of records and annotators in the selected database, load them
-// into the page, and set up an event handler for record selection.
-function loadrlist() {
-    var db = $('[name=db]').val();
-    var title = 'LightWAVE: ' + db;
-    var url;
-    document.title = title;
-    $('#tabs').tabs({disabled:[1,2]});
-    $('#alist').empty();
-    $('#rlist').empty();
-    $('#slist').empty();
-    $('#info').empty();
-    $('#textdata').empty();
-    $('#plotdata').empty();
+// Load the list of annotators in the selected database.
+function alist() {
     url = 'http://physionet.org/cgi-bin/lightwave?action=alist&callback=?&db='
          + db;
     $.getJSON(url, function(data) {
@@ -430,6 +468,11 @@ function loadrlist() {
 	$('#alist').html(alist);
     });
 
+};
+
+// Load the list of records in the selected database, and set up an event
+// handler for record selection.
+function rlist() {
     url = 'http://physionet.org/cgi-bin/lightwave?action=rlist&callback=?&db='
          + db;
     $.getJSON(url, function(data) {
@@ -445,35 +488,52 @@ function loadrlist() {
 	}
 	$('#rlist').html(rlist);
 	// fetch the list of signals when the user selects a record
-	$('[name=record]').on("change", loadslist);
+	$('[name=record]').on("change", slist);
     });
 };
 
-// When the page is loaded, fetch the list of databases, load it into the page,
-// and set up event handlers for database selection and form submission.
-$(document).ready(function(){
+// When a new database is selected, reload the annotation and record lists.
+function newdb() {
+    db = $('[name=db]').val();
+    var title = 'LightWAVE: ' + db;
+    document.title = title;
     $('#tabs').tabs({disabled:[1,2]});
+    $('#alist').empty();
+    $('#rlist').empty();
+    $('#slist').empty();
+    $('#info').empty();
+    $('#textdata').empty();
+    $('#plotdata').empty();
+    alist();
+    rlist();
+}
+
+// Load the list of databases and set up an event handler for db selection.
+function dblist() {
     var dblist;
     $.getJSON('http://physionet.org/cgi-bin/lightwave?action=dblist&callback=?',
      function(data) {
-	if (data) {
-	    dblist = '<td align=right>Database:</td>' + 
-		'<td><select name=\"db\">\n' +
-		'<option value=\"\" selected>--Choose one--</option>\n';
-	    for (i = 0; i < data.database.length; i++)
-	        dblist += '<option value=\"' + data.database[i].name +
-		    '\">' + data.database[i].desc + ' (' +
-		    data.database[i].name + ')</option>\n';
-	    dblist += '</select></td>\n';
-	}
-	else {
-	    dblist = "<td colspan=2><b>Sorry, the database list is temporarily"
-		+ " unavailable.  Please try again later.</b></td>";
-	}
-	$('#dblist').html(dblist);
-	$('[name=db]').on("change", loadrlist);
-    });
-    help();				   // load help into the help tab
+	 if (data) {
+	     dblist = '<td align=right>Database:</td>' + 
+		 '<td><select name=\"db\">\n' +
+		 '<option value=\"\" selected>--Choose one--</option>\n';
+	     for (i = 0; i < data.database.length; i++)
+	         dblist += '<option value=\"' + data.database[i].name +
+		 '\">' + data.database[i].desc + ' (' +
+		 data.database[i].name + ')</option>\n';
+	     dblist += '</select></td>\n';
+	 }
+	 else {
+	     dblist = "<td colspan=2><b>Sorry, the database list is temporarily"
+		 + " unavailable.  Please try again later.</b></td>";
+	 }
+	 $('#dblist').html(dblist)
+	 $('[name=db]').on("change", newdb); // invoke newdb when db changes
+     });
+}
+
+// Set up user interface event handlers.
+function set_handlers() {
     $('#lwform').on("submit", false);      // disable form submission
     // Button handlers:
     $('#fplot').on("click", fetch_plot);   // get data and plot them
@@ -487,7 +547,14 @@ $(document).ready(function(){
     $('#plotdata').mousemove(function(e){
 	var x = e.pageX - this.offsetLeft;
 	var y = e.pageY - this.offsetTop;
-
 	show_time(x, y);
     });
+}
+
+// When the page is ready, load the list of databases and set up event handlers.
+$(document).ready(function(){
+    $('#tabs').tabs({disabled:[1,2]});	// disable the View and Tables tabs
+    dblist();				// get the list of databases
+    help();				// load help into the help tab
+    set_handlers();			// set UI event handlers
 });

@@ -1,7 +1,7 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	19 December 2012  version 0.12
-LightWAVE CGI application
-Copyright (C) 2012 George B. Moody
+			Last revised:	 3 January 2013  version 0.17
+LightWAVE server
+Copyright (C) 2012-2013 George B. Moody
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -27,10 +27,13 @@ LightWAVE is modelled on WAVE, an X11/XView application I wrote and
 maintained between 1989 and 2012.  LightWAVE runs within any modern
 web browser and does not require installation on the user's computer.
 
-This file contains the main server-side code, which uses the WFDB
-library (http://physionet.org/physiotools/wfdb.shtml) to handle AJAX
-requests from the LightWAVE client.  CGI interaction with the web
-server is handled by libcgi (http://libcgi.sourceforge.net/).
+This file contains the main server-side code, which uses the WFDB library
+(http://physionet.org/physiotools/wfdb.shtml) to handle AJAX requests from the
+LightWAVE client.  CGI interaction with the web server is handled by libcgi
+(http://libcgi.sourceforge.net/).  The WFDB library uses libcurl
+(http://curl.haxx.se/libcurl/) to retrieve data from another web server (if the
+data are not stored locally) before reformatting and forwarding them to the
+LightWAVE client.
 _______________________________________________________________________________
 
 */
@@ -114,6 +117,13 @@ int main(int argc, char **argv)
     else {
 	// FIXME: uncomment the next line to work around a WFDB library bug
 	//   setwfdb("/usr/local/database");
+	// This bug was partially fixed in WFDB 10.5.17.  It is triggered when
+	// the WFDB path includes a netfile ('http://...') component and there
+	// is an invalid response to a request (for example, if an ISP accepts
+	// a request for a PhysioNet URL but returns its own signup page with
+	// status 200 (OK) instead of an error (DNS hijacking).  In this case,
+	// the WFDB library attempts to parse the response, with unpredictable
+	// results.
         SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
         sprintf(recpath, "%s/%s", db, record);
 
@@ -422,7 +432,7 @@ void fetchannotations(void)
 	    printf("\n      { \"name\": \"%s\",\n", annotator[i]);
 	    printf("        \"annotation\":\n");
 	    printf("        [");
-	    while (getann(0, &annot) == 0 && annot.time < tf) {
+	    while (getann(0, &annot) == 0 && (tf <= 0 || annot.time < tf)) {
 		if (!first) printf(",");
 		else first = 0;
 		printf("\n          { \"t\": %ld,\n", (long)(annot.time));
