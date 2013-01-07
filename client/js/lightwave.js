@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 4 January 2013  version 0.18
+//			Last revised:	 7 January 2013  version 0.19
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012 George B. Moody
@@ -51,7 +51,6 @@ var url;	// request sent to server
 var dt = 10;    // window width in seconds
 var ts0 = -1;   // time of the first sample in the signal window, in samples
 var tsf;	// time of the first sample after the signal window, in samples
-var tscale;     // signal window time scale (x-units per pixel)
 var ts0t = -1;  // time of the first sample in the table window, in samples
 
 // Convert argument (in samples) to a string in HH:MM:SS format.
@@ -146,23 +145,23 @@ function show_tables(data) {
 function show_plot(data) {
     var width = $('#plotdata').width();
     var height = width/2;
-    tscale = 11.5*tfreq/(width);
-    var svg = '<svg xmlns=\'http://www.w3.org/2000/svg\''
+    var svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
 	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
 	+ ' class="svgplot"'
 	+ ' width="' + width + '" height="' + height
-	+ '" viewBox="-1000 0 11501 5001"'
-	+ ' preserveAspectRatio="xMidYMid meet">\n';
+	+ '" preserveAspectRatio="xMidYMid meet">\n';
+    svg += '<g id="viewport" '
+	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">';
 
     // background grid
     svg += '<path stroke="rgb(200,100,100)" stroke-width="4"'
-	+ 'd="M1,1 ';
+	+ 'd="M0,0 ';
     for (var x = 0; x <= 10000; x += 200)
 	svg += 'l0,4800 m200,-4800 ';
     svg += 'M1,1 '
     for (var y = 0; y < 5000; y += 200)
 	svg += 'l10000,0 m-10000,200 ';
-    svg += '" />/n';
+    svg += '" />\n';
     
     // calculate baselines for signals and annotators
     var dy = Math.round(4800/(nsig + na + 1));
@@ -251,8 +250,15 @@ function show_plot(data) {
 	+ ' d="M10000,4800 l0,100" />\n<text x="10000" y="5000"'
 	+ ' font-size="100" fill="red" style="text-anchor: middle;">'
 	+ timstr(tsf) + '</text>\n';
-    svg += '</svg>\n';
+    svg += '</g></svg>\n';
     $('#plotdata').html(svg);
+    // Handle user input in the signal window
+    $('svg').svgPan('viewport');
+//    $('#plotdata').mousemove(function(e){
+    $('svg').mousemove(function(e){
+	var x = e.pageX;
+	show_time(x);
+    });
 }
 
 // Retrieve one or more complete annotation files for the selected record.
@@ -393,8 +399,9 @@ function help() {
     $('#helpframe').attr('src', 'doc/about.html');
 }
 
-function show_time(x, y) {
-    var t = ts0-tfreq+(x-11)*tscale; // Chrome; Firefox: 12px = margin+border
+function show_time(x) {
+    var m = viewport.getScreenCTM();
+    var t = ts0 + (x - m.e)*tfreq/(1000*m.a);
     if (t < ts0) t = ts0;
     else if (t > tsf) t = tsf;
     var ts = mstimstr(t);
@@ -535,12 +542,6 @@ function set_handlers() {
     $('.rev').on("click", gorev);	   // go back by dt and plot or print
     $('.sor').on("click", gostart);
     $('.eor').on("click", goend);
-    // User input in the signal window:
-    $('#plotdata').mousemove(function(e){
-	var x = e.pageX - this.offsetLeft;
-	var y = e.pageY - this.offsetTop;
-	show_time(x, y);
-    });
 }
 
 // When the page is ready, load the list of databases and set up event handlers.
