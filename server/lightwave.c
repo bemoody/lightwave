@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	 4 January 2013  version 0.18
+			Last revised:	11 January 2013  version 0.20
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -78,6 +78,7 @@ int main(int argc, char **argv)
         cgi_init();
 	atexit(cgi_end);
 	cgi_process_form();
+	cgi_send_header("Content-Type: application/javascript; charset=utf-8");
 	cgi_init_headers();
     }
     else
@@ -159,10 +160,11 @@ int main(int argc, char **argv)
 		SUALLOC(sigmap, nsig, sizeof(int));
 		for (n = 0; n < nsig; n++)
 		    sigmap[n] = -1;
-		while (p = get_param_multiple("signal"))
-		    if (0 <= (n = atoi(p)) && n < nsig) {
+		while (p = get_param_multiple("signal")) {
+		    if ((n = findsig(p)) >= 0) {
 			sigmap[n] = n; n++; nosig++;
 		    }
+		}
 	    }
 	    while (nann < NAMAX && (p = get_param_multiple("annotator"))) {
 		SSTRCPY(annotator[nann], p);
@@ -467,13 +469,22 @@ void fetchsignals(void)
     int first = 1, framelen, i, imax, imin, j, *m, *mp, n;
     WFDB_Calinfo cal;
     WFDB_Sample **sb, **sp, *sbo, *spo, *v;
-    WFDB_Time t;
+    WFDB_Time t, ts0, tsf;
 
     /* Do nothing if no samples were requested. */ 
     if (nosig < 1 || t0 >= tf) return;
 
     /* Open the signal calibration database. */
     (void)calopen("wfdbcal");
+
+    if (tfreq != ffreq) {
+	ts0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
+	tsf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
+    }
+    else {
+	ts0 = t0;
+	tsf = tf;
+    }
 
     /* Allocate buffers and buffer pointers for each selected signal. */
     SUALLOC(sb, nsig, sizeof(WFDB_Sample *));
@@ -517,8 +528,8 @@ void fetchsignals(void)
 	    }
 	    else
 		printf("        \"units\": \"mV [assumed]\",\n");
-	    printf("        \"t0\": %ld,\n", (long)t0);
-	    printf("        \"tf\": %ld,\n", (long)tf);
+	    printf("        \"t0\": %ld,\n", (long)ts0);
+	    printf("        \"tf\": %ld,\n", (long)tsf);
 	    printf("        \"gain\": %g,\n",
 		   s[n].gain ? s[n].gain : WFDB_DEFGAIN);
 	    printf("        \"base\": %d,\n", s[n].baseline);

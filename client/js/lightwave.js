@@ -1,8 +1,8 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 7 January 2013  version 0.19
+//			Last revised:	11 January 2013  version 0.20
 // LightWAVE Javascript code
 //
-// Copyright (C) 2012 George B. Moody
+// Copyright (C) 2012-2013 George B. Moody
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as
@@ -40,18 +40,65 @@ var db;		// name of the selected database
 var record;	// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by loadslist()
 var annotators; // annotators for the selected database, from loadrlist()
-var annotations = [];  // annotations cached by read_annotations()
+var ann = [];   // annotations read and cached by read_annotations()
 var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
-var na = 0;	// number of annotators, initialized by fetch()
-var ann = [];   // annotation array, initialized by fetch()
-var nsig = 0;	// number of signals, initialized by fetch()
-var sig = [];   // signal array, initialized by fetch()
+var nann = 0;	// number of annotators, set by read_annotations()
+var nsig = 0;	// number of signals, set by read_signals()
+var sig = [];   // signal array, read and cached by read_signals()
 var out_format; // 'plot' or 'text', set by button handler functions
 var url;	// request sent to server
 var dt = 10;    // window width in seconds
 var ts0 = -1;   // time of the first sample in the signal window, in samples
 var tsf;	// time of the first sample after the signal window, in samples
-var ts0t = -1;  // time of the first sample in the table window, in samples
+var tpool = []; // cache of 'trace' objects (10-second signal segments)
+var tid = 0;	// next trace id (all traces have id < tid)
+
+// Initialize or expand tpool
+function init_tpool(ntrace) {
+    for (var i = tpool.length; i < ntrace; i++) {
+	tpool[i] = {};
+	tpool[i].id = tid++;
+    }
+}
+
+// Replace the least-recently-used trace with the contents of s
+function set_trace(db, record, s) {
+    var idmin = tid, imin, j, len, p, v;
+
+    // set properties of s that are not properties from server response
+    s.id = tid++;
+    s.visible = true;
+    s.db = db;
+    s.record = record;
+
+    // restore amplitudes from first differences sent by server
+    len = s.samp.length;
+    v = s.samp;
+    for (j = p = 0; j < len; j++)
+	p = v[j] += p;
+
+    // find the least-recently-used trace
+    for (var i = 0; i < tpool.length; i++) {
+	if (tpool[i].id < idmin) {
+	    imin = i;
+	    idmin = tpool[i].id;
+	}
+    }
+    tpool[imin] = s; // replace it
+}
+
+// Find a trace in the cache, if it exists
+function find_trace(db, record, signame, t) {
+    for (var i = 0; i < tpool.length; i++) {
+	if (tpool[i].name == signame &&
+	    tpool[i].t0 == t &&
+	    tpool[i].record == record &&
+	    tpool[i].db == db) {
+	    return tpool[i];
+	}
+    }
+    return null;
+}
 
 // Convert argument (in samples) to a string in HH:MM:SS format.
 function timstr(t) {
@@ -91,7 +138,7 @@ function strtim(s) {
     return t*tfreq;
 }
 
-function show_tables(data) {
+function show_tables() {
     var atext = '', stext = '';
     if (ann) {
 	atext += '<h3>Annotations</h3>\n';
@@ -142,206 +189,227 @@ function show_tables(data) {
     $('#textdata').append(stext);
 }
 
-function show_plot(data) {
+function show_plot() {
     var width = $('#plotdata').width();
-    var height = width/2;
+    var height = width*0.525;
+    // calculate baselines for signals and annotators
+    var dy = Math.round(5000/(nsig + nann + 1));
+    var y = dy;
+    var y0s = [];	// signal baselines
+    var y0a = [];	// annotator baselines
+    var ia = 0, is = 0;
+    while (is < nsig || ia < nann) {
+	if (is < nsig) { y0s[is] = y; y += dy; is++; }
+	if (ia < nann)   { y0a[ia] = y; y += dy; ia++; }
+    }
+
     var svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
 	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
 	+ ' class="svgplot"'
 	+ ' width="' + width + '" height="' + height
 	+ '" preserveAspectRatio="xMidYMid meet">\n';
     svg += '<g id="viewport" '
-	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">';
+	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">\n';
 
     // background grid
-    svg += '<path stroke="rgb(200,100,100)" stroke-width="4"'
-	+ 'd="M0,0 ';
+    var grd = '<g id="grid">\n' +
+	'<path stroke="rgb(200,100,100)" stroke-width="4" d="M0,0 ';
     for (var x = 0; x <= 10000; x += 200)
-	svg += 'l0,4800 m200,-4800 ';
-    svg += 'M1,1 '
-    for (var y = 0; y < 5000; y += 200)
-	svg += 'l10000,0 m-10000,200 ';
-    svg += '" />\n';
+	grd += 'l0,5000 m200,-5000 ';
+    grd += 'M0,0 '
+    for (var y = 0; y <= 5000; y += 200)
+	grd += 'l10000,0 m-10000,200 ';
+    grd += '" />\n</g>\n';
     
-    // calculate baselines for signals and annotators
-    var dy = Math.round(4800/(nsig + na + 1));
-    var y = dy;
-    var is = 0;
-    var ia = 0;
-    var y0s = [];	// signal baselines
-    var y0a = [];	// annotator baselines
-    while (is < nsig || ia < na) {
-	if (is < nsig) { y0s[is] = y; y += dy; is++; }
-	if (ia < na)   { y0a[ia] = y; y += dy; ia++; }
-    }
+    // timestamps
+    var tsm = (ts0 + +tsf)/2;
+    tst = '<g id="times">\n<text x="0" y="5200" font-size="100" fill="red"'
+	+ 'style="text-anchor: middle;">' + timstr(ts0) + '</text>\n'
+	+ '<text x="5000" y="5200" font-size="100" fill="red"'
+	+ 'style="text-anchor: middle;">' + timstr(tsm) + '</text>\n'
+	+ '<text x="10000" y="5200" font-size="100" fill="red"'
+	+ 'style="text-anchor: middle;">' + timstr(tsf) + '</text>\n</g>\n';
     
     // annotator names and annotations
-    if (ann) {
-	for (ia = 0; ia < na; ia++) {
-	    var y0 = y0a[ia];
-	    // annotator name
-	    svg += '<text x="-50" y="' + y0
+    sva = '';
+    for (ia = 0; ia < nann; ia++) {
+	var y0 = y0a[ia];
+	sva += '<g id="ann-' + ann[ia].name + '">\n';
+	if (!ann[ia].visible) { // annotations to be hidden, show name at left
+	    sva += '<text x="-900" y="' + y0 + '" font-size="120"'
+		+ ' font-style="italic"'
+		+ ' fill="rgb(100,100,200)">'
+		+ ann[ia].name + '</text>\n';
+	}
+	else {  // annotations are to be visible, show name at right
+	    sva += '<text x="-50" y="' + y0
 		+ '" style="text-anchor: end;" font-size="120" '
 		+ 'font-style="italic" fill="rgb(0,0,200)">'
-		+ data.fetch.annotator[ia].name + '</text>\n';
-	    ann = data.fetch.annotator[ia].annotation;
-	    for (var i = 0; i < ann.length; i++) {
-		if (ann[i].t < ts0) continue;
-		else if (ann[i].t > tsf) break;
+		+ ann[ia].name + '</text>\n';
+	    var a = ann[ia].annotation;
+	    for (var i = 0; i < a.length; i++) {
+		if (a[i].t < ts0) continue;
+		else if (a[i].t > tsf) break;
 		var x, y, y1, txt;
-		x = Math.round((ann[i].t - ts0)*1000/tfreq);
-		if (ann[i].x && (ann[i].a == '+' || ann[i].a == '"')) {
-		    if (ann[i].a == '+') y = y0+120;
+		x = Math.round((a[i].t - ts0)*1000/tfreq);
+		if (a[i].x && (a[i].a == '+' || a[i].a == '"')) {
+		    if (a[i].a == '+') y = y0+120;
 		    else y = y0-120;
-		    txt = '' + ann[i].x;
+		    txt = '' + a[i].x;
 		}
 		else {
 		    y = y0;
 		    // display N annotations as bullets
-		    if (ann[i].a == 'N') txt = '&bull;'
-		    else txt = ann[i].a;
+		    if (a[i].a == 'N') txt = '&bull;'
+		    else txt = a[i].a;
 		}
 		y1 = y - 150;
-		svg += '<path stroke="rgb(0,0,200)" stroke-width="6"'
+		sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
 		    + ' fill="none"'
-		    + ' d="M' + x + ',1 V' + y1 + ' m0,210 V4800" />\n'
+		    + ' d="M' + x + ',0 V' + y1 + ' m0,210 V5000" />\n'
 		    + '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"'
 		    + '" font-size="120" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
 	    }
 	}
+	sva += '</g>\n';
     }
 
     // signal names and traces
-    if (sig) {
-	for (var j = 0; j < sig.length; j++) {
-	    var s = sig[j];
-	    var g = (-400/(s.scale*s.gain));
-	    var zero = s.base*g - y0s[j];
-	    var v = Math.round(g*s.samp[0] - zero);
-	    // signal name
-	    svg += '<text x="-50" y="' + y0s[j]
-		+ '" fill="rgb(64,64,64)"'
-		+ ' " style="text-anchor: end;"'
-		+ ' font-size="100" font-style="italic">'
-		+ s.name + '</text>\n';
+    svs = '';
+    for (is = 0; is < nsig; is++) {
+	var y0 = y0s[is];
+	svs += '<g id="sig-' + sig[is].name + '">\n';
+	if (!sig[is].visible) { // signal to be hidden, show name at left
+	    svs += '<text x="-900" y="' + y0 + '" font-size="100"'
+		+ ' font-style="italic" fill="rgb(64,64,64)">'
+		+ sig[is].name + '</text>\n';
+	}
+	else {  // signal is to be visible, show name at right
+	    svs += '<text x="-50" y="' + y0 + '" font-size="100"'
+		+ ' font-style="italic" fill="rgb(64,64,64)"'
+		+ ' " style="text-anchor: end;">' + sig[is].name + '</text>\n';
+	    var s = sig[is].samp;
+	    var g = (-400/(sig[is].scale*sig[is].gain));
+	    var z = sig[is].base*g - y0;
+	    var v = Math.round(g*s[0] - z);
 	    // move to start of trace
-	    svg += '<path stroke="black" stroke-width="6" fill="none"'
+	    svs += '<path stroke="black" stroke-width="6" fill="none"'
 		+ 'd="M0,' + v + ' L';
 	    var t = 0;
-	    var tmax = s.samp.length * s.tps;
+	    var tps = sig[is].tps;
+	    var tmax = s.length * tps;
+	    var ts = 1000/tfreq;
 	    if (tmax > dt * tfreq) tmax = dt * tfreq;
 	    // add remaining samples to the trace
-	    for (var i = 0; t < tmax; i++, t += s.tps) {
-		v = Math.round(g*s.samp[i] - zero);
-		svg += ' ' + t*1000/tfreq + ',' + v;
+	    for (var i = 0; t < tmax; i++, t += tps) {
+		v = Math.round(g*s[i] - z);
+		svs += ' ' + t*ts + ',' + v;
 	    }
-	    svg += '" />\n';
+	    svs += '" />\n';
 	}
+	svs += '</g>\n';
     }
-    
-    // timestamps
-    svg += '<path stroke="red" stroke-width="6"'
-	+ ' d="M0,4800 l0,100" />\n<text x="0" y="5000"'
-	+ ' font-size="100" fill="red" style="text-anchor: middle;">'
-	+ timstr(ts0) + '</text>\n'
-	+ '<path stroke="red" stroke-width="6"'
-	+ ' d="M10000,4800 l0,100" />\n<text x="10000" y="5000"'
-	+ ' font-size="100" fill="red" style="text-anchor: middle;">'
-	+ timstr(tsf) + '</text>\n';
-    svg += '</g></svg>\n';
+
+    svg += grd + tst + sva + svs + '</g></svg>\n';
     $('#plotdata').html(svg);
     // Handle user input in the signal window
     $('svg').svgPan('viewport');
-//    $('#plotdata').mousemove(function(e){
     $('svg').mousemove(function(e){
 	var x = e.pageX;
 	show_time(x);
     });
 }
 
+
+function update_output() {
+    if (out_format == 'plot') show_plot();
+    else if (out_format == 'text') show_tables();
+}
+
 // Retrieve one or more complete annotation files for the selected record.
-// (This function is not currently used!)
 function read_annotations() {
-    var annreq = false;
+    var annreq = '', i;
     $('[name=annotator]').each(function() {
 	if (this.checked) {
-	    for (i = 0; i < na; i++) {
-		if (annotator[i].name == $(this).val())
+	    for (i = 0; i < nann; i++) {
+		if (ann[i].name == $(this).val()) {
+		    ann[i].visible = true; // already in cache, visible
 		    break;
+		}
 	    }
-	    if (i >= na)
+	    if (i >= nann)
 		annreq += '&annotator=' + $(this).val();
+	}
+	else {
+	    for (i = 0; i < nann; i++) {
+		if (ann[i].name == $(this).val())
+		    ann[i].visible = false;  // cached but hidden
+	    }
 	}
     });
     if (annreq) {
 	url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db=' + db
-	    + '&record=' + record + annreq + '&callback=?';
+	    + '&record=' + record + annreq + '&dt=0&callback=?';
 	$.getJSON(url, function(data) {
-	    for (i = 0; i < data.fetch.annotator.length; i++, na++)
-		annotations[na] = data.fetch.annotator[i];
-	    annotations_read = true;
+	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
+		ann[nann] = data.fetch.annotator[i];
+		ann[nann].visible = true;  // added to the cache, visible
+	    }
 	});
     }
 }
 
-// Handle a request for data to display as a plot or tables.  Retrieve any
-// samples or annotations needed to fill the request, load them into 'data',
-// then invoke the proper output function (show_plot or show_tables).
+// Retrieve one or more signal segments starting at t for the selected record.
+function read_signals(t, update) {
+    var is = 0, sigreq = '';
+    $('[name=signal]').each(function() {
+	var signame = $(this).val();
+	if (this.checked) {
+	    if (sig[is] = find_trace(db, record, signame, t)) {
+	        sig[is].id = tid++;	// found, mark as recently used
+		sig[is++].visible = true; // already in cache, visible
+	    }
+	    else {
+		sigreq += '&signal=' + signame;  // add to request
+	    }
+	}
+	else if (sig[is] = find_trace(db, record, signame, t)) {
+	    sig[is++].visible = false;  // cached but hidden
+	}
+    });
+
+    if (sigreq) {
+	url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db='
+	    + db + '&record=' + record + sigreq
+	    + '&t0=' + t/tfreq + '&dt=' + dt + '&callback=?';
+	$.getJSON(url, function(data) {
+	    for (i = 0; i < data.fetch.signal.length; i++, is++) {
+		sig[is] = data.fetch.signal[i];
+		set_trace(db, record, sig[is]);
+	    }
+	    nsig = is;
+	    if (update) update_output();
+	});
+    }
+    else {
+	nsig = is;
+	if (update) update_output();
+    }
+}
+
+// Handle a request for data to display as a plot or tables.
 function fetch() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
-    var url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db=' + db
-	+ '&record=' + record;
     var title = 'LightWAVE: ' + db + '/' + record;
     document.title = title;
-    $('[name=signal]').each(function() {
-	if (this.checked) { url += '&signal=' + $(this).val(); }
-    });
-    $('[name=annotator]').each(function() {
-	if (this.checked) { url += '&annotator=' + $(this).val(); }
-    });
     var t0 = $('[name=t0]').val();
-    if (t0) { url += '&t0=' + t0; }
-    url += '&dt=' + dt + '&callback=?';
     ts0 = strtim(t0);
-    tsf = ts0 + dt * tfreq;
-    if (ts0 >= tsf) tsf = ts0 + 1;
-    var fetch_data = '';
-    $.getJSON(url, function(data) {
-	if (!data) {
-	    var error = 'Sorry, the data you requested are not available.';
-	    $('#textdata').html(error).show();
-	    $('#plotdata').hide();
-	    return;
-	}
-	nsig = 0;
-	na = 0;
-	if (data.fetch.annotator) {
-	    na = data.fetch.annotator.length;
-	    ann = data.fetch.annotator[0].annotation;
-	}
-	else
-	    ann = false;
-	sig = data.fetch.signal;
-	if (sig) {
-	    var i, j, len, p, v;
-	    nsig = sig.length;
-	    for (i = 0; i < nsig; i++) {
-		len = sig[i].samp.length;
-		v = sig[i].samp;
-		for (j = p = 0; j < len; j++)
-		    p = v[j] += p;
-	    }
-	}
-	if (out_format == 'plot') {
-	    show_plot(data);
-	}
-	else if (out_format == 'text') {
-	    show_tables(data);
-	}
-    });
+    tsf = ts0 + dt*tfreq;
+    read_annotations();  // read annotations not previously cached, if any
+    read_signals(ts0, true); // read signals not previously cached, if any
 }
 
 // Button handlers
@@ -361,7 +429,7 @@ function go_here(t) {
     else { $('.fwd').removeAttr('disabled'); }
     if (t <= 0) { t = 0; $('.rev').attr('disabled', 'disabled'); }
     else { $('.rev').removeAttr('disabled'); }
-    t0 = timstr(t);
+    var t0 = timstr(t);
     $('[name=t0]').val(t0);
     if (out_format == 'text') fetch();
     else fetch_plot();
@@ -374,8 +442,10 @@ function gostart() {
 
 function gorev() {
     var t0 = $('[name=t0]').val();
-    var t = strtim(t0) - Number(dt)*tfreq;
+    var t = strtim(t0) - dt*tfreq;
     go_here(t);
+    t -= dt*tfreq;
+    if (t >= 0) read_signals(t, false);  // prefetch the previous window
 }
 
 function go_to() {
@@ -386,12 +456,15 @@ function go_to() {
 
 function gofwd() {
     var t0 = $('[name=t0]').val();
-    var t = strtim(t0) + Number(dt)*tfreq;
+    var t = strtim(t0) + dt*tfreq;
     go_here(t);
+    t += dt*tfreq;
+    if (t < strtim(recinfo.duration))
+	read_signals(t, false);	  // prefetch the next window
 }
 
 function goend() {
-    var t = Math.floor(strtim(recinfo.duration)/(Number(dt)*tfreq));
+    var t = Math.floor((strtim(recinfo.duration)-1)/(dt*tfreq));
     go_here(t*dt*tfreq);
 }
 
@@ -429,16 +502,20 @@ function slist() {
 		slist += '<td align="right">Signals:</td>\n<td>\n';
 		if (recinfo.signal.length > 5)
 	            slist += '<div class="container">\n';
-		for (var i = 0; i < recinfo.signal.length; i++)
+		for (var i = 0; i < recinfo.signal.length; i++) {
 	            slist += '<input type="checkbox" checked="checked" value="'
-		    + i + '" name="signal">' + recinfo.signal[i].name
-		    + '<br>\n';
+			+ recinfo.signal[i].name + '" name="signal">'
+			+ recinfo.signal[i].name + '<br>\n';
+		}
 		if (recinfo.signal.length > 5)
 	            slist += '</div>\n';
 		slist += '</td>\n';
+		init_tpool(recinfo.signal.length * 4);
 	    }
 	}
 	$('#slist').html(slist);
+	nann = nsig = 0; // new record -- clear the annotation and signal caches
+	read_annotations();
 	$('#tabs').tabs("enable");
     });
 };

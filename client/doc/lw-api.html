@@ -395,6 +395,16 @@ The server responds with
 }
 </pre>
 
+<p>Note that signals can be requested by number (as above) or by name;  thus
+the request
+
+<pre>
+    <a href="http://physionet.org/cgi-bin/lightwave?action=fetch&db=slpdb&record=slp67x&signal=ECG&signal=BP&annotator=ecg&annotator=st&t0=15:0&dt=10">http://physionet.org/cgi-bin/lightwave?action=fetch&amp;db=slpdb&amp;record=slp67x&amp;<b>signal=ECG&amp;signal=BP</b>&amp;annotator=ecg&amp;annotator=st&amp;t0=15:0&amp;dt=10</a>
+</pre>
+
+is equivalent to the previous request, and the response from the server is
+the same.
+
 <p>The arrays of <tt>signal</tt> and <tt>annotator</tt> objects will be
 omitted if no signals or annotators are requested.
 
