@@ -139,34 +139,41 @@ function strtim(s) {
 }
 
 function show_tables() {
-    var atext = '', stext = '';
-    if (ann) {
+    var atext = '', stext = '', ia;
+    if (ann.length > 0) 
 	atext += '<h3>Annotations</h3>\n';
-	atext += 'Number of annotations: ' + ann.length + '<br>';
-	atext += '<p><table class="dtable">\n'
-	    + '<tr><th>Time</th><th>Type</th>'
-	    + '<th>Sub</th><th>Ch</th><th>Num</th><th>Aux</th></tr>\n';
-	for (var i = 0; i < ann.length; i++) {
-	    if (ann[i].t < ts0) continue;
-	    else if (ann[i].t > tsf) break;
-	    atext += '<tr><td>' + mstimstr(ann[i].t) + '</td><td>' +
-		ann[i].a + '</td><td>' + ann[i].s + '</td><td>' +
-		ann[i].c + '</td><td>' + ann[i].n + '</td><td>';
-	    if (ann[i].x) { atext += ann[i].x; }
-	    atext +=  '</td></tr>\n';
+    for (ia = 0; ia < nann; ia++) {
+	if (!ann[ia].visible) {
+	    atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
 	}
-	atext += '</table>\n<p>\n';
+	else {
+	    atext += '<p><b>Annotator:</b> ' + ann[ia].name + '<br>\n';
+	    atext += '<p><table class="dtable">\n<tr>'
+		+ '<th>Time (elapsed)&nbsp;</th><th>Type</th><th>Sub&nbsp;</th>'
+		+ '<th>Chan</th><th>Num&nbsp;</th><th>Aux</th></tr>\n';
+	    var a = ann[ia].annotation;
+	    for (var i = 0; i < a.length; i++) {
+		if (a[i].t < ts0) continue;
+		else if (a[i].t > tsf) break;
+		atext += '<tr><td>' + mstimstr(a[i].t) + '</td><td>'
+		    + a[i].a + '</td><td>' + a[i].s + '</td><td>'
+		    + a[i].c + '</td><td>' + a[i].n + '</td><td>';
+		if (a[i].x) { atext += a[i].x; }
+		atext +=  '</td></tr>\n';
+	    }
+	    atext += '</table>\n<p>\n';
+	}
     }
     $('#textdata').html(atext);
     
     if (sig) {
 	stext = '<h3>Signals</h3>\n';
 	stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
-	stext += '<p><table class="dtable">\n<tr><th>Time</th>';
-	for (i = 0; i < sig.length; i++)
-	    stext += '<th>' + sig[i].name + '</th>';
+	stext += '<p><table class="dtable">\n<tr><th>Time (elapsed)&nbsp;</th>';
+	for (i = 0; i < nsig; i++)
+	    stext += '<th>' + sig[i].name + '&nbsp;</th>';
 	stext += '\n<tr><th></th>';
-	for (i = 0; i < sig.length; i++) {
+	for (i = 0; i < nsig; i++) {
 	    u = sig[i].units;
 	    if (!u) u = '[mV]';
 	    stext += '<th><i>(' + u + ')</i></th>';
@@ -174,7 +181,7 @@ function show_tables() {
 	var t = ts0;
 	for (var i = 0; t < tsf; i++, t++) {
 	    stext += '</tr>\n<tr><td>' + mstimstr(t);
-	    for (var j = 0; j < sig.length; j++) {
+	    for (var j = 0; j < nsig; j++) {
 		stext += '</td><td>';
 		if (t%sig[j].tps == 0) {
 		    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/

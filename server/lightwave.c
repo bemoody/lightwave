@@ -73,20 +73,20 @@ int main(int argc, char **argv)
 {
     static char *callback = NULL;
     int i;
+    extern int headers_initialized;
 
     if (argc < 2) {  /* normal operation as a CGI application */
-        cgi_init();
+	cgi_init();
 	atexit(cgi_end);
-	cgi_process_form();
-	cgi_send_header("Content-Type: application/javascript; charset=utf-8");
-	cgi_init_headers();
+       	cgi_process_form();
+	printf("Content-type: application/javascript; charset=utf-8\r\n\r\n");
     }
     else
         interactive = 1;  /* interactive mode for debugging */
     wfdbquiet();	  /* suppress WFDB library error messages */
 
     if (!(action = get_param("action"))) {
-	print_file(LWDIR "/index.shtml");
+	print_file(LWDIR "/doc/about.shtml");
 	exit(0);
     }
 

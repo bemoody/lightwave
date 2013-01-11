@@ -1,42 +1,62 @@
 <html>
+<style>td {text-align:center}</style>
 <h2>Browsers compatible with LightWAVE</h2>
 
-<p>
-The LightWAVE client runs in a web browser and does not require any
-platform-specific components.  The browser must support HTML5,
-JavaScript, and (for graphical output only) SVG.  The table below shows the
-oldest LightWAVE-compatible version of each browser.
+<p> <em>[Last checked: 11 Jan 2013 (LightWAVE version 0.21)]</em>
 
+<p> The LightWAVE client runs in a web browser and does not require any
+platform-specific components.  The browser must support HTML5, JavaScript, and
+(for graphical output only) SVG.  <em>Recommended:</em> Chrome, MSIE 9, and
+Safari currently provide the best performance because of their notably fast
+JavaScript engines.  On older Windows systems, MSIE 7 or 8 (or even 6)
+with <a href="http://www.google.com/chromeframe">Google Chrome Frame</a> are
+tolerable choices if you cannot install Chrome itself.  On devices running
+Android 2.x and earlier, you will not have the Android 3 browser, and you may
+be unable to install Chrome 18; both Firefox 15 and Opera 12 are usable with
+limitations on Android 2.x, however, if you cannot update your Android
+platform.
+
+<p> The table below shows the oldest LightWAVE-compatible version of each
+browser.
+
+<center>
 <table cellpadding=5>
 <tr valign="top"><th>Platform &#9654;<br>Browser<br>&#9660;</th>
-<th>Android</th><th>IOS</th><th>Linux</th><th>Mac OS X</th><th>Windows</th></tr>
+<th>Android</th><th>iOS</th><th>Linux</th><th>Mac OS X</th><th>Windows</th></tr>
 <tr><th>Android</th>
     <td>3</td><td>n/a</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>
 <tr><th>Chrome</th>
-    <td>18</td><td>?</td><td>7</td><td>7</td><td>7</td></tr>
-<tr><th>Firefox</th>
+    <td>18</td><td>23</td><td>7</td><td>7</td><td>7</td></tr>
+<tr><th>Firefox <a href="#firefox">[1]</a></th>
     <td>15</td><td>n/a</td>
-    <td>4<br><b>[1]</b><a href="#zoom">zoom, see below</a></td><td>4</td>
+    <td>4</td><td>4</td>
     <td>4</td></tr>
 <tr><th>MSIE</th>
     <td>n/a</td><td>n/a</td><td>n/a</td><td>n/a</td>
-    <td>9<br><b>[2]</b><a href="#gcf">6-8, see below</a></td></tr>
-<tr><th>Opera</th>
-    <td>12</td><td>?</td><td>11.6</td><td>11.6</td><td>11.6</td></tr>
+    <td>9 <a href="#msie"><b>[2]</b></a></td></tr>
+<tr><th>Opera <a href="#opera"><b>[3]</b></b></th>
+    <td>12</td><td><a href="#opera-mini"><b>[4]</b></a></td>
+    <td>11.6</td><td>11.6</td><td>11.6</td></tr>
 <tr><th>Safari</th>
     <td>n/a</td><td>5.0</td><td>n/a</td><td>5.1</td><td>5.1</td></tr>
 </table>
+</center>
 
-<p>
-<a name="zoom"><b>[1]</b></a>  Pan-and-zoom, introduced in LightWAVE
-0.19, is not fully functional on Linux in Firefox 9 (bug 543965) but it
-works in Firefox 15 and later (and probably in some earlier versions also).
-<p>
-<a name="gcf"><b>[2]</b></a>  Although MSIE 6, 7, and 8 do not support SVG,
+<p> <a name="firefox"><b>[1]</b></a> Firefox may not display the correct time
+in the pointer location indicator (in the upper right corner of the View/edit
+tab) if pan-and-zoom is enabled.
+
+<p> <a name="msie"><b>[2]</b></a> Although MSIE 6, 7, and 8 do not support SVG,
 you can use them to run LightWAVE if you install
 <a href="http://www.google.com/chromeframe">Google Chrome Frame</a>
 (a free plugin that provides the missing support).
 
-<p>
-[<a href="about.html">Main help</a>]
+<p> <a name="opera"><b>[3]</b></a> Opera does not display the pointer location
+indicator if pan-and-zoom is enabled.
+
+<p> <a name="opera-mini"><b>[4]</b></a> Opera's browser for iOS, Opera Mini,
+does not support SVG as of its most recent version (7.0.5).  Use Safari or
+Chrome on iOS.
+
+<p> [<a href="about.html">Main help</a>]
 </html>
