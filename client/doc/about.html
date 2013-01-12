@@ -1,16 +1,56 @@
-<p> <b>LightWAVE</b> is a lightweight waveform and annotation viewer and editor.
+<h2>About LightWAVE</h2>
+
+<p> <b>LightWAVE</b> is a lightweight waveform and annotation viewer and
+editor.  Use it to view any of the recordings of physiologic signals and time
+series in <a href="http://physionet.org/physiobank/database/">PhysioBank</a>,
+together with their annotations (event markers).
+
+<p> LightWAVE runs within <a href="browser-compatibility.html">any modern web
+browser</a> and does not require installation on the user's computer, tablet, or
+phone.  LightWAVE is free software licensed under
+the <a href="COPYING.html">GPL</a>.
+
+<h3>Getting started</h3>
+
+<ol>
+<li> On the <b>Choose input</b> tab, select one of PhysioBank's databases.
+(Learn more about them in PhysioBank's
+<a href="http://physionet.org/physiobank/database/">index</a>.)
+
+<li> Once you have chosen a database, a <b>Record</b> selector appears.  Choose
+a record.
+
+<li> On the <b>View/edit</b> tab, click on <b>Plot</b>.  The first 10 seconds
+of the record appears.  Use the other controls at the top of the
+<b>View/edit</b> tab to navigate to other locations in the record.
+</ol>
+
+<p> To find out how any LightWAVE control works, move the pointer over it,
+and a tooltip with a brief description will appear after a short
+interval.
+
+<p> If you have a mouse with a scroll wheel or a multitouch trackpad or screen,
+point to any location in the plot and scroll or "pinch" to change the
+magnification.
+
+<p> View details about the record, including text representations of the
+annotations and digitized signals, on the <b>Tables</b> tab.
+
+<p>
+Checklists of the signals and annotators (sets of annotations) in the currently
+open record appear on the <b>Choose input</b> tab.  You may uncheck any of them
+that are not of interest if you wish; this may be useful if there are many
+signals or if you have an unusually slow network connection.  You may also
+select another record to view on the <b>Choose input</b> tab.
+
+<hr>
 
 <p> LightWAVE is modelled on WAVE, an X11/XView application I wrote and
-maintained between 1989 and 2012.  LightWAVE runs within <a
-href="browser-compatibility.html">any modern web browser</a> and does not
-require installation on the user's computer.  LightWAVE is free software
-licensed under the <a href="COPYING.html">GPL</a>.
-
-<p> This is an alpha version of LightWAVE, which I wrote as a testbed and
-proof-of-concept.  It provides a way to select and extract data from PhysioBank
-records and to view them as annotated waveforms or in text form.  The current
-version does not provide editing functions, and it provides only limited
-navigation controls.
+maintained between 1989 and 2012.  This is an alpha version of LightWAVE, which
+I wrote as a testbed and proof-of-concept.  It provides a way to select and
+extract data from PhysioBank records and to view them as annotated waveforms or
+in text form.  The current version does not provide editing functions, and it
+provides only limited navigation controls.
 
 <p> <b>LightWAVE's data repository</b> is
 <a href="http://physionet.org/physiobank/database/">PhysioBank</a> by default,
@@ -57,4 +97,9 @@ an outline, to be expanded into a tutorial once editing is implemented
 Other documentation is currently limited to comments embedded in LightWAVE's
 source files (especially its <tt>Makefile</tt>).  Sources are available in
 the LightWAVE project on PhysioNetWorks.
+
+<p>George Moody<br>
+12 January 2013
+
+
 </html>

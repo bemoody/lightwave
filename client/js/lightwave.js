@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	11 January 2013  version 0.20
+//			Last revised:	12 January 2013  version 0.22
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -52,6 +52,9 @@ var ts0 = -1;   // time of the first sample in the signal window, in samples
 var tsf;	// time of the first sample after the signal window, in samples
 var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
+
+var g_opacity = 1;
+var m_opacity = 1;
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -161,6 +164,7 @@ function show_tables() {
 		if (a[i].x) { atext += a[i].x; }
 		atext +=  '</td></tr>\n';
 	    }
+	    atext += '</table>\n</div></div>\n';
 	    atext += '</table>\n<p>\n';
 	}
     }
@@ -220,9 +224,12 @@ function show_plot() {
 
     // background grid
     var grd = '<g id="grid">\n' +
-	'<path stroke="rgb(200,100,100)" stroke-width="4" d="M0,0 ';
-    for (var x = 0; x <= 10000; x += 200)
-	grd += 'l0,5000 m200,-5000 ';
+	'<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
+	+ ' opacity="' + g_opacity + '" d="M0,0 ';
+    for (var x = 0; x <= 10000; x += 200) {
+	if (x%1000 == 0) grd += 'l0,5000 l-20,100 l40,0 l-20,-100 m200,-5000 ';
+	else grd += 'l0,5000 m200,-5000 ';
+    }
     grd += 'M0,0 '
     for (var y = 0; y <= 5000; y += 200)
 	grd += 'l10000,0 m-10000,200 ';
@@ -272,8 +279,9 @@ function show_plot() {
 		}
 		y1 = y - 150;
 		sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
-		    + ' fill="none"'
-		    + ' d="M' + x + ',0 V' + y1 + ' m0,210 V5000" />\n'
+		    + ' fill="blue" + opacity="' + m_opacity + '"'
+		    + ' d="M' + x + ',0 l-20,-100 l40,0 l-20,100 V' + y1
+		    + ' m0,210 V5000" />\n'
 		    + '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"'
 		    + '" font-size="120" fill="rgb(0,0,200)">'
@@ -410,7 +418,7 @@ function read_signals(t, update) {
 function fetch() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
-    var title = 'LightWAVE: ' + db + '/' + record;
+    var title = 'LW: ' + db + '/' + record;
     document.title = title;
     var t0 = $('[name=t0]').val();
     ts0 = strtim(t0);
@@ -492,7 +500,7 @@ function show_time(x) {
 function slist() {
     db = $('[name=db]').val();
     record = $('[name=record]').val();
-    var title = 'LightWAVE: ' + db + '/' + record;
+    var title = 'LW: ' + db + '/' + record;
     $('.recann').html(db + '/' + record);
     document.title = title;
     $('#info').empty();
@@ -618,6 +626,15 @@ function dblist() {
 // Set up user interface event handlers.
 function set_handlers() {
     $('#lwform').on("submit", false);      // disable form submission
+    $(window).resize(show_plot);           // redraw signal window if resized
+    // Allow the browser to redraw content from its cache when switching tabs
+    // (using jQuery UI 1.9 interface; use 'cache: true' with older jQuery UI)
+    $('#tabs').tabs({
+	beforeLoad: function(event, ui) {
+	    if (ui.tab.data("loaded")) { event.preventDefault(); return; }
+	    ui.jqXHR.success(function() { ui.tab.data("loaded", true); });
+	}
+    });
     // Button handlers:
     $('#fplot').on("click", fetch_plot);   // get data and plot them
     $('#ftext').on("click", fetch_text);   // get data and print them
@@ -626,6 +643,12 @@ function set_handlers() {
     $('.rev').on("click", gorev);	   // go back by dt and plot or print
     $('.sor').on("click", gostart);
     $('.eor').on("click", goend);
+    $("#bgrid").button().click(function(event){
+	g_opacity = 1 - g_opacity;	   // toggle grid visibility
+    });
+    $("#bmarkers").button().click(function(event){
+	m_opacity = 1 - m_opacity;	   // toggle marker bar visibility
+    });
 }
 
 // When the page is ready, load the list of databases and set up event handlers.

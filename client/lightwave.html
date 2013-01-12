@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	31 December 2012  version 0.15
+			Last revised:	12 January 2013   version 0.22
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.
 
@@ -54,7 +54,9 @@ provides some of the functions of LightWAVE without Javascript.
  <table>
   <tr id="dblist"><td colspan=2>Loading list of databases ...</td></tr>
 
-  <tr id="rlist"></tr>
+  <tr id="rlist">
+   <td colspan=2 align="center">
+     First visit? Click on the <b>Help</b> tab above.</td></tr>
 
   <tr id="slist"></tr>
 
@@ -68,8 +70,11 @@ provides some of the functions of LightWAVE without Javascript.
   <tr>
     <td align=left>Go to:
       <input type="text" name="t0" value="" tabindex="1"
-	     placeholder="HH:MM:SS" size="20">
-      &nbsp;<button id="fplot" tabindex="2">Plot</button>
+	     title="Enter the elapsed time from the start of the
+record to the start of the window, then click 'Plot'"
+	     placeholder="HH:MM:SS" size="10">
+      &nbsp;<button id="fplot" tabindex="2"
+		    title="(re)plot data">Plot</button>
       &nbsp;<button class="sor" tabindex="5"
 		    title="start of record">|&lt;</button>
       &nbsp;<button class="rev" tabindex="4"
@@ -79,7 +84,7 @@ provides some of the functions of LightWAVE without Javascript.
       &nbsp;<button class="eor" tabindex="6"
 		    title="end of record">&gt;|</button></td>
     <td align=right>
-      <span class="recann"></span>&nbsp;<span class="pointer"></span></td>
+      <span class="recann"></span><br><span class="pointer">&nbsp;</span></td>
   </tr>
  </table>
  <div id="plotdata"></div>
@@ -97,10 +102,12 @@ provides some of the functions of LightWAVE without Javascript.
  <table width="100%">
   <tr>
     <td align=left>Go to:
-      <input type="text" name="t0" placeholder="HH:MM:SS" size="20">
+      <input type="text" name="t0" placeholder="HH:MM:SS" size="10"
+	     title="Enter the elapsed time from the start of the
+record to the start of the data tables, then click 'Text'">
       &nbsp;<button class="sor" title="start of record">|&lt;</button>
       &nbsp;<button class="rev" title="previous window">&lt;</button>
-      &nbsp;<button id="ftext">Text</button>
+      &nbsp;<button id="ftext" title="(re)print data">Text</button>
       &nbsp;<button class="fwd" title="next window">&gt;</button>
       &nbsp;<button class="eor" title="end of record">&gt;|</button></td>
     <td align=right>
@@ -114,6 +121,12 @@ provides some of the functions of LightWAVE without Javascript.
 <div id="settings">
  <div id="calibrate-display" style='height: 1in; left: -100%;
       position: absolute; top: -100%; width: 1in;'></div>
+
+<input type=checkbox checked="checked" name=bgrid id=bgrid>
+  <label title="toggle grid" for=bgrid>Grid</label></input>
+<input type=checkbox checked="checked" name=bmarkers id=bmarkers>
+  <label title="toggle marker bars" for=bmarkers>Markers</label></input>
+
 </div>
 
 <div id="help">
