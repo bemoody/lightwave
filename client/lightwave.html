@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	12 January 2013   version 0.22
+			Last revised:	13 January 2013   version 0.23
 
-LightWAVE is a lightweight waveform and annotation viewer and editor.
+LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
+to view any of the recordings of physiologic signals and time series in
+PhysioBank, together with their annotations (event markers).
 
-LightWAVE is modelled on WAVE, an X11/XView application I wrote and maintained
-between 1989 and 2012.  LightWAVE runs within any modern web browser and does
-not require installation on the user's computer.
+LightWAVE runs within any modern web browser and does not require installation
+on the user's computer, tablet, or phone.  LightWAVE is free software licensed
+under the GPL.
 
 This file contains the main HTML5 page, which is the starting point for using
-LightWAVE.  When this page is loaded by a JavaScript-enabled web browser, the
-browser loads lightwave.css and jquery-ui.min.css (CSS style sheets),
-jquery.min.js and jquery-ui.min.js (the jQuery and jQuery UI JavaScript
-libraries), and lightwave.js (LightWAVE-specific JavaScript code, which runs
-within the browser to provide low-latency interaction with the user).
+LightWAVE.  When a JavaScript-enabled web browser loads this page, it also
+loads the .css and .js files mentioned in its <head> section, including
+lightwave.css (LightWAVE-specific styles) and lightwave.js (LightWAVE-specific
+JavaScript code, which runs within the browser to provide low-latency
+interaction with the user).  The other .css and .js files are recent unmodified
+versions of standard jQuery and jQuery UI components.
 -->
 <html>
 <head>
@@ -75,13 +78,19 @@ record to the start of the window, then click 'Plot'"
 	     placeholder="HH:MM:SS" size="10">
       &nbsp;<button id="fplot" tabindex="2"
 		    title="(re)plot data">Plot</button>
-      &nbsp;<button class="sor" tabindex="5"
+      &nbsp;<button class="sor" tabindex="8"
 		    title="start of record">|&lt;</button>
+      &nbsp;<button class="srev" tabindex="5"
+	   title="search for previous 'Find' target">&lt; Search</button>
       &nbsp;<button class="rev" tabindex="4"
 		    title="previous window">&lt;</button>
+      &nbsp;<button class="find" tabindex="9"
+		    title="define search target">Find...</button>
       &nbsp;<button class="fwd" tabindex="3"
 		    title="next window">&gt;</button>
-      &nbsp;<button class="eor" tabindex="6"
+      &nbsp;<button class="sfwd" tabindex="6"
+		    title="search for next 'Find' target">Search &gt;</button>
+      &nbsp;<button class="eor" tabindex="7"
 		    title="end of record">&gt;|</button></td>
     <td align=right>
       <span class="recann"></span><br><span class="pointer">&nbsp;</span></td>

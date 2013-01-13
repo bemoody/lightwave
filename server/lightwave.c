@@ -85,6 +85,9 @@ int main(int argc, char **argv)
         interactive = 1;  /* interactive mode for debugging */
     wfdbquiet();	  /* suppress WFDB library error messages */
 
+    /* To add a custom data repository, uncomment and edit the next line. */
+/* setwfdb(". /usr/local/database http://physionet.org/physiobank/database"); */
+
     if (!(action = get_param("action"))) {
 	print_file(LWDIR "/doc/about.shtml");
 	exit(0);

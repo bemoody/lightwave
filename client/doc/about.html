@@ -36,12 +36,29 @@ magnification.
 <p> View details about the record, including text representations of the
 annotations and digitized signals, on the <b>Tables</b> tab.
 
+<p> Use the controls on the <b>Settings</b> tab to modify LightWAVE's
+behavior.  Your changes persist until LightWAVE is reloaded.
+
 <p>
 Checklists of the signals and annotators (sets of annotations) in the currently
 open record appear on the <b>Choose input</b> tab.  You may uncheck any of them
 that are not of interest if you wish; this may be useful if there are many
 signals or if you have an unusually slow network connection.  You may also
 select another record to view on the <b>Choose input</b> tab.
+
+<p>
+You may add a query string of the form <tt>?db=</tt><em>database</em> to
+the LightWAVE URL to restrict the input to the specified <em>database</em>.
+For example, the URL <a href="http://physionet.org/lightwave/?db=mitdb">http://physionet.org/lightwave/?db=mitdb</a> starts LightWAVE with the MIT-BIH Arrhythmia Database (mitdb) preselected on the <b>Choose input</b> tab.
+
+<p> Similarly, you may add a query string of the form
+<tt>?db=</tt><em>database</em><tt>&amp;record=</tt><em>record</em> to
+the LightWAVE URL to restrict the input to the specified
+<em>database</em> and <em>record</em>.  For example, the URL <a
+href="http://physionet.org/lightwave/?db=mitdb&record=200">http://physionet.org/lightwave/?db=mitdb&amp;record=200</a>
+starts LightWAVE with the MIT-BIH Arrhythmia Database (mitdb)
+preselected on the <b>Choose input</b> tab.
+
 
 <hr>
 
@@ -87,6 +104,8 @@ across multiple computers.)
 <li> <a href="COPYING.html">License information</a>
 <li> <a href="client-install.html">Installing a local copy of the LightWAVE
 client</a>: setting up a testbed for customizing the user interface
+<li> <a href="server-install.html">Installing a local copy of the LightWAVE
+server</a>: run LightWAVE without a network connection
 <li> <a href="lw-api.html">The LightWAVE Server Protocol</a>: technical note
 for developers of custom clients and standalone applications
 <li> <a href="to-do.html">LightWAVE to-do list</a>: planned features and

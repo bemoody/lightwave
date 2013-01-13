@@ -1,4 +1,4 @@
-LWVERSION = 0.22
+LWVERSION = 0.23
 # file: Makefile	G. Moody	18 November 2012
 #			Last revised:	 1 January 2013 (version 0.16)
 # 'make' description file for building and installing LightWAVE
@@ -81,11 +81,16 @@ LDFLAGS = -lcgi -lwfdb
 
 # Install both the lightwave server and client on this machine.
 install:	server client
+	@echo
 	@echo "LightWAVE has been installed.  If an HTTP server is running,"
 	@echo "use LightWAVE by opening your web browser and visiting"
 	@echo "    http://HOST/lightwave/"
 	@echo "(replacing HOST by the hostname of this server, or by localhost"
 	@echo "or 0.0.0.0 to run without a network connection)."
+
+# Check that the server is working.
+test:
+	check/lw-test $(BINDIR)
 
 # Install the lightwave client.
 client:	  clean FORCE

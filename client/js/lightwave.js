@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	12 January 2013  version 0.22
+//			Last revised:	13 January 2013  version 0.23
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -36,8 +36,8 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
-var db;		// name of the selected database
-var record;	// name of the selected record
+var db = '';	// name of the selected database
+var record = '';// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by loadslist()
 var annotators; // annotators for the selected database, from loadrlist()
 var ann = [];   // annotations read and cached by read_annotations()
@@ -416,8 +416,6 @@ function read_signals(t, update) {
 
 // Handle a request for data to display as a plot or tables.
 function fetch() {
-    db = $('[name=db]').val();
-    record = $('[name=record]').val();
     var title = 'LW: ' + db + '/' + record;
     document.title = title;
     var t0 = $('[name=t0]').val();
@@ -483,6 +481,18 @@ function goend() {
     go_here(t*dt*tfreq);
 }
 
+function srev() {
+    alert("Search backward not implemented yet");
+}
+
+function sfwd() {
+    alert("Search forward not implemented yet");
+}
+
+function find() {
+    alert("Find not implemented yet");
+}
+
 function help() {
     $('#helpframe').attr('src', 'doc/about.html');
 }
@@ -498,8 +508,6 @@ function show_time(x) {
 
 // Load the list of signals for the selected record.
 function slist() {
-    db = $('[name=db]').val();
-    record = $('[name=record]').val();
     var title = 'LW: ' + db + '/' + record;
     $('.recann').html(db + '/' + record);
     document.title = title;
@@ -535,6 +543,12 @@ function slist() {
     });
 };
 
+// When a new record is selected, reload the signal list.
+function newrec() {
+    record = $('[name=record]').val();
+    slist();
+}
+
 // Load the list of annotators in the selected database.
 function alist() {
     url = 'http://physionet.org/cgi-bin/lightwave?action=alist&callback=?&db='
@@ -564,10 +578,17 @@ function alist() {
 // Load the list of records in the selected database, and set up an event
 // handler for record selection.
 function rlist() {
+    var rlist = '';
+
+    if (record !== '') {
+	rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
+	$('#rlist').html(rlist);
+	slist();
+	return;
+    }
     url = 'http://physionet.org/cgi-bin/lightwave?action=rlist&callback=?&db='
          + db;
     $.getJSON(url, function(data) {
-	var rlist = '';
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
 		'<td><select name=\"record\">\n' +
@@ -579,13 +600,14 @@ function rlist() {
 	}
 	$('#rlist').html(rlist);
 	// fetch the list of signals when the user selects a record
-	$('[name=record]').on("change", slist);
+	$('[name=record]').on("change", newrec);
     });
 };
 
 // When a new database is selected, reload the annotation and record lists.
 function newdb() {
-    db = $('[name=db]').val();
+    db = $('#db').val();
+    record = '';
     var title = 'LightWAVE: ' + db;
     document.title = title;
     $('#tabs').tabs({disabled:[1,2]});
@@ -602,11 +624,18 @@ function newdb() {
 // Load the list of databases and set up an event handler for db selection.
 function dblist() {
     var dblist;
+
+    if (db !== '') {
+	dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
+	$('#dblist').html(dblist);
+	alist();
+	return;
+    }
     $.getJSON('http://physionet.org/cgi-bin/lightwave?action=dblist&callback=?',
      function(data) {
 	 if (data) {
 	     dblist = '<td align=right>Database:</td>' + 
-		 '<td><select name=\"db\">\n' +
+		 '<td><select name=\"db\" id=\"db\">\n' +
 		 '<option value=\"\" selected>--Choose one--</option>\n';
 	     for (i = 0; i < data.database.length; i++)
 	         dblist += '<option value=\"' + data.database[i].name +
@@ -619,7 +648,7 @@ function dblist() {
 		 + " unavailable.  Please try again later.</b></td>";
 	 }
 	 $('#dblist').html(dblist)
-	 $('[name=db]').on("change", newdb); // invoke newdb when db changes
+	 $('#db').on("change", newdb); // invoke newdb when db changes
      });
 }
 
@@ -641,8 +670,17 @@ function set_handlers() {
     $('.fwd').on("click", gofwd);	   // advance by dt and plot or print
     $('[name=t0]').on("blur", go_to);      // go to selected location
     $('.rev').on("click", gorev);	   // go back by dt and plot or print
-    $('.sor').on("click", gostart);
-    $('.eor').on("click", goend);
+    $('.sor').on("click", gostart);	   // go to start of record
+    $('.eor').on("click", goend);	   // go to end of record
+    $('.srev').on("click", srev);	   // search for previous 'Find' target
+    $('.sfwd').on("click", sfwd);	   // search for next 'Find' target
+    $('.find').on("click", find);	   // open 'Find' dialog
+
+    // These buttons are disabled until the search function is implemented.
+    $('.sfwd').attr('disabled', 'disabled');
+    $('.srev').attr('disabled', 'disabled');
+    $('.find').attr('disabled', 'disabled');
+
     $("#bgrid").button().click(function(event){
 	g_opacity = 1 - g_opacity;	   // toggle grid visibility
     });
@@ -651,10 +689,41 @@ function set_handlers() {
     });
 }
 
+// Check for query string in URL, decode and run query or queries if present
+function parse_url() {
+    var s = window.location.href.split("?");
+    var n = s.length - 1;
+    if (n < 1) {
+	dblist();	// no query, get the list of databases
+	return;
+    }
+    if (n > 1) {
+	alert('The URL contains ' + n + ' "?" characters:\n\n'
+	      + window.location.href
+	      + '\n\n  ... but it may have no more than one.\n'
+	      + 'Everything after the first "?" will be ignored.');
+	dblist();
+	return;
+    }
+    var q = s[1].split("&");
+    for (n = 0; n < q.length; n++) {
+	var v = q[n].split("=");
+	if (v[0] == 'db') db = v[1];
+	else if (v[0] == 'record') record = v[1];
+    }
+    if (db !== '') {
+	var title = 'LightWAVE: ' + db;
+	dblist();
+	rlist();
+	if (record !== '') title = 'LW: ' + db + '/' + record;
+	document.title = title;
+    }
+}
+
 // When the page is ready, load the list of databases and set up event handlers.
 $(document).ready(function(){
     $('#tabs').tabs({disabled:[1,2]});	// disable the View and Tables tabs
-    dblist();				// get the list of databases
+    parse_url();			// handle query string if present
     help();				// load help into the help tab
     set_handlers();			// set UI event handlers
 });
