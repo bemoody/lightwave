@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	11 January 2013  version 0.20
+			Last revised:	14 January 2013  version 0.24
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -176,8 +176,26 @@ int main(int argc, char **argv)
 	    if ((p = get_param("t0")) == NULL) p = "0";
 	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
 	    if ((p = get_param("dt")) == NULL) p = "1";
-	    if ((dt = atoi(p)) <= 0) dt = 0;
-	    else if ((dt *= ffreq) < 1) dt = 1;
+
+	    /* dt is the amount of data to be retrieved.  On input, dt is
+	       in seconds, but the next block of code converts it to sample
+	       intervals.  There are several special cases:
+	       * If dt is 0 or negative, no samples are retrieved, but all
+	         annotations are retrieved.
+	       * If dt is positive but less than 1 sampling interval, it is
+	         set to 1 sampling interval.  This occurs for records with
+		 very low sampling rates, such as once per minute.
+	       * Otherwise, if dt is longer than 2 minutes and longer than
+	         120000 sample intervals, it is reduced to 2 minutes, to
+		 limit the load on the server from a single request.
+	    */
+	    dt = atoi(p);
+	    if (dt <= 0) dt = 0;
+	    else {
+		dt *= ffreq;
+		if (dt < 1) dt = 1;
+		else if (dt > 120*ffreq && dt > 120000) dt = 120*ffreq;
+	    }
 	    tf = t0 + dt;
 
 	    fetch();

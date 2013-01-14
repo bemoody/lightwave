@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	13 January 2013  version 0.23
+//			Last revised:	14 January 2013  version 0.24
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -52,9 +52,10 @@ var ts0 = -1;   // time of the first sample in the signal window, in samples
 var tsf;	// time of the first sample after the signal window, in samples
 var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
-
-var g_opacity = 1;
-var m_opacity = 1;
+var target = '';// search target, set in Find... dialog
+var atarget = '';// annotator to be searched, set in Find... dialog
+var g_opacity = 1; // grid opacity (1: opaque, 0: transparent)
+var m_opacity = 1; // annotation marker bar opacity
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -482,15 +483,102 @@ function goend() {
 }
 
 function srev() {
-    alert("Search backward not implemented yet");
+    var na = 0, sa = '', i;
+
+    for (i = 0; i < nann; i++) {
+	if (ann[i].name == atarget) {
+	    sa = ann[i].annotation;
+	    na = sa.length;
+	    break;
+	}
+    }
+    if (i >= nann) return;
+
+    for (i = na - 1; i >= 0 && sa[i].t > ts0; i--)
+	;
+
+    for ( ; i >= 0 && sa[i].a != target; i--)
+	;
+
+    if (i >= 0) {
+	var t = sa[i].t - (sa[i].t % (dt * tfreq));
+	go_here(t);
+    }
+    else alert(target + ' not found in ' + atarget + ' before ' + timstr(ts0));
 }
 
 function sfwd() {
-    alert("Search forward not implemented yet");
+    var na = 0, sa = '', i;
+
+    for (i = 0; i < nann; i++) {
+	if (ann[i].name == atarget) {
+	    sa = ann[i].annotation;
+	    na = sa.length;
+	    break;
+	}
+    }
+    if (i >= nann) return;
+
+    for (i = 0; i < na && sa[i].t < tsf; i++)
+	;
+
+    for ( ; i < na && sa[i].a != target; i++)
+	;
+
+    if (i < na) {
+	var t = sa[i].t - (sa[i].t % (dt * tfreq));
+	go_here(t);
+    }
+    else alert(target + ' not found in ' + atarget + ' after ' + timstr(tsf));
 }
 
+// Set target for searches.
 function find() {
-    alert("Find not implemented yet");
+    if (nann < 1) {
+	alert('No annotations to search!');
+	return;
+    }
+
+    var content = '<p>Search for: <input type="text"'
+	+ ' name="target" id="target" value="' + target + '"'
+	+ ' title="Enter an annotation mnemonic (N, V, S, ...)" size="4"></p>';
+    if (nann > 1) {
+	content += '<br>In annotator: <select name=\"atarget\">\n';
+	if (atarget === '') {
+	    content += 	'<option value=\"\" selected>--Choose one--</option>\n';
+	}
+	for (var i = 0; i < annotators.length; i++) {
+	    content += '<option value=\"' + annotators[i].name + '\"';
+	    if (atarget === annotators[i].name) {
+		content += ' selected';
+	    }
+	    content += '>' + annotators[i].name + '</option>\n';
+	}
+	content += '</select></td>\n';
+    }
+    $('#findbox').dialog("open").html(content);
+    $('#findbox').dialog({
+	open: function(event, ui){
+//	    $('[name=target]').val(target);
+	    $('.srev').attr('disabled', 'disabled');
+	    $('.sfwd').attr('disabled', 'disabled');
+	}
+    });
+    $('#findbox').dialog({
+	beforeClose: function(event, ui){
+	    target = $('#target').val();
+	    if (nann > 1) {
+		atarget = $('[name=atarget]').val();
+	    }
+	    else atarget = annotators[0].name;
+	}
+    });
+    $('#findbox').dialog({
+	close: function(event, ui){
+	    $('.srev').removeAttr('disabled');
+	    $('.sfwd').removeAttr('disabled');
+	}
+    });
 }
 
 function help() {
@@ -675,11 +763,12 @@ function set_handlers() {
     $('.srev').on("click", srev);	   // search for previous 'Find' target
     $('.sfwd').on("click", sfwd);	   // search for next 'Find' target
     $('.find').on("click", find);	   // open 'Find' dialog
+    $('#findbox').dialog({autoOpen: false});
 
     // These buttons are disabled until the search function is implemented.
     $('.sfwd').attr('disabled', 'disabled');
     $('.srev').attr('disabled', 'disabled');
-    $('.find').attr('disabled', 'disabled');
+//    $('.find').attr('disabled', 'disabled');
 
     $("#bgrid").button().click(function(event){
 	g_opacity = 1 - g_opacity;	   // toggle grid visibility
@@ -693,6 +782,7 @@ function set_handlers() {
 function parse_url() {
     var s = window.location.href.split("?");
     var n = s.length - 1;
+    var t0 = '';
     if (n < 1) {
 	dblist();	// no query, get the list of databases
 	return;
@@ -710,12 +800,20 @@ function parse_url() {
 	var v = q[n].split("=");
 	if (v[0] == 'db') db = v[1];
 	else if (v[0] == 'record') record = v[1];
+	else if (v[0] == 't0') t0 = v[1];
     }
     if (db !== '') {
 	var title = 'LightWAVE: ' + db;
 	dblist();
 	rlist();
-	if (record !== '') title = 'LW: ' + db + '/' + record;
+	if (record !== '') {
+	    title = 'LW: ' + db + '/' + record;
+	    if (t0 != '') {
+		t = strtim(t0);
+		t0 = timstr(t);
+		$('[name=t0]').val(t0);
+	    }
+	}
 	document.title = title;
     }
 }
