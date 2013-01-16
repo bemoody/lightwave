@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	14 January 2013  version 0.24
+			Last revised:	15 January 2013  version 0.25
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -55,7 +55,8 @@ _______________________________________________________________________________
 
 #define TOL	0.001	/* tolerance for error in approximate equality */
 
-static char *action, *annotator[NAMAX], buf[BUFSIZE], *db, *record, *recpath;
+static char *action, *annotator[NAMAX], buf[BUFSIZE], *db, *record, *recpath,
+    **sname;
 static int interactive, nann, nsig, nosig, *sigmap;
 WFDB_FILE *ifile;
 WFDB_Frequency ffreq, tfreq;
@@ -65,8 +66,10 @@ WFDB_Time t0, tf, dt;
 
 char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
+int ufindsig(char *name);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
     fetchannotations(void), fetchsignals(void), fetch(void),
+    force_unique_signames(void), free_sname(void),
     print_file(char *filename), jsonp_end(void);
 
 int main(int argc, char **argv)
@@ -89,7 +92,7 @@ int main(int argc, char **argv)
 /* setwfdb(". /usr/local/database http://physionet.org/physiobank/database"); */
 
     if (!(action = get_param("action"))) {
-	print_file(LWDIR "/doc/about.shtml");
+	print_file(LWDIR "/doc/about.txt");
 	exit(0);
     }
 
@@ -119,15 +122,6 @@ int main(int argc, char **argv)
         exit(0);	/* early exit if no record chosen */
 
     else {
-	// FIXME: uncomment the next line to work around a WFDB library bug
-	//   setwfdb("/usr/local/database");
-	// This bug was partially fixed in WFDB 10.5.17.  It is triggered when
-	// the WFDB path includes a netfile ('http://...') component and there
-	// is an invalid response to a request (for example, if an ISP accepts
-	// a request for a PhysioNet URL but returns its own signup page with
-	// status 200 (OK) instead of an error (DNS hijacking).  In this case,
-	// the WFDB library attempts to parse the response, with unpredictable
-	// results.
         SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
         sprintf(recpath, "%s/%s", db, record);
 
@@ -137,6 +131,8 @@ int main(int argc, char **argv)
 	    SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
 	    nsig = isigopen(recpath, s, nsig);
 	} 
+
+	force_unique_signames();
 
 	/* Find the least common multiple of the sampling frequencies (which
 	   may not be exactly expressible as floating-point numbers).  In
@@ -164,7 +160,7 @@ int main(int argc, char **argv)
 		for (n = 0; n < nsig; n++)
 		    sigmap[n] = -1;
 		while (p = get_param_multiple("signal")) {
-		    if ((n = findsig(p)) >= 0) {
+		    if ((n = ufindsig(p)) >= 0) {
 			sigmap[n] = n; n++; nosig++;
 		    }
 		}
@@ -412,7 +408,7 @@ void info(void)
     printf("    \"duration\": \"%s\"", p);
     if (nsig > 0) printf(",\n    \"signal\": [\n");
     for (i = 0; i < nsig; i++) {
-        printf("      { \"name\": %s,\n", p = strjson(s[i].desc)); SFREE(p);
+        printf("      { \"name\": %s,\n", p = strjson(sname[i])); SFREE(p);
 	printf("        \"tps\": %g,\n", tfreq/(ffreq*s[i].spf));
 	if (s[i].units) {
 	    printf("        \"units\": %s,\n", p = strjson(s[i].units));
@@ -542,7 +538,7 @@ void fetchsignals(void)
 
  	    if (!first) printf(",\n");
 	    else first = 0;
-	    printf("      { \"name\": %s,\n", p = strjson(s[n].desc)); SFREE(p);
+	    printf("      { \"name\": %s,\n", p = strjson(sname[n])); SFREE(p);
 	    if (s[n].units) {
 		printf("        \"units\": %s,\n", p = strjson(s[n].units));
 		SFREE(p);
@@ -555,7 +551,7 @@ void fetchsignals(void)
 		   s[n].gain ? s[n].gain : WFDB_DEFGAIN);
 	    printf("        \"base\": %d,\n", s[n].baseline);
 	    printf("        \"tps\": %d,\n", (int)(tfreq/(ffreq*s[n].spf)+0.5));
-	    if (getcal(s[n].desc, s[n].units, &cal) == 0)
+	    if (getcal(sname[n], s[n].units, &cal) == 0)
 		printf("        \"scale\": %g,\n", cal.scale);
 	    else
 		printf("        \"scale\": 1,\n");
@@ -579,4 +575,80 @@ void fetch(void)
     fetchsignals();
     fetchannotations();
     printf("}\n");
+}
+
+/* force_unique_signames() tries to ensure that each signal has a unique name.
+   By default, the name of signal i is s[i].desc.  The names of any signals
+   that are not unique are modified by appending a unique suffix to each
+   such signal.  For example, if there are five signals with default names
+        A, A, B, C, B
+   they are renamed as
+        A:1*, A:2*, B:3*, C, B:4*
+
+   For efficiency, this function makes two assumptions that may cause it
+   to fail to achieve its intended purpose in rare cases.  First, the unique
+   suffix is limited to five characters, so that at most 999 signals can be
+   renamed.  Second, if any default name ends with a string that matches a
+   unique suffix, it will not be recognized as non-unique.  For example, if
+   the default names are
+       A, A, A:0*
+   they are renamed as
+       A:0*, A:1*, A:0*
+   The format of the suffix has been chosen to make this unlikely.
+ */
+void force_unique_signames(void) {
+    int i, j;
+
+    atexit(free_sname);
+    SALLOC(sname, sizeof(char *), nsig);
+
+    for (i = 0; i < nsig; i++) {
+	for (j = i+1; j < nsig; j++) {
+	    if (strcmp(s[i].desc, s[j].desc) == 0) {
+		sname[i] = sname[j] = "change";
+	    }
+	}
+    }
+
+    for (i = j =  0; i < nsig; i++) {
+	if (sname[i] == NULL && j < 1000) {
+	    SSTRCPY(sname[i], s[i].desc);
+	}
+	else {
+	    SUALLOC(sname[i], sizeof(char), strlen(s[i].desc) + 6);
+	    sprintf(sname[i], "%s:%d*", s[i].desc, j++);
+	}
+    }	
+}
+
+/* ufindsig() is based on findsig() from the WFDB library, but it uses the
+   unique signal names assigned by force_unique_signames() rather than
+   the default signal names.
+*/
+int ufindsig(char *p) {
+  char *q = p;
+  int i;
+
+  while ('0' <= *q && *q <= '9')
+      q++;
+  if (*q == 0) {	/* all digits, probably a signal number */
+      i = atoi(p);
+      if (i < nsig) return (i);
+  }
+  /* Otherwise, p is either an integer too large to be a signal number or a
+     string containing a non-digit character.  Assume it's a signal name. */
+  for (i = 0; i < nsig; i++)
+      if (strcmp(p, sname[i]) == 0) return (i);
+
+  /* No match found. */
+  return (-1);    
+}
+
+void free_sname(void)
+{
+    if (sname) {
+	while (nsig > 0)
+	    free(sname[--nsig]);
+	free(sname);
+    }
 }

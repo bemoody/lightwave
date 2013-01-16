@@ -8,7 +8,6 @@ then
 else
    LW=lightwave
 fi
-echo $LW
 
 cat >lw-test-params <<EOF
 fetch

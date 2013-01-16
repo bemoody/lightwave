@@ -220,6 +220,28 @@ of databases ..." for a long time, check that:
      be read by Apache
 </ul>
 
+<h3>Using your locally hosted server</h3>
+
+<p>
+If you have a network connection, you may use your server by connecting to
+it with a browser and LightWAVE client running on the same host.  The
+server will use PhysioBank as its data repository by default.  (This is the
+configuration that you tested in the previous section.)
+
+<p>
+If you have set up your own data repository (see below) on the same host
+as the server, you may use LightWAVE without a network connection, by
+connecting to the server with a browser and LightWAVE client also running
+on the same host.
+
+<p>
+In order to use your server from a different host, the LightWAVE client
+must be configured to use it rather than PhysioNet's public server.  To
+do this, go to the <b>Settings</b> tab and set the server URL to the
+location of your server.  You can change the default server URL by changing
+the value of <tt>server</tt> just below the initial comment block in
+<tt>client/js/lightwave.js</tt>.
+
 <h3>Custom data repositories</h3>
 
 <p>
@@ -285,17 +307,4 @@ If you wish to use a repository other than PhysioBank:
      is unannotated.
 </ul>
 </ol>
-
-<p>
-[<a href="about.html">Main help</a>]
 </html>
-
-
-
-
-
-
-
-
-
-

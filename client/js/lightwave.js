@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	14 January 2013  version 0.24
+//			Last revised:	16 January 2013  version 0.25
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -21,7 +21,7 @@
 //
 // You may contact the author by e-mail (george@mit.edu) or postal
 // mail (MIT Room E25-505A, Cambridge, MA 02139 USA).  For updates to
-// this software, please visit PhysioNet (http://www.physionet.org/).
+// this software, please visit PhysioNet (http://physionet.org/).
 // ____________________________________________________________________________
 //
 // LightWAVE is a lightweight waveform and annotation viewer and editor.
@@ -36,17 +36,21 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
+// server is the first part of every AJAX request.  Change it if you are
+// not using the public LightWAVE server.
+var server = 'http://physionet.org/cgi-bin/lightwave';
+
+var url;	// request sent to server (server + request-specific string)
 var db = '';	// name of the selected database
 var record = '';// name of the selected record
-var recinfo;    // metadata for the selected record, initialized by loadslist()
-var annotators; // annotators for the selected database, from loadrlist()
-var ann = [];   // annotations read and cached by read_annotations()
+var recinfo;    // metadata for the selected record, initialized by slist()
 var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
+var annotators = ''; // annotators for the selected database, from alist()
+var ann = [];   // annotations read and cached by read_annotations()
 var nann = 0;	// number of annotators, set by read_annotations()
+var signals;    // signals for the selected record, from slist()
 var nsig = 0;	// number of signals, set by read_signals()
-var sig = [];   // signal array, read and cached by read_signals()
 var out_format; // 'plot' or 'text', set by button handler functions
-var url;	// request sent to server
 var dt = 10;    // window width in seconds
 var ts0 = -1;   // time of the first sample in the signal window, in samples
 var tsf;	// time of the first sample after the signal window, in samples
@@ -54,8 +58,10 @@ var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
 var target = '';// search target, set in Find... dialog
 var atarget = '';// annotator to be searched, set in Find... dialog
-var g_opacity = 1; // grid opacity (1: opaque, 0: transparent)
-var m_opacity = 1; // annotation marker bar opacity
+var g_visible = 1; // grid (1: on, 0: off)
+var m_visible = 1; // annotation marker bars (1: on, 0: off)
+var a_visible = [];
+var s_visible = [];
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -71,7 +77,6 @@ function set_trace(db, record, s) {
 
     // set properties of s that are not properties from server response
     s.id = tid++;
-    s.visible = true;
     s.db = db;
     s.record = record;
 
@@ -143,11 +148,11 @@ function strtim(s) {
 }
 
 function show_tables() {
-    var atext = '', stext = '', ia;
+    var atext = '', stext = '', ia, is;
     if (ann.length > 0) 
 	atext += '<h3>Annotations</h3>\n';
     for (ia = 0; ia < nann; ia++) {
-	if (!ann[ia].visible) {
+	if (a_visible[ann[ia].name] == 0) {
 	    atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
 	}
 	else {
@@ -170,15 +175,22 @@ function show_tables() {
 	}
     }
     $('#textdata').html(atext);
-    
-    if (sig) {
+
+    if (signals.length > 0) {
+	var sig = [];
+	for (i = is = 0; i < signals.length; i++) {
+	    var sname = signals[i].name;
+	    if (s_visible[sname])
+		sig[is++] = find_trace(db, record, sname, ts0);
+	}
+
 	stext = '<h3>Signals</h3>\n';
 	stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
 	stext += '<p><table class="dtable">\n<tr><th>Time (elapsed)&nbsp;</th>';
-	for (i = 0; i < nsig; i++)
+	for (i = 0; i < is; i++)
 	    stext += '<th>' + sig[i].name + '&nbsp;</th>';
 	stext += '\n<tr><th></th>';
-	for (i = 0; i < nsig; i++) {
+	for (i = 0; i < is; i++) {
 	    u = sig[i].units;
 	    if (!u) u = '[mV]';
 	    stext += '<th><i>(' + u + ')</i></th>';
@@ -186,7 +198,7 @@ function show_tables() {
 	var t = ts0;
 	for (var i = 0; t < tsf; i++, t++) {
 	    stext += '</tr>\n<tr><td>' + mstimstr(t);
-	    for (var j = 0; j < nsig; j++) {
+	    for (var j = 0; j < is; j++) {
 		stext += '</td><td>';
 		if (t%sig[j].tps == 0) {
 		    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
@@ -212,54 +224,62 @@ function show_plot() {
     var ia = 0, is = 0;
     while (is < nsig || ia < nann) {
 	if (is < nsig) { y0s[is] = y; y += dy; is++; }
-	if (ia < nann)   { y0a[ia] = y; y += dy; ia++; }
+	if (ia < nann) { y0a[ia] = y; y += dy; ia++; }
     }
 
     var svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
-	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\''
-	+ ' class="svgplot"'
+	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
 	+ ' width="' + width + '" height="' + height
 	+ '" preserveAspectRatio="xMidYMid meet">\n';
     svg += '<g id="viewport" '
 	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">\n';
 
     // background grid
-    var grd = '<g id="grid">\n' +
-	'<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
-	+ ' opacity="' + g_opacity + '" d="M0,0 ';
-    for (var x = 0; x <= 10000; x += 200) {
-	if (x%1000 == 0) grd += 'l0,5000 l-20,100 l40,0 l-20,-100 m200,-5000 ';
-	else grd += 'l0,5000 m200,-5000 ';
+    var grd = '<g id="grid">\n';
+    grd += '<circle cx="-120" cy="5000" r="50" stroke="rgb(200,100,100)"'
+        + ' stroke-width="4" fill="red" fill-opacity="' + g_visible + '"/>';
+    if (g_visible == 0) {
+	grd += '<title>(click to show grid)</title></g>';
     }
-    grd += 'M0,0 '
-    for (var y = 0; y <= 5000; y += 200)
-	grd += 'l10000,0 m-10000,200 ';
-    grd += '" />\n</g>\n';
-    
+    else {
+	grd += '<title>(click to hide grid)</title>'
+	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
+	    + ' d="M0,0 ';
+	for (var x = 0; x <= 10000; x += 200) {
+	    if (x%1000 == 0)
+		grd += 'l0,5000 l-20,100 l40,0 l-20,-100 m200,-5000 ';
+	    else
+		grd += 'l0,5000 m200,-5000 ';
+	}
+	grd += 'M0,0 '
+	for (var y = 0; y <= 5000; y += 200)
+	    grd += 'l10000,0 m-10000,200 ';
+	grd += '" /></g>\n';
+    }
+
     // timestamps
     var tsm = (ts0 + +tsf)/2;
     tst = '<g id="times">\n<text x="0" y="5200" font-size="100" fill="red"'
-	+ 'style="text-anchor: middle;">' + timstr(ts0) + '</text>\n'
+	+ ' style="text-anchor: middle;">' + timstr(ts0) + '</text>\n'
 	+ '<text x="5000" y="5200" font-size="100" fill="red"'
-	+ 'style="text-anchor: middle;">' + timstr(tsm) + '</text>\n'
+	+ ' style="text-anchor: middle;">' + timstr(tsm) + '</text>\n'
 	+ '<text x="10000" y="5200" font-size="100" fill="red"'
-	+ 'style="text-anchor: middle;">' + timstr(tsf) + '</text>\n</g>\n';
+	+ ' style="text-anchor: middle;">' + timstr(tsf) + '</text>\n</g>\n';
     
     // annotator names and annotations
-    sva = '';
+    sva = '<g id="mrkr">\n';
+    sva += '<circle cx="-120" cy="0" r="50" stroke="rgb(0,0,200)"'
+        + ' stroke-width="4" fill="blue" fill-opacity="' + m_visible + '"/>'
+    if (m_visible == 0) sva += '<title>(click to show marker bars)</title>';
+    else sva += '<title>(click to hide marker bars)</title>';
     for (ia = 0; ia < nann; ia++) {
 	var y0 = y0a[ia];
 	sva += '<g id="ann-' + ann[ia].name + '">\n';
-	if (!ann[ia].visible) { // annotations to be hidden, show name at left
-	    sva += '<text x="-900" y="' + y0 + '" font-size="120"'
-		+ ' font-style="italic"'
-		+ ' fill="rgb(100,100,200)">'
-		+ ann[ia].name + '</text>\n';
-	}
-	else {  // annotations are to be visible, show name at right
-	    sva += '<text x="-50" y="' + y0
-		+ '" style="text-anchor: end;" font-size="120" '
-		+ 'font-style="italic" fill="rgb(0,0,200)">'
+	if (a_visible[ann[ia].name] == 1) {
+	    sva += '<title>' + ann[ia].desc + ' (click to hide)</title>'
+		+ '<text x="-50" y="' + y0 + '"'
+		+ ' font-size="120" fill="blue" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
 		+ ann[ia].name + '</text>\n';
 	    var a = ann[ia].annotation;
 	    for (var i = 0; i < a.length; i++) {
@@ -278,16 +298,25 @@ function show_plot() {
 		    if (a[i].a == 'N') txt = '&bull;'
 		    else txt = a[i].a;
 		}
-		y1 = y - 150;
-		sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
-		    + ' fill="blue" + opacity="' + m_opacity + '"'
-		    + ' d="M' + x + ',0 l-20,-100 l40,0 l-20,100 V' + y1
-		    + ' m0,210 V5000" />\n'
-		    + '<text x="' + x + '" y="' + y
+		if (m_visible) {
+		    y1 = y - 150;
+		    sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
+			+ ' fill="blue" + opacity="' + m_visible
+			+ '" d="M' + x + ',0 l-20,-100 l40,0 l-20,100 V' + y1
+			+ ' m0,210 V5000" />\n';
+		}
+		sva += '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"'
 		    + '" font-size="120" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
 	    }
+	}
+	else {
+	    sva += '<title>' + ann[ia].desc + ' (click to view)</title>'
+		+ '<text x="-50" y="' + y0 + '"'
+		+ ' font-size="120" fill="rgb(150,150,200)" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
+		+ ann[ia].name + '</text>\n';
 	}
 	sva += '</g>\n';
     }
@@ -296,25 +325,25 @@ function show_plot() {
     svs = '';
     for (is = 0; is < nsig; is++) {
 	var y0 = y0s[is];
-	svs += '<g id="sig-' + sig[is].name + '">\n';
-	if (!sig[is].visible) { // signal to be hidden, show name at left
-	    svs += '<text x="-900" y="' + y0 + '" font-size="100"'
-		+ ' font-style="italic" fill="rgb(64,64,64)">'
-		+ sig[is].name + '</text>\n';
-	}
-	else {  // signal is to be visible, show name at right
-	    svs += '<text x="-50" y="' + y0 + '" font-size="100"'
-		+ ' font-style="italic" fill="rgb(64,64,64)"'
-		+ ' " style="text-anchor: end;">' + sig[is].name + '</text>\n';
-	    var s = sig[is].samp;
-	    var g = (-400/(sig[is].scale*sig[is].gain));
-	    var z = sig[is].base*g - y0;
+	var sname = signals[is].name;
+	var trace = find_trace(db, record, sname, ts0);
+	
+	svs += '<g id="sig-' + sname + '">\n';
+	if (trace && s_visible[sname] == 1) {
+	    svs += '<title>' + sname + ' (click to hide)</title>' 
+		+ '<text x="-50" y="' + y0 + '"'
+		+ ' font-size="120" fill="black" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
+		+ sname + '</text>\n';
+	    var s = trace.samp;
+	    var g = (-400/(trace.scale*trace.gain));
+	    var z = trace.base*g - y0;
 	    var v = Math.round(g*s[0] - z);
 	    // move to start of trace
 	    svs += '<path stroke="black" stroke-width="6" fill="none"'
-		+ 'd="M0,' + v + ' L';
+		+ ' d="M0,' + v + ' L';
 	    var t = 0;
-	    var tps = sig[is].tps;
+	    var tps = trace.tps;
 	    var tmax = s.length * tps;
 	    var ts = 1000/tfreq;
 	    if (tmax > dt * tfreq) tmax = dt * tfreq;
@@ -324,6 +353,13 @@ function show_plot() {
 		svs += ' ' + t*ts + ',' + v;
 	    }
 	    svs += '" />\n';
+	}
+	else {	// signal is hidden, show label only
+	    svs += '<title>' + sname + ' (click to view)</title>'
+		+ '<text x="-50" y="' + y0 + '"'
+		+ ' font-size="120" fill="rgb(128,128,128)" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
+		+ sname + '</text>\n';
 	}
 	svs += '</g>\n';
     }
@@ -336,6 +372,21 @@ function show_plot() {
 	var x = e.pageX;
 	show_time(x);
     });
+    $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
+    $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
+
+    $("[id^='ann-']").click(function(event){
+	var aname = $(this).attr('id').split("-")[1];
+	a_visible[aname] = 1 - a_visible[aname];
+	show_plot();
+    });
+
+    $("[id^='sig-']").click(function(event){
+	var sname = $(this).attr('id').split("-")[1];
+	s_visible[sname] = 1 - s_visible[sname];
+	read_signals(ts0, true);
+	show_plot();
+    });
 }
 
 
@@ -346,32 +397,21 @@ function update_output() {
 
 // Retrieve one or more complete annotation files for the selected record.
 function read_annotations() {
-    var annreq = '', i;
-    $('[name=annotator]').each(function() {
-	if (this.checked) {
-	    for (i = 0; i < nann; i++) {
-		if (ann[i].name == $(this).val()) {
-		    ann[i].visible = true; // already in cache, visible
-		    break;
-		}
-	    }
-	    if (i >= nann)
-		annreq += '&annotator=' + $(this).val();
-	}
-	else {
-	    for (i = 0; i < nann; i++) {
-		if (ann[i].name == $(this).val())
-		    ann[i].visible = false;  // cached but hidden
-	    }
-	}
-    });
-    if (annreq) {
-	url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db=' + db
-	    + '&record=' + record + annreq + '&dt=0&callback=?';
+    nann = 0;	// new record -- (re)fill the cache
+    if (annotators.length) {
+	var annreq = '', i;
+	for (i = 0; i < annotators.length; i++)
+	    annreq += '&annotator=' + annotators[i].name;
+	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
+	    + '&dt=0&callback=?';
 	$.getJSON(url, function(data) {
 	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
 		ann[nann] = data.fetch.annotator[i];
-		ann[nann].visible = true;  // added to the cache, visible
+		a_visible[ann[nann].name] = 1;
+		ann[nann].opacity = 1;
+		for (var j = 0; j < annotators.length; j++)
+		    if (ann[nann].name == annotators[j].name)
+			ann[nann].desc = annotators[j].desc;
 	    }
 	});
     }
@@ -379,40 +419,30 @@ function read_annotations() {
 
 // Retrieve one or more signal segments starting at t for the selected record.
 function read_signals(t, update) {
-    var is = 0, sigreq = '';
-    $('[name=signal]').each(function() {
-	var signame = $(this).val();
-	if (this.checked) {
-	    if (sig[is] = find_trace(db, record, signame, t)) {
-	        sig[is].id = tid++;	// found, mark as recently used
-		sig[is++].visible = true; // already in cache, visible
+    var i, trace = '', sigreq = '';
+
+    for (i = 0; i < signals.length; i++) {
+	if (s_visible[signals[i].name] == 1) {
+	    trace = find_trace(db, record, signals[i].name, t);
+	    if (trace) {
+		trace.id = tid++;	// found, mark as recently used
 	    }
-	    else {
-		sigreq += '&signal=' + signame;  // add to request
-	    }
+	    else sigreq += '&signal=' + signals[i].name;  // add to request
 	}
-	else if (sig[is] = find_trace(db, record, signame, t)) {
-	    sig[is++].visible = false;  // cached but hidden
-	}
-    });
+    }
 
     if (sigreq) {
-	url = 'http://physionet.org/cgi-bin/lightwave?action=fetch&db='
+	url = server + '?action=fetch&db='
 	    + db + '&record=' + record + sigreq
 	    + '&t0=' + t/tfreq + '&dt=' + dt + '&callback=?';
 	$.getJSON(url, function(data) {
-	    for (i = 0; i < data.fetch.signal.length; i++, is++) {
-		sig[is] = data.fetch.signal[i];
-		set_trace(db, record, sig[is]);
-	    }
-	    nsig = is;
+	    var s = data.fetch.signal;
+	    for (i = 0; i < s.length; i++)
+		set_trace(db, record, s[i]);
 	    if (update) update_output();
 	});
     }
-    else {
-	nsig = is;
-	if (update) update_output();
-    }
+    else if (update) update_output();
 }
 
 // Handle a request for data to display as a plot or tables.
@@ -422,7 +452,6 @@ function fetch() {
     var t0 = $('[name=t0]').val();
     ts0 = strtim(t0);
     tsf = ts0 + dt*tfreq;
-    read_annotations();  // read annotations not previously cached, if any
     read_signals(ts0, true); // read signals not previously cached, if any
 }
 
@@ -559,7 +588,6 @@ function find() {
     $('#findbox').dialog("open").html(content);
     $('#findbox').dialog({
 	open: function(event, ui){
-//	    $('[name=target]').val(target);
 	    $('.srev').attr('disabled', 'disabled');
 	    $('.sfwd').attr('disabled', 'disabled');
 	}
@@ -602,31 +630,22 @@ function slist() {
     $('#info').empty();
     $('#textdata').empty();
     $('#plotdata').empty();
-    var request = 'http://physionet.org/cgi-bin/lightwave?action=info&db='
-	+ db + '&record=' + record + '&callback=?';
-    $.getJSON(request, function(data) {
+    var url = server + '?action=info&db=' + db + '&record=' + record
+	+ '&callback=?';
+    nsig = 0;
+    $.getJSON(url, function(data) {
 	var slist = '';
 	if (data) {
 	    recinfo = data.info;
 	    tfreq = recinfo.tfreq;
 	    if (recinfo.signal) {
-		slist += '<td align="right">Signals:</td>\n<td>\n';
-		if (recinfo.signal.length > 5)
-	            slist += '<div class="container">\n';
-		for (var i = 0; i < recinfo.signal.length; i++) {
-	            slist += '<input type="checkbox" checked="checked" value="'
-			+ recinfo.signal[i].name + '" name="signal">'
-			+ recinfo.signal[i].name + '<br>\n';
-		}
-		if (recinfo.signal.length > 5)
-	            slist += '</div>\n';
-		slist += '</td>\n';
-		init_tpool(recinfo.signal.length * 4);
+		signals = recinfo.signal;
+		nsig = signals.length;
+		for (var i = 0; i < nsig; i++)
+		    s_visible[signals[i].name] = 1;
+		init_tpool(nsig * 4);
 	    }
 	}
-	$('#slist').html(slist);
-	nann = nsig = 0; // new record -- clear the annotation and signal caches
-	read_annotations();
 	$('#tabs').tabs("enable");
     });
 };
@@ -635,47 +654,23 @@ function slist() {
 function newrec() {
     record = $('[name=record]').val();
     slist();
+    read_annotations();
 }
 
 // Load the list of annotators in the selected database.
 function alist() {
-    url = 'http://physionet.org/cgi-bin/lightwave?action=alist&callback=?&db='
-         + db;
+    url = server + '?action=alist&callback=?&db=' + db;
     $.getJSON(url, function(data) {
-	var alist = '';
-	annotators = '';
-	if (data) {
-	    annotators = data.annotator;
-	    alist += '<td align=right>Annotators:</td>\n<td>\n';
-	    if (data.annotator.length > 5)
-	        alist += '<div class="container">\n';
-	    for (var i = 0; i < data.annotator.length; i++)
-		alist += '<input type="checkbox" checked="checked" value="'
-		+ data.annotator[i].name + '" name="annotator">'
-		+ data.annotator[i].desc + ' (' + data.annotator[i].name
-		+ ')<br>\n';
-	    if (data.annotator.length > 5)
-		alist += '</div>\n';
-	    alist += '</td>\n';
-	}
-	$('#alist').html(alist);
+	if (data) annotators = data.annotator;
+	else annotators = '';
     });
-
 };
 
 // Load the list of records in the selected database, and set up an event
 // handler for record selection.
 function rlist() {
     var rlist = '';
-
-    if (record !== '') {
-	rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
-	$('#rlist').html(rlist);
-	slist();
-	return;
-    }
-    url = 'http://physionet.org/cgi-bin/lightwave?action=rlist&callback=?&db='
-         + db;
+    url = server + '?action=rlist&callback=?&db=' + db;
     $.getJSON(url, function(data) {
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
@@ -713,14 +708,9 @@ function newdb() {
 function dblist() {
     var dblist;
 
-    if (db !== '') {
-	dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
-	$('#dblist').html(dblist);
-	alist();
-	return;
-    }
-    $.getJSON('http://physionet.org/cgi-bin/lightwave?action=dblist&callback=?',
-     function(data) {
+    $('#server').html('Server: ' + server);
+    url = server + '?action=dblist&callback=?';
+    $.getJSON(url, function(data) {
 	 if (data) {
 	     dblist = '<td align=right>Database:</td>' + 
 		 '<td><select name=\"db\" id=\"db\">\n' +
@@ -738,6 +728,7 @@ function dblist() {
 	 $('#dblist').html(dblist)
 	 $('#db').on("change", newdb); // invoke newdb when db changes
      });
+
 }
 
 // Set up user interface event handlers.
@@ -752,7 +743,8 @@ function set_handlers() {
 	    ui.jqXHR.success(function() { ui.tab.data("loaded", true); });
 	}
     });
-    // Button handlers:
+    // Button handlers
+    //  on View/edit and Tables tabs:
     $('#fplot').on("click", fetch_plot);   // get data and plot them
     $('#ftext').on("click", fetch_text);   // get data and print them
     $('.fwd').on("click", gofwd);	   // advance by dt and plot or print
@@ -764,35 +756,30 @@ function set_handlers() {
     $('.sfwd').on("click", sfwd);	   // search for next 'Find' target
     $('.find').on("click", find);	   // open 'Find' dialog
     $('#findbox').dialog({autoOpen: false});
-
-    // These buttons are disabled until the search function is implemented.
+    // disable search buttons until a target has been defined
     $('.sfwd').attr('disabled', 'disabled');
     $('.srev').attr('disabled', 'disabled');
-//    $('.find').attr('disabled', 'disabled');
 
+    // on Settings tab:
     $("#bgrid").button().click(function(event){
 	g_opacity = 1 - g_opacity;	   // toggle grid visibility
     });
     $("#bmarkers").button().click(function(event){
 	m_opacity = 1 - m_opacity;	   // toggle marker bar visibility
     });
+
+    // on Help tab:
+    $('#help_about').on("click", help);    // return to 'about' (main help doc)
 }
 
 // Check for query string in URL, decode and run query or queries if present
 function parse_url() {
     var s = window.location.href.split("?");
-    var n = s.length - 1;
-    var t0 = '';
-    if (n < 1) {
+    var n = s.length, t = 0, t0 = '0';
+    if (n != 2) {
+	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
+	$("body").show();
 	dblist();	// no query, get the list of databases
-	return;
-    }
-    if (n > 1) {
-	alert('The URL contains ' + n + ' "?" characters:\n\n'
-	      + window.location.href
-	      + '\n\n  ... but it may have no more than one.\n'
-	      + 'Everything after the first "?" will be ignored.');
-	dblist();
 	return;
     }
     var q = s[1].split("&");
@@ -803,24 +790,83 @@ function parse_url() {
 	else if (v[0] == 't0') t0 = v[1];
     }
     if (db !== '') {
-	var title = 'LightWAVE: ' + db;
-	dblist();
-	rlist();
-	if (record !== '') {
-	    title = 'LW: ' + db + '/' + record;
-	    if (t0 != '') {
-		t = strtim(t0);
-		t0 = timstr(t);
-		$('[name=t0]').val(t0);
-	    }
+	if (record === '') {
+	    var title = 'LightWAVE: ' + db;
+	    document.title = title;
+	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
+	    $("body").show();
+	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
+	    $('#dblist').html(dblist);
+	    alist();
+	    rlist();
 	}
-	document.title = title;
+	else {
+	    $('#tabs').tabs();
+	    $('#tabs').tabs("remove",0);
+	    var title = 'LW: ' + db + '/' + record;
+	    document.title = title;
+	    $('.recann').html(db + '/' + record);
+	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
+	    $('#dblist').html(dblist);
+	    rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
+	    $('#rlist').html(rlist);
+	    url = server + '?action=alist&callback=?&db=' + db;
+	    $.getJSON(url, function(data) {
+		if (data) annotators = data.annotator;
+		else annotators = '';
+		url = server + '?action=info&db=' + db + '&record=' + record
+		    + '&callback=?';
+		nsig = 0;
+		$.getJSON(url, function(data) {
+		    if (data) {
+			recinfo = data.info;
+			tfreq = recinfo.tfreq;
+			if (recinfo.signal) {
+			    signals = recinfo.signal;
+			    nsig = signals.length;
+			    for (var i = 0; i < nsig; i++)
+				s_visible[signals[i].name] = 1;
+			    init_tpool(nsig * 4);
+			}
+		    }
+		    $('#tabs').tabs("enable");
+		    nann = 0;	// new record -- (re)fill the cache
+		    if (annotators.length) {
+			var annreq = '', i;
+			for (i = 0; i < annotators.length; i++)
+			    annreq += '&annotator=' + annotators[i].name;
+			url = server + '?action=fetch&db=' + db + '&record='
+			    + record + annreq + '&dt=0&callback=?';
+			$.getJSON(url, function(data) {
+			    for (i = 0; i < data.fetch.annotator.length; i++) {
+				ann[nann] = data.fetch.annotator[i];
+				a_visible[ann[nann].name] = 1;
+				ann[nann].opacity = 1;
+				for (var j = 0; j < annotators.length; j++)
+				    if (ann[nann].name == annotators[j].name)
+					ann[nann].desc = annotators[j].desc;
+				nann++;
+			    }
+			    if (t0 != '') {
+				t = strtim(t0);
+				t -= t%(dt*tfreq);
+			    }
+			    t0 = timstr(t);
+			    $('[name=t0]').val(t0);
+			    $('#tabs').tabs("select", "#view");
+			    out_format = 'plot';
+			    go_here(t);
+			    $("body").show();
+			});
+		    }
+		});
+	    });
+	}
     }
 }
 
 // When the page is ready, load the list of databases and set up event handlers.
 $(document).ready(function(){
-    $('#tabs').tabs({disabled:[1,2]});	// disable the View and Tables tabs
     parse_url();			// handle query string if present
     help();				// load help into the help tab
     set_handlers();			// set UI event handlers
