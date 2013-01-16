@@ -1,4 +1,4 @@
-LWVERSION = 0.25
+LWVERSION = 0.26
 # file: Makefile	G. Moody	18 November 2012
 #			Last revised:	 1 January 2013 (version 0.16)
 # 'make' description file for building and installing LightWAVE
@@ -15,8 +15,9 @@ LWVERSION = 0.25
 # 
 # This file, and the others in this directory, can be used to install
 # LightWAVE on your own web server.  You might want to do this if your
-# connection to physionet.org is slow or intermittent, or if you want
-# to use LightWAVE to work with local files.
+# connection to physionet.org is slow or intermittent, if you want to
+# use LightWAVE to work with local files, or if you want to participate
+# in LightWAVE's development.
 #
 # Prerequisites for building and using the LightWAVE server:
 #  httpd	 (a properly configured web server, such as Apache)
@@ -46,11 +47,15 @@ LWVERSION = 0.25
 # restart Apache and verify that it is (still) working before continuing.
 #
 # Return to this directory and type 'make' to build and install LightWAVE.
+# Then type 'make check' to run a basic test of the LightWAVE server.
 #
-# If you have installed LightWAVE on "myserver.com", start it by pointing your
-# browser to http://myserver.com/lightwave/.  If you have installed LightWAVE
-# on a standalone computer without a network connection, use the URL
-# http://0.0.0.0/lightwave/ or http://localhost/lightwave/ .
+# If you have installed LightWAVE on "myserver.com", start the LightWAVE client
+# by pointing your browser to http://myserver.com/lightwave/.  If you have
+# installed LightWAVE on a standalone computer without a network connection,
+# use any of these URLs:
+#  http://127.0.0.1/lightwave/
+#  http://0.0.0.0/lightwave/
+#  http://localhost/lightwave/ 
 
 # DocumentRoot is the web server's top-level directory of (HTML) content.
 # The values below and in your Apache configuration file should match.
