@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	17 January 2013  version 0.26
+			Last revised:	18 January 2013  version 0.28
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -572,7 +572,7 @@ int fetchsignals(void)
 void fetch(void)
 {
     printf("{ \"fetch\":\n");
-    if (fetchsignals() == 0 && fetchannotations() == 0) printf("null");
+    if ((fetchsignals() + fetchannotations()) == 0) printf("null");
     printf("}\n");
 }
 
