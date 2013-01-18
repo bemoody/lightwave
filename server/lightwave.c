@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	15 January 2013  version 0.25
+			Last revised:	17 January 2013  version 0.26
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -66,10 +66,9 @@ WFDB_Time t0, tf, dt;
 
 char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
-int ufindsig(char *name);
+int  fetchannotations(void), fetchsignals(void), ufindsig(char *name);
 void dblist(void), rlist(void), alist(void), slist(void), info(void),
-    fetchannotations(void), fetchsignals(void), fetch(void),
-    force_unique_signames(void), free_sname(void),
+    fetch(void), force_unique_signames(void), free_sname(void),
     print_file(char *filename), jsonp_end(void);
 
 int main(int argc, char **argv)
@@ -425,13 +424,13 @@ void info(void)
     printf("\n  }\n}\n");
 }
 
-void fetchannotations(void)
+int fetchannotations(void)
 {
     int afirst = 1, i;
     WFDB_Anninfo ai;
     WFDB_Time ta0, taf;
 
-    if (nann < 1) return;
+    if (nann < 1) return (0);
     if (tfreq != ffreq) {
 	ta0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
 	taf = (WFDB_Time)(tf*tfreq/ffreq + 0.5);
@@ -479,9 +478,10 @@ void fetchannotations(void)
 	}
     }
     printf("\n    ]\n  }\n");
+    return (1);
 }
 
-void fetchsignals(void)
+int fetchsignals(void)
 {
     int first = 1, framelen, i, imax, imin, j, *m, *mp, n;
     WFDB_Calinfo cal;
@@ -489,7 +489,7 @@ void fetchsignals(void)
     WFDB_Time t, ts0, tsf;
 
     /* Do nothing if no samples were requested. */ 
-    if (nosig < 1 || t0 >= tf) return;
+    if (nosig < 1 || t0 >= tf) return (0);
 
     /* Open the signal calibration database. */
     (void)calopen("wfdbcal");
@@ -566,14 +566,13 @@ void fetchsignals(void)
     }
     printf("\n    ]%s", nann ? ",\n" : "\n  }\n");
     flushcal();
-    return;	/* output was written */
+    return (1);	/* output was written */
 }
 
 void fetch(void)
 {
     printf("{ \"fetch\":\n");
-    fetchsignals();
-    fetchannotations();
+    if (fetchsignals() == 0 && fetchannotations() == 0) printf("null");
     printf("}\n");
 }
 

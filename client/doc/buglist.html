@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+
+<h2>LightWAVE bug list</h2>
+
+<ul>
+<li><b>Signals not visible/not centered.</b><br>
+There are at least three bugs that cause this symptom:
+<ul>
+<li> In records that have no signals (e.g., crisdb records) a null response
+from the server is not handled properly in the client.
+<li> In records with incorrectly specified adczero (e.g., qtdb/sel100),
+the signals may be rendered off-screen.
+<li> In records with sampling frequencies less than 0.1 Hz, there is at
+most one sample in the window, and nothing is drawn as a result.
+</ul>
+
+<li><b>LightWAVE doesn't work in Internet Explorer.</b><br>
+Yes, it does.  But unless you have IE 9 or 10, you <em>must</em> install
+the free <a href="http://www.google.com/chromeframe">Google Chrome
+Frame</a> plugin.
+
+<li><b>Can't go to times that are not multiples of 10 seconds.</b><br>
+This is not a bug.  It will be possible to set a location with
+finer resolution when smooth scrolling is implemented.
+
+<li><b>MIMIC II Waveform Database "numerics" records are missing.</b><br>
+LightWAVE needs a record submenu, like the PhysioBank ATM has.

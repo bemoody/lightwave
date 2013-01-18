@@ -62,6 +62,7 @@ var g_visible = 1; // grid (1: on, 0: off)
 var m_visible = 1; // annotation marker bars (1: on, 0: off)
 var a_visible = [];
 var s_visible = [];
+var help_main = 'about.html';
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -421,6 +422,7 @@ function read_annotations() {
 function read_signals(t, update) {
     var i, trace = '', sigreq = '';
 
+    if (!signals) return;
     for (i = 0; i < signals.length; i++) {
 	if (s_visible[signals[i].name] == 1) {
 	    trace = find_trace(db, record, signals[i].name, t);
@@ -610,7 +612,15 @@ function find() {
 }
 
 function help() {
-    $('#helpframe').attr('src', 'doc/about.html');
+    $('#helpframe').attr('src', 'doc/' + help_main);
+}
+
+function help_topics() {
+    $('#helpframe').attr('src', 'doc/topics.html');
+}
+
+function help_contacts() {
+    $('#helpframe').attr('src', 'doc/contacts.html');
 }
 
 function show_time(x) {
@@ -770,6 +780,8 @@ function set_handlers() {
 
     // on Help tab:
     $('#help_about').on("click", help);    // return to 'about' (main help doc)
+    $('#help_topics').on("click", help_topics);  // show help topics
+    $('#help_contacts').on("click", help_contacts); // show contacts
 }
 
 // Check for query string in URL, decode and run query or queries if present
@@ -805,6 +817,7 @@ function parse_url() {
 	    $('#tabs').tabs("remove",0);
 	    var title = 'LW: ' + db + '/' + record;
 	    document.title = title;
+	    help_main = 'followed-link.html';
 	    $('.recann').html(db + '/' + record);
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#dblist').html(dblist);
