@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	16 January 2013  version 0.25
+//			Last revised:	18 January 2013  version 0.29
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody

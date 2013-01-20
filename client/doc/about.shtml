@@ -1,0 +1,10 @@
+<!--#set var="TITLE" value="About LightWAVE"-->
+<!--#include virtual="/pn/head.shtml"-->
+
+<!--#include virtual="about.html" -->
+
+<p>
+A live version of LightWAVE is available for experimentation on PhysioNet at
+<a href="http://physionet.org/lightwave/">http://physionet.org/lightwave/</a>.
+
+<!--#include virtual="/pn/footer.shtml" -->
