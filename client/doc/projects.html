@@ -66,22 +66,41 @@ form.</b>
 
 <h2>LightWAVE projects</h2>
 
+<h3>LightWAVE as an off-line web application</h3>
 
-<h3>Interactive filter design</h3>
+<p> Many users who might wish to use LightWAVE while off-line will find the
+currently necessary installation of a locally hosted web server to be
+challenging, particularly if they are unaccustomed to system administration.  We
+seek a simplified alternative for such users.
 
-<p> The goal of this project is to develop a graphical UI to allow the user to
-experiment with FIR and IIR filters, applying them to a selected signal or group
-of signals, and observing their effects with little or no perceived delay.  It
-should be possible to load predefined filters or create new ones, and apply them
-sequentially.
+<p> This project aims to provide a way to configure LightWAVE as
+an <a href="http://www.whatwg.org/specs/web-apps/current-work/multipage/offline.html">
+off-line web application</a>, with the ability to preload and cache data while
+on-line, for later use off-line.  For example, we might download a few sets of
+compressed JSON files (as in the server-side caching project below) to study on
+a long flight.
 
-<p> Since the client receives the digitized signals as unscaled first
-differences, the filters might be applied within <tt>set_trace</tt> (which
-reconstructs the series of unscaled amplitudes) or within
-<tt>show_plot</tt> (which transforms the amplitudes into calibrated
-values).
+<p> It is also important to provide a way to save annotations created during
+off-line use for subsequent uploading and sharing when a network connection
+becomes available.
 
-<h3>Server-side caching [server development]</h3>
+<h3>A LightWAVE client optimized for smart phones</h3>
+
+<p> The LightWAVE client has been designed to be usable on both desktop and
+mobile devices.  It is not possible, however, for a user to obtain the same
+pointing precision with a finger on a smart phone's touch screen as with a mouse
+or trackball on a large desktop display.  Since annotation editing requires
+high-precision placement of markers, a user interface that is most efficient on
+a small touch display may be substantially different from one developed for the
+desktop.
+
+<p> This project's goal is to develop a client that is optimized for smart
+phones and small tablets, with high-resolution displays and low-resolution touch
+input, either by modifying the existing LightWAVE client or starting from
+scratch.  It is important to maintain compatibility with the standard LightWAVE
+server and with plugins for the existing client.
+
+<h3>Server-side caching for LightWAVE [server development]</h3>
 
 <p>We would like to investigate the possible benefits of storing server
 responses to common requests.  The server reads data in response to each
@@ -95,20 +114,16 @@ entire record at the time that record is first requested.  Being able to do
 this efficiently might be useful in the <b>Data import</b> and <b>Off-line
 editing</b> projects as well.
 
-<h3>Off-line use, including annotation editing</h3>
+<h3>Repackaging the LightWAVE server as an Apache module or a FastCGI app
+  [server development]</h3>
 
-<p> Many users who might wish to use LightWAVE while off-line will find the
-currently necessary installation of a locally hosted web server to be
-challenging, particularly if they are unaccustomed to system administration.  We
-seek a simplified alternative for such users.
+<p> Unlike conventional CGI apps, Apache modules and FastCGI apps are
+persistent processes, saving disk I/O and computation time on the server
+since they do not need to be loaded and initialized each time their service
+is requested.  The goal of this project is to investigate the efficiency
+gains that may be possible using these technologies for the LightWAVE server.
 
-<p> This project aims to provide a way to configure LightWAVE as an <a
-href="http://www.whatwg.org/specs/web-apps/current-work/multipage/offline.html">
-off-line web application</a>, with the ability to preload and cache data while
-on-line, for later use off-line.  For example, we might download a few sets of
-compressed JSON files (as in the previous project) to study on a long flight.
-
-<h3>Data import and export</h3>
+<h3>Data import and export plugins for the LightWAVE client</h3>
 
 <p> Currently, users of LightWAVE who are able to collect their own data must
 upload them to PhysioNetWorks in order to view them with LightWAVE.
@@ -126,10 +141,33 @@ able to recognize common formats automatically, and to make plausible
 hypotheses about unrecognized formats, displaying the hypothesized signals
 and allowing the user to explore alternate assumptions about the format.
 
-<p> We also aim to provide a similar tool for creating data files in other
-useful formats (e.g., CSV, .mat, and PhysioBank/WFDB) for use by other software.
+<p> We also aim to provide a similar tool for exporting data files in other
+useful formats (e.g., CSV, EDF/EDF+, .mat, and PhysioBank/WFDB) for use by
+other software.
 
-<h3>Beat detection in JavaScript</h3>
+<p> Ideally, this project should produce sets of import and export plugins
+for the most important formats, as well as templates for plugins and
+documentation for use by others needing to import or export files in other
+formats.
+
+<h3>Interactive filter design plugin for the LightWAVE client</h3>
+
+<p> The goal of this project is to develop a client-side plugin for LightWAVE
+that provides a graphical user interface to allow the user to experiment with
+FIR and IIR filters, applying them to a selected signal or group of signals, and
+observing their effects with little or no perceived delay.  It should be
+possible to load predefined filters or create new ones, and apply them
+sequentially.  Applications include user-adjustable filtering for visual noise
+reduction, and signal enhancement for event detection.
+
+<p> Since the client receives the digitized signals as unscaled first
+differences, the filters might be applied within <tt>set_trace</tt> (which
+reconstructs the series of raw amplitudes) or within
+<tt>show_plot</tt> (which transforms the raw amplitudes into calibrated
+values).
+
+<h3>Data analysis plugins for the LightWAVE client: Beat detection in
+JavaScript</h3>
 
 <p> One of the design goals for LightWAVE is to provide a comfortable and
 efficient method of annotating PhysioBank-compatible data.  Most often, we
@@ -141,9 +179,30 @@ normal beats from abnormal (ectopic) beats, a task that is much more difficult
 than QRS detection.  Beat annotations made by human experts and validated by
 comparison among experts are the gold standard and highly valued for research.
 
-<p> Several high-quality QRS detectors written in C are included in the WFDB
-Software Package, and any of them might serve as a model for a JavaScript
-QRS detector function that could be run within the LightWAVE client as a first
-step in the process of developing a reference annotation file for a previously
-unannotated record.
+<p> Several QRS detectors written in C are included in the WFDB Software
+Package, and any of them might serve as a model for a JavaScript QRS detector
+function that could be run within the LightWAVE client as a first step in the
+process of developing a reference annotation file for a previously unannotated
+record.
+
+<p> A plugin for QRS detection should be a protypical example of a class of
+plugins to perform other types of analysis in the LightWAVE client.  Such
+plugins may be required to record their output as annotations, or to display
+their results using special-purpose graphical or tabular outputs.
+
+<h3>A multichannel programmable analog signal generator built on LightWAVE</h3>
+
+<p> The LightWAVE server offers a very simple API for retrieval of signals from
+PhysioBank and compatible data repositories.  This project aims to develop an
+alternative LightWAVE client that can function as an analog signal generator for
+simulating realistic inputs to medical instruments, using either a multichannel
+DAC or an audio output.
+
+<p> Typical audio output devices are not capable of producing output below the
+limits of human hearing (about 20 Hz), which makes direct real-time output of
+signals such as ECG, continuous blood pressure, and respiration impossible.  A
+workaround is to produce amplitude- or frequency-modulated signals in software,
+convert them to analog form, and then to demodulate the AM or FM signals with
+low-cost analog hardware.
+
 </html>

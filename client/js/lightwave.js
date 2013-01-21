@@ -492,7 +492,7 @@ function gorev() {
     t -= dt*tfreq;
     if (t >= 0) read_signals(t, false);  // prefetch the previous window
 }
-
+	 
 function go_to() {
     var t0 = $('[name=t0]').val();
     var t = strtim(t0);
@@ -611,6 +611,11 @@ function find() {
     });
 }
 
+function set_server() {
+    server = $('[name=server]').val();
+    dblist();
+}
+
 function help() {
     $('#helpframe').attr('src', 'doc/' + help_main);
 }
@@ -714,31 +719,37 @@ function newdb() {
     rlist();
 }
 
+function alert_server_error() {
+    alert('The LightWAVE server at\n' + server
+	  + '\nis not responding properly.  Please check\n'
+	  + 'the network connection.  Select another server\n'
+	  + 'on the Settings tab if necessary.');
+}
+
 // Load the list of databases and set up an event handler for db selection.
 function dblist() {
-    var dblist;
+    var dblist = '';
 
-    $('#server').html('Server: ' + server);
+    $('#dblist').html('<td colspan=2>Loading list of databases ...</td>')
     url = server + '?action=dblist&callback=?';
+    var timer = setTimeout(alert_server_error, 10000);
     $.getJSON(url, function(data) {
-	 if (data) {
-	     dblist = '<td align=right>Database:</td>' + 
-		 '<td><select name=\"db\" id=\"db\">\n' +
-		 '<option value=\"\" selected>--Choose one--</option>\n';
-	     for (i = 0; i < data.database.length; i++)
-	         dblist += '<option value=\"' + data.database[i].name +
-		 '\">' + data.database[i].desc + ' (' +
-		 data.database[i].name + ')</option>\n';
-	     dblist += '</select></td>\n';
-	 }
-	 else {
-	     dblist = "<td colspan=2><b>Sorry, the database list is temporarily"
-		 + " unavailable.  Please try again later.</b></td>";
-	 }
-	 $('#dblist').html(dblist)
-	 $('#db').on("change", newdb); // invoke newdb when db changes
-     });
-
+	clearTimeout(timer);
+	if (data && data.database && data.database.length > 0) {
+	    dblist = '<td align=right>Database:</td>' + 
+		'<td><select name=\"db\" id=\"db\">\n' +
+		'<option value=\"\" selected>--Choose one--</option>\n';
+	    for (i = 0; i < data.database.length; i++)
+	        dblist += '<option value=\"' + data.database[i].name +
+		'\">' + data.database[i].desc + ' (' +
+		data.database[i].name + ')</option>\n';
+	    dblist += '</select></td>\n';
+	    $('#dblist').html(dblist)
+	    $('#db').on("change", newdb); // invoke newdb when db changes
+	}
+	else
+	    alert_server_error();
+    });
 }
 
 // Set up user interface event handlers.
@@ -771,12 +782,7 @@ function set_handlers() {
     $('.srev').attr('disabled', 'disabled');
 
     // on Settings tab:
-    $("#bgrid").button().click(function(event){
-	g_opacity = 1 - g_opacity;	   // toggle grid visibility
-    });
-    $("#bmarkers").button().click(function(event){
-	m_opacity = 1 - m_opacity;	   // toggle marker bar visibility
-    });
+    $('[name=server]').on("change", set_server);      // go to selected location
 
     // on Help tab:
     $('#help_about').on("click", help);    // return to 'about' (main help doc)
@@ -791,6 +797,7 @@ function parse_url() {
     if (n != 2) {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$("body").show();
+	$('[name=server]').val(server);     // set default server URL
 	dblist();	// no query, get the list of databases
 	return;
     }
@@ -807,6 +814,7 @@ function parse_url() {
 	    document.title = title;
 	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
 	    $("body").show();
+	    $('[name=server]').val(server);     // set default server URL
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#dblist').html(dblist);
 	    alist();
@@ -820,6 +828,7 @@ function parse_url() {
 	    help_main = 'followed-link.html';
 	    $('.recann').html(db + '/' + record);
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
+	    $('#server').html(server);
 	    $('#dblist').html(dblist);
 	    rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
 	    $('#rlist').html(rlist);

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	16 January 2013   version 0.26
+			Last revised:	20 January 2013   version 0.30
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -55,7 +55,7 @@ provides some of the functions of LightWAVE without Javascript.
  <h1>LightWAVE [local]</h1>
 
  <table>
-  <tr id="dblist"><td colspan=2>Loading list of databases ...</td></tr>
+  <tr id="dblist"><td colspan=2>Loading LightWAVE ...</td></tr>
 
   <tr id="rlist">
    <td colspan=2 align="center">
@@ -134,8 +134,9 @@ record to the start of the data tables, then click 'Text'">
  <div id="calibrate-display" style='height: 1in; left: -100%;
       position: absolute; top: -100%; width: 1in;'></div>
 
- <div id="server"></div>
-
+ Server: <span id="server"><input type="text" name="server" size="50"
+		title="URL of LightWAVE server (reload to restore default)">
+ </span>
 </div>
 
 <div id="help">

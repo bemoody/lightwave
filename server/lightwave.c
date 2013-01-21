@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	18 January 2013  version 0.28
+			Last revised:	20 January 2013  version 0.30
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -87,8 +87,10 @@ int main(int argc, char **argv)
         interactive = 1;  /* interactive mode for debugging */
     wfdbquiet();	  /* suppress WFDB library error messages */
 
-    /* To add a custom data repository, uncomment and edit the next line. */
-/* setwfdb(". /usr/local/database http://physionet.org/physiobank/database"); */
+    /* To add a custom data repository, define LW_WFDB (see Makefile). */
+#ifdef LW_WFDB
+    setwfdb(LW_WFDB);
+#endif
 
     if (!(action = get_param("action"))) {
 	print_file(LWDIR "/doc/about.txt");

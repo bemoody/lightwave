@@ -1,6 +1,6 @@
-LWVERSION = 0.29
+LWVERSION = 0.30
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	 1 January 2013 (version 0.16)
+#			Last revised:	20 January 2013 (version 0.30)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -53,9 +53,13 @@ LWVERSION = 0.29
 # by pointing your browser to http://myserver.com/lightwave/.  If you have
 # installed LightWAVE on a standalone computer without a network connection,
 # use any of these URLs:
+#  http://localhost/lightwave/
 #  http://127.0.0.1/lightwave/
 #  http://0.0.0.0/lightwave/
-#  http://localhost/lightwave/ 
+
+# LW_WFDB is the LightWAVE server's WFDB path, a list of locations (data
+# repositories) where the server will look for requested data.
+LW_WFDB = "/usr/local/database http://physionet.org/physiobank/database"
 
 # DocumentRoot is the web server's top-level directory of (HTML) content.
 # The values below and in your Apache configuration file should match.
@@ -79,7 +83,7 @@ LWDIR = $(DocumentRoot)/lightwave
 CC = gcc
 
 # CFLAGS is a set of options for the C compiler.
-CFLAGS = -g -DLWDIR=\"$(LWDIR)\"
+CFLAGS = -g -DLWDIR=\"$(LWDIR)\" -DLW_WFDB=\"$(LW_WFDB)\"
 
 # LDFLAGS is a set of options for the linker.
 LDFLAGS = -lcgi -lwfdb
@@ -91,7 +95,7 @@ install:	server client
 	@echo "use LightWAVE by opening your web browser and visiting"
 	@echo "    http://HOST/lightwave/"
 	@echo "(replacing HOST by the hostname of this server, or by localhost"
-	@echo "or 0.0.0.0 to run without a network connection)."
+	@echo "or 127.0.0.1 to run without a network connection)."
 
 # Check that the server is working.
 test:

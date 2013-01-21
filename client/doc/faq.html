@@ -37,19 +37,21 @@ maintained between 1989 and 2012.  (WAVE: <em>W</em>aveform and <em>A</em>nnotat
 <p> At one time, WAVE was not difficult to install and run anywhere, because
 it's written in portable C, and the libraries that it uses (including X11 and
 XView) have been ported to all of the popular platforms (GNU/Linux, Mac OS X,
-Solaris, and Windows).  XView was abandoned by its authors years ago, however,
-and changes in X11 have resulted in chronic problems for all applications that
-rely on XView, including WAVE, and finding workarounds and patching XView has
-become increasingly difficult.  WAVE has had a long run and was well liked by
-those who used it, but a replacement built on modern standards was clearly
-needed.
+other Unix-like platforms, and Windows).  XView was abandoned by its authors
+years ago, however, and changes in the popular X11 server have resulted in
+chronic problems for all applications that rely on XView, including WAVE.
+Finding workarounds and patching XView to avoid newly introduced
+incompatibilities with updated X11 servers on different platforms has become
+increasingly difficult.  WAVE has had a long run and was well liked by those who
+used it, but a replacement built on modern standards was clearly needed.
 
 <h3>Why didn't you write LightWAVE in the first place, then?</h3>
 
 <p> WAVE was designed before there were web browsers with fast JavaScript and
 SVG engines, mice with scrollwheels, smart phones, touch-input tablets, SVG,
-fast and inexpensive high-resolution graphics, JavaScript, the World Wide
-Web(!), and many of the user interface elements that are familiar today.
+fast and inexpensive high-resolution graphics, JavaScript, Unicode, Wifi,
+TCP/IP, 64-bit CPUs in every toaster, the World Wide Web(!), and many of the
+user interface elements that are familiar today.  OK, I'm kidding about TCP/IP.
 
 <p> Developing a replacement for WAVE offers the opportunity to revisit
 design decisions that would be made differently given current technology.  We
