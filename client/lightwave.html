@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	20 January 2013   version 0.30
+			Last revised:	21 January 2013   version 0.31
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -91,7 +91,13 @@ record to the start of the window, then click 'Plot'"
       &nbsp;<button class="sfwd" tabindex="6"
 		    title="search for next 'Find' target">Search &gt;</button>
       &nbsp;<button class="eor" tabindex="7"
-		    title="end of record">&gt;|</button></td>
+		    title="end of record">&gt;|</button>
+      &nbsp;&nbsp;<button class="stretch"
+		    title="enlarge the highlighted signal">&#9650;</button>
+      <button class="reset"
+		    title="reset the highlighted signal">=</button>
+      <button class="shrink"
+		    title="reduce the highlighted signal">&#9660;</button></td>
     <td align=right>
       <span class="recann"></span><br><span class="pointer">&nbsp;</span></td>
   </tr>
@@ -99,7 +105,7 @@ record to the start of the window, then click 'Plot'"
 
  <div id="findbox" title="Find..."></div>
 
- <div id="plotdata"></div>
+ <div id="plotdata" tabindex="0"></div>
  <!--[if lt IE 9]>
   <p> MSIE versions 8 and earlier do not support LightWAVE's SVG graphics.
   MSIE 6, 7, and 8 can be used to run modern web apps such as LightWAVE if you

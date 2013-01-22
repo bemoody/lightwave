@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	18 January 2013  version 0.29
+//			Last revised:	21 January 2013  version 0.31
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -48,8 +48,10 @@ var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
 var annotators = ''; // annotators for the selected database, from alist()
 var ann = [];   // annotations read and cached by read_annotations()
 var nann = 0;	// number of annotators, set by read_annotations()
+var annselected = '';// name of annotator to be highlighted, if any
 var signals;    // signals for the selected record, from slist()
 var nsig = 0;	// number of signals, set by read_signals()
+var sigselected = '';// name of signal to be highlighted, if any
 var out_format; // 'plot' or 'text', set by button handler functions
 var dt = 10;    // window width in seconds
 var ts0 = -1;   // time of the first sample in the signal window, in samples
@@ -62,6 +64,7 @@ var g_visible = 1; // grid (1: on, 0: off)
 var m_visible = 1; // annotation marker bars (1: on, 0: off)
 var a_visible = [];
 var s_visible = [];
+var mag = [];   // magnification of signals in plots
 var help_main = 'about.html';
 
 // Initialize or expand tpool
@@ -275,13 +278,16 @@ function show_plot() {
     else sva += '<title>(click to hide marker bars)</title>';
     for (ia = 0; ia < nann; ia++) {
 	var y0 = y0a[ia];
-	sva += '<g id="ann-' + ann[ia].name + '">\n';
-	if (a_visible[ann[ia].name] == 1) {
+	var aname = ann[ia].name;
+	sva += '<g id="ann-' + aname + '">\n';
+	if (a_visible[aname] == 1) {
 	    sva += '<title>' + ann[ia].desc + ' (click to hide)</title>'
-		+ '<text x="-50" y="' + y0 + '"'
-		+ ' font-size="120" fill="blue" font-style="italic"'
+		+ '<text x="-50" y="' + y0 + '"';
+	    if (aname == annselected)
+		sva += ' font-weight="bold"';
+	    sva += ' font-size="120" fill="blue" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ ann[ia].name + '</text>\n';
+		+ aname + '</text>\n';
 	    var a = ann[ia].annotation;
 	    for (var i = 0; i < a.length; i++) {
 		if (a[i].t < ts0) continue;
@@ -307,8 +313,10 @@ function show_plot() {
 			+ ' m0,210 V5000" />\n';
 		}
 		sva += '<text x="' + x + '" y="' + y
-		    + '" style="text-anchor: middle;"'
-		    + '" font-size="120" fill="rgb(0,0,200)">'
+		    + '" style="text-anchor: middle;"';
+		if (aname == annselected)
+		    sva += ' font-weight="bold"';
+		sva += ' font-size="120" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
 	    }
 	}
@@ -317,7 +325,7 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0 + '"'
 		+ ' font-size="120" fill="rgb(150,150,200)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ ann[ia].name + '</text>\n';
+		+ aname + '</text>\n';
 	}
 	sva += '</g>\n';
     }
@@ -332,17 +340,23 @@ function show_plot() {
 	svs += '<g id="sig-' + sname + '">\n';
 	if (trace && s_visible[sname] == 1) {
 	    svs += '<title>' + sname + ' (click to hide)</title>' 
-		+ '<text x="-50" y="' + y0 + '"'
-		+ ' font-size="120" fill="black" font-style="italic"'
+		+ '<text x="-50" y="' + y0 + '"';
+	    if (sname == sigselected)
+		svs += ' font-weight="bold"';
+	    svs += ' font-size="120" fill="black" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
 		+ sname + '</text>\n';
 	    var s = trace.samp;
-	    var g = (-400/(trace.scale*trace.gain));
+	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
 	    var z = trace.base*g - y0;
 	    var v = Math.round(g*s[0] - z);
 	    // move to start of trace
-	    svs += '<path stroke="black" stroke-width="6" fill="none"'
-		+ ' d="M0,' + v + ' L';
+	    svs += '<path stroke="black" fill="none" stroke-width="';
+	    if (sname == sigselected)
+		svs += '10';
+	    else
+		svs += '6';
+	    svs += '" d="M0,' + v + ' L';
 	    var t = 0;
 	    var tps = trace.tps;
 	    var tmax = s.length * tps;
@@ -369,27 +383,52 @@ function show_plot() {
     $('#plotdata').html(svg);
     // Handle user input in the signal window
     $('svg').svgPan('viewport');
+
     $('svg').mousemove(function(e){
 	var x = e.pageX;
 	show_time(x);
     });
+
     $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
 
     $("[id^='ann-']").click(function(event){
 	var aname = $(this).attr('id').split("-")[1];
-	a_visible[aname] = 1 - a_visible[aname];
+	if (a_visible[aname] == 0) {
+	    a_visible[aname] = 1;
+	    annselected = aname;
+	}
+	else if (annselected == aname) {
+	    annselected = '';
+	}
+	else {
+	    a_visible[aname] = 0;
+	}
 	show_plot();
     });
 
     $("[id^='sig-']").click(function(event){
 	var sname = $(this).attr('id').split("-")[1];
-	s_visible[sname] = 1 - s_visible[sname];
+	if (s_visible[sname] == 0) {
+	    s_visible[sname] = 1;
+	    sigselected = sname;
+	    $('.stretch').removeAttr('disabled');
+	    $('.reset').removeAttr('disabled');
+	    $('.shrink').removeAttr('disabled');
+	}
+	else if (sigselected == sname) {
+	    sigselected = '';
+	    $('.stretch').attr('disabled', 'disabled');
+	    $('.reset').attr('disabled', 'disabled');
+	    $('.shrink').attr('disabled', 'disabled');
+	}
+	else {
+	    s_visible[sname] = 0;
+	}
 	read_signals(ts0, true);
 	show_plot();
     });
 }
-
 
 function update_output() {
     if (out_format == 'plot') show_plot();
@@ -611,6 +650,27 @@ function find() {
     });
 }
 
+function stretch_signal() {
+    if (sigselected != '' && mag[sigselected] < 1000) {
+	mag[sigselected] *= 1.1;
+	show_plot();
+    }
+}
+
+function shrink_signal() {
+    if (sigselected != '' && mag[sigselected] > 0.001) {
+	mag[sigselected] /= 1.1;
+	show_plot();
+    }
+}
+
+function reset_signal() {
+    if (sigselected != '' && mag[sigselected] != 1) {
+	mag[sigselected] = 1.1;
+	show_plot();
+    }
+}
+
 function set_server() {
     server = $('[name=server]').val();
     dblist();
@@ -657,7 +717,7 @@ function slist() {
 		signals = recinfo.signal;
 		nsig = signals.length;
 		for (var i = 0; i < nsig; i++)
-		    s_visible[signals[i].name] = 1;
+		    s_visible[signals[i].name] = mag[signals[i].name] = 1;
 		init_tpool(nsig * 4);
 	    }
 	}
@@ -776,10 +836,17 @@ function set_handlers() {
     $('.srev').on("click", srev);	   // search for previous 'Find' target
     $('.sfwd').on("click", sfwd);	   // search for next 'Find' target
     $('.find').on("click", find);	   // open 'Find' dialog
+    $('.stretch').on("click", stretch_signal);
+    $('.reset').on("click", reset_signal);
+    $('.shrink').on("click", shrink_signal);
     $('#findbox').dialog({autoOpen: false});
     // disable search buttons until a target has been defined
     $('.sfwd').attr('disabled', 'disabled');
     $('.srev').attr('disabled', 'disabled');
+    // disable signal resize buttons until a signal has been selected
+    $('.stretch').attr('disabled', 'disabled');
+    $('.reset').attr('disabled', 'disabled');
+    $('.shrink').attr('disabled', 'disabled');
 
     // on Settings tab:
     $('[name=server]').on("change", set_server);      // go to selected location
