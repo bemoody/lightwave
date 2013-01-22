@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	21 January 2013  version 0.31
+//			Last revised:	22 January 2013  version 0.32
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -152,7 +152,50 @@ function strtim(s) {
 }
 
 function show_tables() {
-    var atext = '', stext = '', ia, is;
+    var atext = '', itext = '', stext = '', ia, ii, is;
+
+    itext += '<h3>Summary</h3>\n<table>\n'
+        + ' <tr><td>Record length</td><td>' + recinfo.duration + '</td></tr>\n';
+    if (recinfo.start) {
+	itext += ' <tr><td>Start</td><td>' + recinfo.start + '</td></tr>\n'
+	    + ' <tr><td>End</td><td>' + recinfo.end + '</td></tr>\n';
+    }
+    itext += ' <tr><td>Clock frequency&nbsp;</td><td>' + tfreq
+	+ ' ticks per second</td></tr>\n';
+
+    if (ann.length > 0) {
+	for (ia = 0; ia < ann.length; ia++) {
+	    itext += '<tr><td>Annotator: ' + ann[ia].name + '</td><td>'
+		+ '(' + ann[ia].annotation.length + ' annotations)</td></tr>\n';
+	}
+    }
+    if (signals.length > 0) {
+	for (is = 0; is < signals.length; is++) {
+	    itext += '<tr><td>Signal: ' + signals[is].name + '</td><td>';
+	    if (signals[is].tps == 1)
+		itext += signals[is].tps + ' tick per sample; ';
+	    else
+		itext += signals[is].tps + ' ticks per sample; ';
+	    itext += signals[is].gain + ' adu/';
+	    if (signals[is].units)
+		itext += signals[is].units + '; ';
+	    else
+		itext += 'mV; ';
+	    itext +=  signals[is].adcres + '-bit ADC, zero at '
+		+ signals[is].adczero + ';  baseline is '
+		+ signals[is].baseline + '</td></tr>\n';
+	}
+    }
+    if (recinfo.info) {
+	itext += '<tr><td style="vertical-align: top;">Notes</td><td><pre>';
+	for (ii = 0; ii < recinfo.info.length; ii++) {
+	    itext += recinfo.info[ii] + '\n';
+	}
+	itext += '</pre></td></tr>\n';
+    }
+    itext += '</table>';
+    $('#info').html(itext);
+
     if (ann.length > 0) 
 	atext += '<h3>Annotations</h3>\n';
     for (ia = 0; ia < nann; ia++) {
@@ -160,11 +203,12 @@ function show_tables() {
 	    atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
 	}
 	else {
-	    atext += '<p><b>Annotator:</b> ' + ann[ia].name + '<br>\n';
+	    var a = ann[ia].annotation;
+	    atext += '<p><b>Annotator:</b> ' + ann[ia].name
+		  + ' (' + a.length + ' annotations)<br>\n';
 	    atext += '<p><table class="dtable">\n<tr>'
 		+ '<th>Time (elapsed)&nbsp;</th><th>Type</th><th>Sub&nbsp;</th>'
 		+ '<th>Chan</th><th>Num&nbsp;</th><th>Aux</th></tr>\n';
-	    var a = ann[ia].annotation;
 	    for (var i = 0; i < a.length; i++) {
 		if (a[i].t < ts0) continue;
 		else if (a[i].t > tsf) break;
@@ -189,7 +233,6 @@ function show_tables() {
 	}
 
 	stext = '<h3>Signals</h3>\n';
-	stext += '<p>Sampling frequency = ' + tfreq + ' Hz</p>\n';
 	stext += '<p><table class="dtable">\n<tr><th>Time (elapsed)&nbsp;</th>';
 	for (i = 0; i < is; i++)
 	    stext += '<th>' + sig[i].name + '&nbsp;</th>';
@@ -279,7 +322,7 @@ function show_plot() {
     for (ia = 0; ia < nann; ia++) {
 	var y0 = y0a[ia];
 	var aname = ann[ia].name;
-	sva += '<g id="ann-' + aname + '">\n';
+	sva += '<g id="ann;;' + aname + '">\n';
 	if (a_visible[aname] == 1) {
 	    sva += '<title>' + ann[ia].desc + ' (click to hide)</title>'
 		+ '<text x="-50" y="' + y0 + '"';
@@ -337,7 +380,7 @@ function show_plot() {
 	var sname = signals[is].name;
 	var trace = find_trace(db, record, sname, ts0);
 	
-	svs += '<g id="sig-' + sname + '">\n';
+	svs += '<g id="sig;;' + sname + '">\n';
 	if (trace && s_visible[sname] == 1) {
 	    svs += '<title>' + sname + ' (click to hide)</title>' 
 		+ '<text x="-50" y="' + y0 + '"';
@@ -392,8 +435,8 @@ function show_plot() {
     $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
 
-    $("[id^='ann-']").click(function(event){
-	var aname = $(this).attr('id').split("-")[1];
+    $("[id^='ann;;']").click(function(event){
+	var aname = $(this).attr('id').split(";")[2];
 	if (a_visible[aname] == 0) {
 	    a_visible[aname] = 1;
 	    annselected = aname;
@@ -407,8 +450,8 @@ function show_plot() {
 	show_plot();
     });
 
-    $("[id^='sig-']").click(function(event){
-	var sname = $(this).attr('id').split("-")[1];
+    $("[id^='sig;;']").click(function(event){
+	var sname = $(this).attr('id').split(";")[2];
 	if (s_visible[sname] == 0) {
 	    s_visible[sname] = 1;
 	    sigselected = sname;
@@ -698,8 +741,8 @@ function show_time(x) {
 }
 
 // Load the list of signals for the selected record.
-function slist() {
-    var title = 'LW: ' + db + '/' + record;
+function slist(t0) {
+    var title = 'LW: ' + db + '/' + record, t = 0;
     $('.recann').html(db + '/' + record);
     document.title = title;
     $('#info').empty();
@@ -709,7 +752,6 @@ function slist() {
 	+ '&callback=?';
     nsig = 0;
     $.getJSON(url, function(data) {
-	var slist = '';
 	if (data) {
 	    recinfo = data.info;
 	    tfreq = recinfo.tfreq;
@@ -722,14 +764,25 @@ function slist() {
 	    }
 	}
 	$('#tabs').tabs("enable");
+	$('#tabs').tabs("select", "#view");
+	out_format = 'plot';
+	if (t0 != '') t = strtim(t0);
+	t0 = timstr(t);
+	$('[name=t0]').val(t0);
+	go_here(t);
+	$("body").show();
     });
 };
 
-// When a new record is selected, reload the signal list.
+// When a new record is selected, reload signals and show the first 10 seconds.
 function newrec() {
     record = $('[name=record]').val();
-    slist();
+     var prompt = 'Reading annotations for ' + db + '/' + record;
+    $('#prompt').html(prompt);
     read_annotations();
+    slist("0");
+    prompt = 'Click on the <b>View/edit</b> tab to view ' + db + '/' + record;
+    $('#prompt').html(prompt);
 }
 
 // Load the list of annotators in the selected database.
@@ -746,6 +799,7 @@ function alist() {
 function rlist() {
     var rlist = '';
     url = server + '?action=rlist&callback=?&db=' + db;
+    $('#rlist').html('Reading list of records in ' + db);
     $.getJSON(url, function(data) {
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
@@ -769,9 +823,7 @@ function newdb() {
     var title = 'LightWAVE: ' + db;
     document.title = title;
     $('#tabs').tabs({disabled:[1,2]});
-    $('#alist').empty();
     $('#rlist').empty();
-    $('#slist').empty();
     $('#info').empty();
     $('#textdata').empty();
     $('#plotdata').empty();
@@ -905,50 +957,26 @@ function parse_url() {
 		else annotators = '';
 		url = server + '?action=info&db=' + db + '&record=' + record
 		    + '&callback=?';
-		nsig = 0;
-		$.getJSON(url, function(data) {
-		    if (data) {
-			recinfo = data.info;
-			tfreq = recinfo.tfreq;
-			if (recinfo.signal) {
-			    signals = recinfo.signal;
-			    nsig = signals.length;
-			    for (var i = 0; i < nsig; i++)
-				s_visible[signals[i].name] = 1;
-			    init_tpool(nsig * 4);
+		nann = 0;	// new record -- (re)fill the cache
+		if (annotators.length) {
+		    var annreq = '', i;
+		    for (i = 0; i < annotators.length; i++)
+			annreq += '&annotator=' + annotators[i].name;
+		    url = server + '?action=fetch&db=' + db + '&record='
+			+ record + annreq + '&dt=0&callback=?';
+		    $.getJSON(url, function(data) {
+			for (i = 0; i < data.fetch.annotator.length; i++) {
+			    ann[nann] = data.fetch.annotator[i];
+			    a_visible[ann[nann].name] = 1;
+			    ann[nann].opacity = 1;
+			    for (var j = 0; j < annotators.length; j++)
+				if (ann[nann].name == annotators[j].name)
+				    ann[nann].desc = annotators[j].desc;
+			    nann++;
 			}
-		    }
-		    $('#tabs').tabs("enable");
-		    nann = 0;	// new record -- (re)fill the cache
-		    if (annotators.length) {
-			var annreq = '', i;
-			for (i = 0; i < annotators.length; i++)
-			    annreq += '&annotator=' + annotators[i].name;
-			url = server + '?action=fetch&db=' + db + '&record='
-			    + record + annreq + '&dt=0&callback=?';
-			$.getJSON(url, function(data) {
-			    for (i = 0; i < data.fetch.annotator.length; i++) {
-				ann[nann] = data.fetch.annotator[i];
-				a_visible[ann[nann].name] = 1;
-				ann[nann].opacity = 1;
-				for (var j = 0; j < annotators.length; j++)
-				    if (ann[nann].name == annotators[j].name)
-					ann[nann].desc = annotators[j].desc;
-				nann++;
-			    }
-			    if (t0 != '') {
-				t = strtim(t0);
-				t -= t%(dt*tfreq);
-			    }
-			    t0 = timstr(t);
-			    $('[name=t0]').val(t0);
-			    $('#tabs').tabs("select", "#view");
-			    out_format = 'plot';
-			    go_here(t);
-			    $("body").show();
-			});
-		    }
-		});
+			slist(t0);
+		    });
+		}
 	    });
 	}
     }

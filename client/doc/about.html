@@ -9,10 +9,10 @@
 
 <h2>About LightWAVE</h2>
 
-<p> <b>LightWAVE</b> is a lightweight waveform and annotation viewer and
-editor.  Use it to view any of the recordings of physiologic signals and time
-series in <a href="http://physionet.org/physiobank/database/">PhysioBank</a>,
-together with their annotations (event markers).
+<p> <b>LightWAVE</b> is a lightweight waveform and annotation viewer and editor.
+Use it to view any of the recordings of physiologic signals and time series
+in <a href="http://physionet.org/physiobank/database/">PhysioBank</a>, together
+with their annotations (event markers).
 
 <p> LightWAVE runs within <a href="browser-compatibility.html">any modern web
 browser</a> and does not require installation on the user's computer, tablet, or
@@ -29,38 +29,61 @@ the <a href="COPYING.html">GPL</a>.
 <li> Once you have chosen a database, a <b>Record</b> selector appears.  Choose
 a record.
 
-<li> On the <b>View/edit</b> tab, click on <b>Plot</b>.  The first 10 seconds
-of the record appears.  Use the other controls at the top of the
-<b>View/edit</b> tab to navigate to other locations in the record.
+<li> Once you have chosen a record, LightWAVE's <b>View/edit</b> panel opens,
+showing the first 10 seconds of the record.
 </ol>
+
+<h3>Controls:</h3>
 
 <p> To find out how any LightWAVE control works, move the pointer over it,
 and a tooltip with a brief description will appear after a short
-interval.
+interval.  Click (tap) a tab (Choose input, View/edit, etc.) to open it.
 
-<p> Click on any of the labels on the left side of the <b>View/edit</b> tab
-to remove that item from the plot.  Click again to restore it, highlighted.
-Click a third time to show it in the original mode.  This feature
-may be useful if there are many signals or annotations, or if you have an
-unusually slow network connection.  You may increase or decrease the size
-of a signal, or reset it to its default size, while it is highlighted,
-using the &#9650;, <b>=</b>, and &#9660; buttons.
+<dl>
+<dt><b>Choose input</b></dt>
+<dd>Return here to select a different record.</dd>
+
+<dt><b>View/edit</b></dt>
+<dd>This panel contains navigation controls and indicators along its top edge.
+Below, the <em>signal window</em> shows a 10-second excerpt of the record named
+in the upper right corner.  The time indicators along the lower edge of the
+signal window indicate the elapsed time from the beginning of the record, in
+hours, minutes, and seconds.
+
+<p>
+Use the navigation controls to view any other location in the record.  For
+example, enter a time in the box next to <b>Go to:</b>, then press [Enter] or
+click (tap) the <button><b>&#x21b4;</b></button> (refresh signal window) button.
+
+<p> Use the <button>Find...</button> button to specify a search target (a type
+of annotation to be found), then use the <button>&lt;&nbsp;Search</button>
+and <button>Search&nbsp;&gt;</button> buttons to find the previous or next
+occurrence of the target.  Clicking on <button>Find...</button> opens a dialog
+box; enter an annotation mnemonic, such as N, V, or A, and choose an annotation
+set to search if more than one set is available.
+
+<p> Click on any of the labels on the left side of the signal window to
+cycle among three display states (hidden, highlighted, and normal).  At most one
+signal and one annotation set may be highlighted at a time.  Change the scale of
+a highlighted signal using the <button>&#9650;</button> (expand),
+<button>&#x21b6;</button> (restore to default), and <button>&#9660;</button>
+(shrink) buttons.  Click on the red circle to hide or restore the grid, or the
+blue circle to hide or restore the annotation markers.
 
 <p> If you have a mouse with a scroll wheel or a multitouch trackpad or screen,
 point to any location in the plot and scroll or "pinch" to change the
 magnification.
+</dd>
+<dt><b>Tables</b></dt>
+<dd>View details about the record, including text representations of the
+annotations and digitized signals.</dd>
 
-<p> View details about the record, including text representations of the
-annotations and digitized signals, on the <b>Tables</b> tab.
+<dt><b>Settings</b></dt>
+<dd>Use the controls to modify LightWAVE's behavior.  Your changes persist until
+LightWAVE is reloaded.</dd>
 
-<p> Use the controls on the <b>Settings</b> tab to modify LightWAVE's
-behavior.  Your changes persist until LightWAVE is reloaded.
-
-<p>
-On the <b>View/edit</b> tab, use the <b>Find...</b> button to specify a search
-target (a type of annotation to be found), then use the <b>&lt;&nbsp;Search</b>
-and <b>Search&nbsp;&gt;</b> buttons to find the previous or next occurrence of
-the target.  Clicking on <b>Find...</b> opens a dialog box;  enter an
-annotation mnemonic, such as N, V, or A, and choose an annotation set to search
-if more than one set is available.
+<dt><b>Help</b></dt>
+<dd>The <button>Main help</button> button shows this page.  Follow the
+links in <button>Help topics</button> to learn more.</dd>
+</dl>
 </html>

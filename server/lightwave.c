@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	20 January 2013  version 0.30
+			Last revised:	22 January 2013  version 0.32
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -388,7 +388,7 @@ void alist(void)
 
 void info(void)
 {
-    char *p;
+    char *info, *p;
     int i;
 
     printf("{ \"info\":\n");
@@ -423,6 +423,16 @@ void info(void)
 	printf("        \"baseline\": %d\n", s[i].baseline);
 	printf("      }%s", i < nsig-1 ? ",\n" : "\n    ]");
     }
+    if (info = getinfo(recpath)) {
+	printf(",\n    \"info\": [\n");
+	do {
+	    printf("      %s,\n", p = strjson(info)); SFREE(p);
+	} while (info = getinfo((char *)NULL));
+	printf("    ]");
+    }
+    else
+	printf(",\n    \"info\": null");
+
     printf("\n  }\n}\n");
 }
 
@@ -546,7 +556,7 @@ int fetchsignals(void)
 		SFREE(p);
 	    }
 	    else
-		printf("        \"units\": \"mV [assumed]\",\n");
+		printf("        \"units\": \"mV\",\n");
 	    printf("        \"t0\": %ld,\n", (long)ts0);
 	    printf("        \"tf\": %ld,\n", (long)tsf);
 	    printf("        \"gain\": %g,\n",
