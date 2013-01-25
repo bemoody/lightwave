@@ -7,3 +7,4 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 .container { border:2px solid #ccc; width:90%; height: 100px;
              overflow-y: scroll; }
 .dtable { table-layout: fixed; }
+div.notice { width: 90%; margin: auto; padding: 2em; background: #cdf; }

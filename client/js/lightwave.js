@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	22 January 2013  version 0.32
+//			Last revised:	24 January 2013  version 0.33
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -64,8 +64,11 @@ var g_visible = 1; // grid (1: on, 0: off)
 var m_visible = 1; // annotation marker bars (1: on, 0: off)
 var a_visible = [];
 var s_visible = [];
+var x_cursor = 0;
 var mag = [];   // magnification of signals in plots
 var help_main = 'about.html';
+var svc = '';
+var svg = '';
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -260,177 +263,43 @@ function show_tables() {
     $('#textdata').append(stext);
 }
 
-function show_plot() {
-    var width = $('#plotdata').width();
-    var height = width*0.525;
-    // calculate baselines for signals and annotators
-    var dy = Math.round(5000/(nsig + nann + 1));
-    var y = dy;
-    var y0s = [];	// signal baselines
-    var y0a = [];	// annotator baselines
-    var ia = 0, is = 0;
-    while (is < nsig || ia < nann) {
-	if (is < nsig) { y0s[is] = y; y += dy; is++; }
-	if (ia < nann) { y0a[ia] = y; y += dy; ia++; }
-    }
+var tracking = false;
 
-    var svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
-	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
-	+ ' width="' + width + '" height="' + height
-	+ '" preserveAspectRatio="xMidYMid meet">\n';
-    svg += '<g id="viewport" '
-	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">\n';
+function zoom_or_track() {
+    var btext;
 
-    // background grid
-    var grd = '<g id="grid">\n';
-    grd += '<circle cx="-120" cy="5000" r="50" stroke="rgb(200,100,100)"'
-        + ' stroke-width="4" fill="red" fill-opacity="' + g_visible + '"/>';
-    if (g_visible == 0) {
-	grd += '<title>(click to show grid)</title></g>';
+    tracking = !tracking;
+    if (tracking) {
+	btext = '<button class=\"torz\"'
+	    + 'title=\"tracking on / zooming off\">T/z</button></span>';
     }
     else {
-	grd += '<title>(click to hide grid)</title>'
-	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
-	    + ' d="M0,0 ';
-	for (var x = 0; x <= 10000; x += 200) {
-	    if (x%1000 == 0)
-		grd += 'l0,5000 l-20,100 l40,0 l-20,-100 m200,-5000 ';
-	    else
-		grd += 'l0,5000 m200,-5000 ';
-	}
-	grd += 'M0,0 '
-	for (var y = 0; y <= 5000; y += 200)
-	    grd += 'l10000,0 m-10000,200 ';
-	grd += '" /></g>\n';
+	btext = '<button class=\"torz\"'
+	    + 'title=\"tracking off | zooming on\">t/Z</button></span>';
     }
-
-    // timestamps
-    var tsm = (ts0 + +tsf)/2;
-    tst = '<g id="times">\n<text x="0" y="5200" font-size="100" fill="red"'
-	+ ' style="text-anchor: middle;">' + timstr(ts0) + '</text>\n'
-	+ '<text x="5000" y="5200" font-size="100" fill="red"'
-	+ ' style="text-anchor: middle;">' + timstr(tsm) + '</text>\n'
-	+ '<text x="10000" y="5200" font-size="100" fill="red"'
-	+ ' style="text-anchor: middle;">' + timstr(tsf) + '</text>\n</g>\n';
-    
-    // annotator names and annotations
-    sva = '<g id="mrkr">\n';
-    sva += '<circle cx="-120" cy="0" r="50" stroke="rgb(0,0,200)"'
-        + ' stroke-width="4" fill="blue" fill-opacity="' + m_visible + '"/>'
-    if (m_visible == 0) sva += '<title>(click to show marker bars)</title>';
-    else sva += '<title>(click to hide marker bars)</title>';
-    for (ia = 0; ia < nann; ia++) {
-	var y0 = y0a[ia];
-	var aname = ann[ia].name;
-	sva += '<g id="ann;;' + aname + '">\n';
-	if (a_visible[aname] == 1) {
-	    sva += '<title>' + ann[ia].desc + ' (click to hide)</title>'
-		+ '<text x="-50" y="' + y0 + '"';
-	    if (aname == annselected)
-		sva += ' font-weight="bold"';
-	    sva += ' font-size="120" fill="blue" font-style="italic"'
-		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ aname + '</text>\n';
-	    var a = ann[ia].annotation;
-	    for (var i = 0; i < a.length; i++) {
-		if (a[i].t < ts0) continue;
-		else if (a[i].t > tsf) break;
-		var x, y, y1, txt;
-		x = Math.round((a[i].t - ts0)*1000/tfreq);
-		if (a[i].x && (a[i].a == '+' || a[i].a == '"')) {
-		    if (a[i].a == '+') y = y0+120;
-		    else y = y0-120;
-		    txt = '' + a[i].x;
-		}
-		else {
-		    y = y0;
-		    // display N annotations as bullets
-		    if (a[i].a == 'N') txt = '&bull;'
-		    else txt = a[i].a;
-		}
-		if (m_visible) {
-		    y1 = y - 150;
-		    sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
-			+ ' fill="blue" + opacity="' + m_visible
-			+ '" d="M' + x + ',0 l-20,-100 l40,0 l-20,100 V' + y1
-			+ ' m0,210 V5000" />\n';
-		}
-		sva += '<text x="' + x + '" y="' + y
-		    + '" style="text-anchor: middle;"';
-		if (aname == annselected)
-		    sva += ' font-weight="bold"';
-		sva += ' font-size="120" fill="rgb(0,0,200)">'
-		    + txt + '</text>\n'; 
-	    }
-	}
-	else {
-	    sva += '<title>' + ann[ia].desc + ' (click to view)</title>'
-		+ '<text x="-50" y="' + y0 + '"'
-		+ ' font-size="120" fill="rgb(150,150,200)" font-style="italic"'
-		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ aname + '</text>\n';
-	}
-	sva += '</g>\n';
+    $('#tz').html(btext);
+    if (tracking) {
+	$('svg').mousemove(function(e){
+	    var x = e.pageX;
+	    show_time(x);
+	});
     }
-
-    // signal names and traces
-    svs = '';
-    for (is = 0; is < nsig; is++) {
-	var y0 = y0s[is];
-	var sname = signals[is].name;
-	var trace = find_trace(db, record, sname, ts0);
-	
-	svs += '<g id="sig;;' + sname + '">\n';
-	if (trace && s_visible[sname] == 1) {
-	    svs += '<title>' + sname + ' (click to hide)</title>' 
-		+ '<text x="-50" y="' + y0 + '"';
-	    if (sname == sigselected)
-		svs += ' font-weight="bold"';
-	    svs += ' font-size="120" fill="black" font-style="italic"'
-		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ sname + '</text>\n';
-	    var s = trace.samp;
-	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
-	    var z = trace.base*g - y0;
-	    var v = Math.round(g*s[0] - z);
-	    // move to start of trace
-	    svs += '<path stroke="black" fill="none" stroke-width="';
-	    if (sname == sigselected)
-		svs += '10';
-	    else
-		svs += '6';
-	    svs += '" d="M0,' + v + ' L';
-	    var t = 0;
-	    var tps = trace.tps;
-	    var tmax = s.length * tps;
-	    var ts = 1000/tfreq;
-	    if (tmax > dt * tfreq) tmax = dt * tfreq;
-	    // add remaining samples to the trace
-	    for (var i = 0; t < tmax; i++, t += tps) {
-		v = Math.round(g*s[i] - z);
-		svs += ' ' + t*ts + ',' + v;
-	    }
-	    svs += '" />\n';
-	}
-	else {	// signal is hidden, show label only
-	    svs += '<title>' + sname + ' (click to view)</title>'
-		+ '<text x="-50" y="' + y0 + '"'
-		+ ' font-size="120" fill="rgb(128,128,128)" font-style="italic"'
-		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ sname + '</text>\n';
-	}
-	svs += '</g>\n';
+    else {
+	$('svg').svgPan('viewport');
     }
+    $('.torz').on("click", zoom_or_track);
+}
 
-    svg += grd + tst + sva + svs + '</g></svg>\n';
-    $('#plotdata').html(svg);
-    // Handle user input in the signal window
-    $('svg').svgPan('viewport');
-
-    $('svg').mousemove(function(e){
-	var x = e.pageX;
-	show_time(x);
-    });
+function handle_svg_events() {
+    if (tracking) {
+	$('svg').mousemove(function(e){
+	    var x = e.pageX;
+	    show_time(x);
+	});
+    }
+    else {
+	$('svg').svgPan('viewport');
+    }
 
     $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
@@ -471,6 +340,190 @@ function show_plot() {
 	read_signals(ts0, true);
 	show_plot();
     });
+}
+
+function show_plot() {
+    var width = $('#plotdata').width();
+    var height = width*0.525;
+    // calculate baselines for signals and annotators
+    var dy = Math.round(5000/(nsig + nann + 1));
+    var y = dy;
+    var y0s = [];	// signal baselines
+    var y0a = [];	// annotator baselines
+    var ia = 0, is = 0;
+    while (is < nsig || ia < nann) {
+	if (is < nsig) { y0s[is] = y; y += dy; is++; }
+	if (ia < nann) { y0a[ia] = y; y += dy; ia++; }
+    }
+
+    svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
+	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
+	+ ' width="' + width + '" height="' + height
+	+ '" preserveAspectRatio="xMidYMid meet">\n';
+    svg += '<g id="viewport" '
+	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">\n';
+    
+    // cursor
+    svg += '<g id="cursor"></g>';
+
+    // background grid
+    var grd = '<g id="grid">\n';
+    grd += '<circle cx="-120" cy="5000" r="50" stroke="rgb(200,100,100)"'
+        + ' stroke-width="4" fill="red" fill-opacity="' + g_visible + '"/>';
+    if (g_visible == 0) {
+	grd += '<title>(click to show grid)</title></g>';
+    }
+    else {
+	grd += '<title>(click to hide grid)</title>'
+	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
+	    + ' d="M0,0 ';
+	for (var x = 0; x <= 10000; x += 200) {
+	    if (x%1000 == 0)
+		grd += 'l0,5000 l-20,100 l40,0 l-20,-100 m200,-5000 ';
+	    else
+		grd += 'l0,5000 m200,-5000 ';
+	}
+	grd += 'M0,0 '
+	for (var y = 0; y <= 5000; y += 200)
+	    grd += 'l10000,0 m-10000,200 ';
+	grd += '" /></g>\n';
+    }
+
+    // timestamps
+    var tsm = (ts0 + +tsf)/2;
+    tst = '<g id="times">\n<text x="0" y="5200" font-size="100" fill="red"'
+	+ ' style="text-anchor: middle;">' + timstr(ts0) + '</text>\n'
+	+ '<text x="5000" y="5200" font-size="100" fill="red"'
+	+ ' style="text-anchor: middle;">' + timstr(tsm) + '</text>\n'
+	+ '<text x="10000" y="5200" font-size="100" fill="red"'
+	+ ' style="text-anchor: middle;">' + timstr(tsf) + '</text>\n</g>\n';
+    
+    // annotator names and annotations
+    sva = '<g id="mrkr">\n';
+    sva += '<circle cx="-120" cy="0" r="50" stroke="rgb(0,0,200)"'
+        + ' stroke-width="4" fill="blue" fill-opacity="' + m_visible + '"/>';
+    if (m_visible == 0) sva += '<title>(click to show marker bars)</title>';
+    else sva += '<title>(click to hide marker bars)</title>';
+    for (ia = 0; ia < nann; ia++) {
+	var y0 = y0a[ia];
+	var aname = ann[ia].name;
+	sva += '<g id="ann;;' + aname + '">\n';
+	if (a_visible[aname] == 1) {
+	    sva += '<title>' + ann[ia].desc;
+	    if (aname == annselected) {
+		sva += ' (click for normal view)</title>'
+		    + '<text font-weight="bold"';
+	    }
+	    else {
+		sva += ' (click to hide)</title><text'
+	    }
+	    sva += ' x="-50" y="' + y0
+		+ '" font-size="120" fill="blue" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle"';
+	    if (aname == annselected)
+		sva += ' font-weight="bold"';
+	    sva += '>' + aname + '</text>\n';
+	    var a = ann[ia].annotation;
+	    for (var i = 0; i < a.length; i++) {
+		if (a[i].t < ts0) continue;
+		else if (a[i].t > tsf) break;
+		var x, y, y1, txt;
+		x = Math.round((a[i].t - ts0)*1000/tfreq);
+		if (a[i].x && (a[i].a == '+' || a[i].a == '"')) {
+		    if (a[i].a == '+') y = y0+120;
+		    else y = y0-120;
+		    txt = '' + a[i].x;
+		}
+		else {
+		    y = y0;
+		    // display N annotations as bullets
+		    if (a[i].a == 'N') txt = '&bull;'
+		    else txt = a[i].a;
+		}
+		if (m_visible) {
+		    y1 = y - 150;
+		    sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
+			+ ' fill="blue" + opacity="' + m_visible
+			+ '" d="M' + x + ',0 l-20,-100 l40,0 l-20,100 V' + y1
+			+ ' m0,210 V5000" />\n';
+		}
+		sva += '<text x="' + x + '" y="' + y
+		    + '" style="text-anchor: middle;"';
+		if (aname == annselected)
+		    sva += ' font-weight="bold"';
+		sva += ' font-size="120" fill="rgb(0,0,200)">'
+		    + txt + '</text>\n'; 
+	    }
+	}
+	else {
+	    sva += '<title>' + ann[ia].desc
+	    	+ ' (click for highlighted view)</title>'
+		+ '<text x="-50" y="' + y0 + '"'
+		+ ' font-size="120" fill="rgb(150,150,200)" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
+		+ aname + '</text>\n';
+	}
+	sva += '</g>\n';
+    }
+
+    // signal names and traces
+    svs = '';
+    for (is = 0; is < nsig; is++) {
+	var y0 = y0s[is];
+	var sname = signals[is].name;
+	var trace = find_trace(db, record, sname, ts0);
+	
+	svs += '<g id="sig;;' + sname + '">\n';
+	if (trace && s_visible[sname] == 1) {
+	    svs += '<title>' + sname;
+	    if (sname == sigselected) {
+		svs += ' (click for normal view)</title>'
+		    + '<text font-weight="bold"';
+	    }
+	    else {
+		svs += ' (click to hide)</title><text'
+	    }
+	    svs += ' x="-50" y="' + y0
+		+ '" font-size="120" fill="black" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
+		+ sname + '</text>\n';
+	    var s = trace.samp;
+	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
+	    var z = trace.base*g - y0;
+	    var v = Math.round(g*s[0] - z);
+	    // move to start of trace
+	    svs += '<path stroke="black" fill="none" stroke-width="';
+	    if (sname == sigselected)
+		svs += '10';
+	    else
+		svs += '6';
+	    svs += '" d="M0,' + v + ' L';
+	    var t = 0;
+	    var tps = trace.tps;
+	    var tmax = s.length * tps;
+	    var ts = 1000/tfreq;
+	    if (tmax > dt * tfreq) tmax = dt * tfreq;
+	    // add remaining samples to the trace
+	    for (var i = 0; t < tmax; i++, t += tps) {
+		v = Math.round(g*s[i] - z);
+		svs += ' ' + t*ts + ',' + v;
+	    }
+	    svs += '" />\n';
+	}
+	else {	// signal is hidden, show label only
+	    svs += '<title>' + sname + ' (click for highlighted view)</title>'
+		+ '<text x="-50" y="' + y0 + '"'
+		+ ' font-size="120" fill="rgb(128,128,128)" font-style="italic"'
+		+ ' style="text-anchor: end; dominant-baseline: middle">'
+		+ sname + '</text>\n';
+	}
+	svs += '</g>\n';
+    }
+
+    svg += grd + tst + sva + svs;
+    $('#plotdata').html(svg + '</svg>\n');
+    $('.pointer').html('&nbsp;');
+    handle_svg_events();    // Handle user input in the signal window
 }
 
 function update_output() {
@@ -520,9 +573,12 @@ function read_signals(t, update) {
 	    + db + '&record=' + record + sigreq
 	    + '&t0=' + t/tfreq + '&dt=' + dt + '&callback=?';
 	$.getJSON(url, function(data) {
-	    var s = data.fetch.signal;
-	    for (i = 0; i < s.length; i++)
-		set_trace(db, record, s[i]);
+	    var fetch = data.fetch;
+	    if (fetch && fetch.hasOwnProperty('signal')) {
+		var s = data.fetch.signal;
+		for (i = 0; i < s.length; i++)
+		    set_trace(db, record, s[i]);
+	    }
 	    if (update) update_output();
 	});
     }
@@ -733,11 +789,19 @@ function help_contacts() {
 
 function show_time(x) {
     var m = viewport.getScreenCTM();
-    var t = ts0 + (x - m.e)*tfreq/(1000*m.a);
-    if (t < ts0) t = ts0;
-    else if (t > tsf) t = tsf;
+    x_cursor = (x - m.e)/m.a;
+    if (x_cursor < 0) x_cursor = 0;
+    else if (x_cursor > 10000) x_cursor = 10000;
+    var t = ts0 + x_cursor*tfreq/1000;
     var ts = mstimstr(t);
     $('.pointer').html(ts);
+
+    svc = '<path stroke="rgb(0,100,200)" stroke-width="4"'
+	+ ' opacity="0.75" fill="blue"'
+	+ ' d="M' + x_cursor
+	+ ',0 l-40,-100 l80,0 l-40,100 V5000 l-40,100 l80,0 l -40,-100" />';
+    $('#plotdata').html(svg + svc + '</svg>\n');
+    handle_svg_events();
 }
 
 // Load the list of signals for the selected record.
@@ -789,7 +853,7 @@ function newrec() {
 function alist() {
     url = server + '?action=alist&callback=?&db=' + db;
     $.getJSON(url, function(data) {
-	if (data) annotators = data.annotator;
+	if (data.success) annotators = data.annotator;
 	else annotators = '';
     });
 };
@@ -899,7 +963,8 @@ function set_handlers() {
     $('.stretch').attr('disabled', 'disabled');
     $('.reset').attr('disabled', 'disabled');
     $('.shrink').attr('disabled', 'disabled');
-
+    $('.torz').on("click", zoom_or_track);
+    
     // on Settings tab:
     $('[name=server]').on("change", set_server);      // go to selected location
 
@@ -953,7 +1018,7 @@ function parse_url() {
 	    $('#rlist').html(rlist);
 	    url = server + '?action=alist&callback=?&db=' + db;
 	    $.getJSON(url, function(data) {
-		if (data) annotators = data.annotator;
+		if (data.success) annotators = data.annotator;
 		else annotators = '';
 		url = server + '?action=info&db=' + db + '&record=' + record
 		    + '&callback=?';

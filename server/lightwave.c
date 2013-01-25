@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	22 January 2013  version 0.32
+			Last revised:	24 January 2013  version 0.33
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -67,9 +67,11 @@ WFDB_Time t0, tf, dt;
 char *get_param(char *name), *get_param_multiple(char *name), *strjson(char *s);
 double approx_LCM(double x, double y);
 int  fetchannotations(void), fetchsignals(void), ufindsig(char *name);
-void dblist(void), rlist(void), alist(void), slist(void), info(void),
-    fetch(void), force_unique_signames(void), free_sname(void),
-    print_file(char *filename), jsonp_end(void);
+void dblist(void), rlist(void), alist(void), info(void), fetch(void),
+    force_unique_signames(void), print_file(char *filename),
+    jsonp_end(void), lwpass(void), lwfail(char *error_message),
+    prep_signals(void), map_signals(void), prep_annotations(void),
+    prep_times(void), cleanup(void);
 
 int main(int argc, char **argv)
 {
@@ -86,6 +88,7 @@ int main(int argc, char **argv)
     else
         interactive = 1;  /* interactive mode for debugging */
     wfdbquiet();	  /* suppress WFDB library error messages */
+    atexit(cleanup);	/* release allocated memory before exiting */
 
     /* To add a custom data repository, define LW_WFDB (see Makefile). */
 #ifdef LW_WFDB
@@ -97,119 +100,138 @@ int main(int argc, char **argv)
 	exit(0);
     }
 
-    if (callback = get_param("callback")) {
+    if (!interactive && (callback = get_param("callback"))) {
 	printf("%s(", callback);	/* JSONP:  "wrap" output in callback */
 	atexit(jsonp_end);	/* close the output with ")" before exiting */
     }
 
-    if (strcmp(action, "dblist") == 0) {
+    if (strcmp(action, "dblist") == 0)
 	dblist();
-	exit(0);
-    }
+
     else if ((db = get_param("db")) == NULL)
-        exit(0);	/* early exit if no database chosen */
-
-    else if (strcmp(action, "rlist") == 0) {
+	lwfail("Your request did not specify a database");
+  
+    else if (strcmp(action, "rlist") == 0)
 	rlist();
-	exit(0);
-    }
 
-    else if (strcmp(action, "alist") == 0) {
+    else if (strcmp(action, "alist") == 0)
 	alist();
-	exit(0);
-    }
 
     else if ((record = get_param("record")) == NULL)
-        exit(0);	/* early exit if no record chosen */
+	lwfail("Your request did not specify a record");
 
-    else {
-        SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
-        sprintf(recpath, "%s/%s", db, record);
+    else if (strcmp(action, "info") == 0)
+	info();
 
-	/* Discover the number of signals defined in the header, allocate
-	   memory for their signal information structures, open the signals. */
-	if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
-	    SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
-	    nsig = isigopen(recpath, s, nsig);
-	} 
+    else if (strcmp(action, "fetch") == 0)
+	fetch();
 
-	force_unique_signames();
-
-	/* Find the least common multiple of the sampling frequencies (which
-	   may not be exactly expressible as floating-point numbers).  In
-	   WFDB-compatible records, all signals are sampled at the same
-	   frequency or at a multiple of the frame frequency, but (especially
-	   in EDF records) there may be many samples of each signal in each
-	   frame.  The for loop below sets the "tick" frequency tfreq to the
-	   number of instants in each second when at least one sample is
-	   acquired. */
-	setgvmode(WFDB_LOWRES);
-	ffreq = sampfreq(NULL);
-	if (ffreq <= 0.) ffreq = WFDB_DEFFREQ;
-	for (i = 0, tfreq = ffreq; i < nsig; i++)
-	    tfreq = approx_LCM(ffreq * s[i].spf, tfreq);
-
-	if (strcmp(action, "info") == 0)
-	    info();
-
-	else if (strcmp(action, "fetch")==0) {
-	    char *p;
-	    int n;
-
-	    if (nsig > 0) {
-		SUALLOC(sigmap, nsig, sizeof(int));
-		for (n = 0; n < nsig; n++)
-		    sigmap[n] = -1;
-		while (p = get_param_multiple("signal")) {
-		    if ((n = ufindsig(p)) >= 0) {
-			sigmap[n] = n; n++; nosig++;
-		    }
-		}
-	    }
-	    while (nann < NAMAX && (p = get_param_multiple("annotator"))) {
-		SSTRCPY(annotator[nann], p);
-		nann++;
-	    }
-	    if ((p = get_param("t0")) == NULL) p = "0";
-	    if ((t0 = strtim(p)) < 0L) t0 = -t0;
-	    if ((p = get_param("dt")) == NULL) p = "1";
-
-	    /* dt is the amount of data to be retrieved.  On input, dt is
-	       in seconds, but the next block of code converts it to sample
-	       intervals.  There are several special cases:
-	       * If dt is 0 or negative, no samples are retrieved, but all
-	         annotations are retrieved.
-	       * If dt is positive but less than 1 sampling interval, it is
-	         set to 1 sampling interval.  This occurs for records with
-		 very low sampling rates, such as once per minute.
-	       * Otherwise, if dt is longer than 2 minutes and longer than
-	         120000 sample intervals, it is reduced to 2 minutes, to
-		 limit the load on the server from a single request.
-	    */
-	    dt = atoi(p);
-	    if (dt <= 0) dt = 0;
-	    else {
-		dt *= ffreq;
-		if (dt < 1) dt = 1;
-		else if (dt > 120*ffreq && dt > 120000) dt = 120*ffreq;
-	    }
-	    tf = t0 + dt;
-
-	    fetch();
-
-	    if (nsig > 0) {
-		SFREE(sigmap);
-		SFREE(v);
-	    }
-	}
-    }
-
-    /* Close open files and release allocated memory. */
-    wfdbquit();
-    if (nsig > 0) SFREE(s);
-    SFREE(recpath);
+    else
+	lwfail("Your request did not specify a valid action");
 
     exit(0);
+}
+
+void prep_signals()
+{
+    int n;
+
+    SUALLOC(recpath, strlen(db) + strlen(record) + 2, sizeof(char));
+    sprintf(recpath, "%s/%s", db, record);
+
+    /* Discover the number of signals defined in the header, allocate
+       memory for their signal information structures, open the signals. */
+    if ((nsig = isigopen(recpath, NULL, 0)) > 0) {
+	SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
+	nsig = isigopen(recpath, s, nsig);
+    } 
+
+    /* Make reasonably sure that signal names are distinct (see below). */
+    force_unique_signames();
+
+    /* Find the least common multiple of the sampling frequencies (which may not
+       be exactly expressible as floating-point numbers).  In WFDB-compatible
+       records, all signals are sampled at the same frequency or at a multiple
+       of the frame frequency, but (especially in EDF records) there may be many
+       samples of each signal in each frame.  The for loop below sets the "tick"
+       frequency, tfreq, to the number of instants in each second when at least
+       one sample is acquired. */
+    setgvmode(WFDB_LOWRES);
+    ffreq = sampfreq(NULL);
+    if (ffreq <= 0.) ffreq = WFDB_DEFFREQ;
+    for (n = 0, tfreq = ffreq; n < nsig; n++)
+	tfreq = approx_LCM(ffreq * s[n].spf, tfreq);
+}   
+
+void lwpass()
+{
+    printf("  \"success\": true\n}\n");
+}
+
+void lwfail(char *error_message)
+{
+    char *p = strjson(error_message);
+
+    printf("{\n  \"success\": false,\n  \"error\": %s\n}\n", p);
+    SFREE(p);
+}
+
+void map_signals()
+{
+    char *p;
+    int n;
+
+    SUALLOC(sigmap, nsig, sizeof(int));
+    for (n = 0; n < nsig; n++)
+	sigmap[n] = -1;
+    while (p = get_param_multiple("signal")) {
+	if ((n = ufindsig(p)) >= 0) {
+	    sigmap[n] = n; n++; nosig++;
+	}
+    }
+}
+
+void prep_annotators()
+{
+    char *p;
+
+    while (nann < NAMAX && (p = get_param_multiple("annotator"))) {
+	SSTRCPY(annotator[nann], p);
+	nann++;
+    }
+}
+
+void prep_times()
+{
+    char *p;
+
+    if ((p = get_param("t0")) == NULL) p = "0";
+    if ((t0 = strtim(p)) < 0L) t0 = -t0;
+    if ((p = get_param("dt")) == NULL) p = "1";
+	
+    /* dt is the amount of data to be retrieved.  On input, dt is in seconds,
+       but the next block of code converts it to sample intervals.  There are
+       several special cases:
+
+       * If dt is 0 or negative, no samples are retrieved, but all annotations
+       are retrieved.
+
+       * If dt is positive but less than 1 sampling interval, it is set to 1
+       sampling interval.  This occurs for records with very low sampling rates,
+       such as once per minute.
+
+       * Otherwise, if dt is longer than 2 minutes and longer than 120000 sample
+       intervals, it is reduced to 2 minutes, to limit the load on the server
+       from a single request.
+    */
+    dt = atoi(p);
+    if (dt <= 0) dt = 0;
+    else {
+	dt *= ffreq;
+	if (dt < 1) dt = 1;
+	else if (dt > 120*ffreq && dt > 120000) dt = 120*ffreq;
+    }
+    tf = t0 + dt;
 }
 
 /* Find the (approximate) least common multiple of two positive numbers
@@ -259,7 +281,8 @@ char *get_param_multiple(char *name)
 
 /* Convert a string to a JSON quoted string.  Note that newlines and other
 control characters that cannot appear in JSON strings are converted to
-spaces. */
+spaces.  IMPORTANT:  the caller must free the string after use to avoid
+memory leaks! */
 char *strjson(char *s)
 {
     char *js;
@@ -331,8 +354,13 @@ void dblist(void)
 	    SFREE(desc);
 	    SFREE(name);
 	}
-	printf("\n  ]\n}\n");
+	printf("\n  ],\n");
+        lwpass();
 	wfdb_fclose(ifile);
+    }
+    else {
+	printf("{\n");
+	lwfail("The list of databases could not be read");
     }
 }
 
@@ -351,9 +379,12 @@ void rlist(void)
 	    printf("    %s", p = strjson(buf));
 	    SFREE(p);
 	}
-	printf("\n  ]\n}\n");
+	printf("\n  ],\n");
+	lwpass();
 	wfdb_fclose(ifile);
     }
+    else
+	lwfail("The list of records could not be read");
 }
 
 void alist(void)
@@ -381,9 +412,12 @@ void alist(void)
 	    SFREE(desc);
 	    SFREE(name);
 	}
-	printf("\n  ]\n}\n");
+	printf("\n  ],\n");
+	lwpass();
 	wfdb_fclose(ifile);
     }
+    else
+	lwfail("The list of annotators could not be read");
 }
 
 void info(void)
@@ -391,6 +425,7 @@ void info(void)
     char *info, *p;
     int i;
 
+    prep_signals();
     printf("{ \"info\":\n");
     printf("  { \"db\": %s,\n", p = strjson(db)); SFREE(p);
     printf("    \"record\": %s,\n", p = strjson(record)); SFREE(p);
@@ -424,16 +459,18 @@ void info(void)
 	printf("      }%s", i < nsig-1 ? ",\n" : "\n    ]");
     }
     if (info = getinfo(recpath)) {
-	printf(",\n    \"info\": [\n");
-	do {
-	    printf("      %s,\n", p = strjson(info)); SFREE(p);
-	} while (info = getinfo((char *)NULL));
+	printf(",\n    \"note\": [\n      %s", p = strjson(info));
+	while (info = getinfo((char *)NULL)) {
+	    printf(",\n      %s", p = strjson(info));
+	    SFREE(p);
+	}
 	printf("    ]");
     }
     else
-	printf(",\n    \"info\": null");
+	printf(",\n    \"note\": null");
 
-    printf("\n  }\n}\n");
+    printf("\n  },");
+    lwpass();
 }
 
 int fetchannotations(void)
@@ -578,11 +615,21 @@ int fetchsignals(void)
     }
     printf("\n    ]%s", nann ? ",\n" : "\n  }\n");
     flushcal();
+    for (n = 0; n < nsig; n++)
+	SFREE(sb[n]);
+    SFREE(sb);
+    SFREE(sp);
+    SFREE(v);
+    SFREE(m);
     return (1);	/* output was written */
 }
 
 void fetch(void)
 {
+    prep_signals();
+    if (nsig > 0) map_signals();
+    prep_annotators();
+    prep_times();
     printf("{ \"fetch\":\n");
     if ((fetchsignals() + fetchannotations()) == 0) printf("null");
     printf("}\n");
@@ -610,7 +657,6 @@ void fetch(void)
 void force_unique_signames(void) {
     int i, j;
 
-    atexit(free_sname);
     SALLOC(sname, sizeof(char *), nsig);
 
     for (i = 0; i < nsig; i++) {
@@ -655,11 +701,23 @@ int ufindsig(char *p) {
   return (-1);    
 }
 
-void free_sname(void)
+
+void cleanup(void)
 {
+    /* Close open files and release allocated memory. */
+    wfdbquit();
+
+    SFREE(recpath);
+    while (--nann >= 0)
+	SFREE(annotator[nann]);
+
+    if (nsig > 0) {
+	SFREE(s);
+	SFREE(sigmap);
+    }
     if (sname) {
-	while (nsig > 0)
-	    free(sname[--nsig]);
-	free(sname);
+	while (--nsig >= 0)
+	    SFREE(sname[nsig]);
+	SFREE(sname);
     }
 }

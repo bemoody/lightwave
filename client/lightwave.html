@@ -1,24 +1,4 @@
 <!DOCTYPE html>
-<!--
-LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	22 January 2013   version 0.32
-
-LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
-to view any of the recordings of physiologic signals and time series in
-PhysioBank, together with their annotations (event markers).
-
-LightWAVE runs within any modern web browser and does not require installation
-on the user's computer, tablet, or phone.  LightWAVE is free software licensed
-under the GPL.
-
-This file contains the main HTML5 page, which is the starting point for using
-LightWAVE.  When a JavaScript-enabled web browser loads this page, it also
-loads the .css and .js files mentioned in its <head> section, including
-lightwave.css (LightWAVE-specific styles) and lightwave.js (LightWAVE-specific
-JavaScript code, which runs within the browser to provide low-latency
-interaction with the user).  The other .css and .js files are recent unmodified
-versions of standard jQuery and jQuery UI components.
--->
 <html>
 <head>
 <meta http-equiv='content-type' content='text/html; charset=utf-8'>
@@ -32,6 +12,26 @@ versions of standard jQuery and jQuery UI components.
 <script src="js/lightwave.js"></script>
 <noscript><style>.js { display: none; }</style></noscript>
 </head>
+<!--
+LightWAVE main page	G. Moody	18 November 2012
+			Last revised:	24 January 2013   version 0.33
+
+LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
+to view any of the recordings of physiologic signals and time series in
+PhysioBank, together with their annotations (event markers).
+
+LightWAVE runs within any modern web browser and does not require installation
+on the user's computer, tablet, or phone.  LightWAVE is free software licensed
+under the GPL.
+
+This file contains the main HTML5 page, which is the starting point for using
+LightWAVE.  When a JavaScript-enabled web browser loads this page, it also loads
+the .css and .js files mentioned above, including lightwave.css
+(LightWAVE-specific styles) and lightwave.js (LightWAVE-specific JavaScript
+code, which runs within the browser to provide low-latency interaction with the
+user).  The other .css and .js files are recent unmodified versions of standard
+jQuery and jQuery UI components.
+-->
 <body style='display: none; background-color:#fff'>
 
 <noscript>
@@ -75,25 +75,30 @@ record to the start of the window, then click '&#x21b4;'"
       <button id="fplot" tabindex="2"
 		    title="refresh signal window">&#x21b4;</button>
       &nbsp;<button class="sor" tabindex="8"
-		    title="start of record">|&lt;</button>
+		    title="start of record">|&#9665;</button>
       <button class="srev" tabindex="5"
-	   title="search for previous 'Find' target">&lt; Search</button>
+	   title="search for previous 'Find' target">&#9665; Search</button>
       <button class="rev" tabindex="4"
-		    title="previous window">&lt;</button>
+		    title="previous window">&#9665;</button>
       <button class="find" tabindex="9"
 		    title="define search target">Find...</button>
       <button class="fwd" tabindex="3"
-		    title="next window">&gt;</button>
+		    title="next window">&#9655;</button>
       <button class="sfwd" tabindex="6"
-		    title="search for next 'Find' target">Search &gt;</button>
+		   title="search for next 'Find' target">Search &#9655;</button>
       <button class="eor" tabindex="7"
-		    title="end of record">&gt;|</button>
+		    title="end of record">&#9655;|</button>
       &nbsp;&nbsp;<button class="stretch"
 		    title="enlarge the highlighted signal">&#9650;</button>
       <button class="reset"
 		    title="reset the highlighted signal">=</button>
       <button class="shrink"
-		    title="reduce the highlighted signal">&#9660;</button></td>
+		    title="reduce the highlighted signal">&#9660;</button>
+    &nbsp;&nbsp;<span id="tz">
+      <button class="torz"
+	            title="tracking off / zooming on">t/Z</button></span>
+    </td>
+    </span>
     <td align=right>
       <span class="recann"></span><br><span class="pointer">&nbsp;</span></td>
   </tr>
