@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	28 January 2013  version 0.34
+			Last revised:	29 January 2013  version 0.37
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -425,6 +425,7 @@ void info(void)
 {
     char *info, *p;
     int i;
+    WFDB_Time t;
 
     prep_signals();
     printf("{ \"info\":\n");
@@ -440,37 +441,49 @@ void info(void)
         printf("    \"start\": null,\n");
 	printf("    \"end\": null,\n");
     }
-    p = mstimstr(strtim("e"));
-    while (*p == ' ') p++;
-    printf("    \"duration\": \"%s\"", p);
-    if (nsig > 0) printf(",\n    \"signal\": [\n");
-    for (i = 0; i < nsig; i++) {
-        printf("      { \"name\": %s,\n", p = strjson(sname[i])); SFREE(p);
-	printf("        \"tps\": %g,\n", tfreq/(ffreq*s[i].spf));
-	if (s[i].units) {
-	    printf("        \"units\": %s,\n", p = strjson(s[i].units));
-	    SFREE(p);
-	}
-	else
-	    printf("        \"units\": null,\n");
-	printf("        \"gain\": %g,\n", s[i].gain ? s[i].gain : WFDB_DEFGAIN);
-	printf("        \"adcres\": %d,\n", s[i].adcres);
-	printf("        \"adczero\": %d,\n", s[i].adczero);
-	printf("        \"baseline\": %d\n", s[i].baseline);
-	printf("      }%s", i < nsig-1 ? ",\n" : "\n    ]");
+    t = strtim("e");
+    if (t > (WFDB_Time)0) {
+	p = mstimstr(t);
+	while (*p == ' ') p++;
+	printf("    \"duration\": \"%s\",\n", p);
     }
+    else
+	printf("    \"duration\": null,\n");
+
+    if (nsig > 0) {
+	printf("    \"signal\": [\n");
+	for (i = 0; i < nsig; i++) {
+	    printf("      { \"name\": %s,\n", p = strjson(sname[i])); SFREE(p);
+	    printf("        \"tps\": %g,\n", tfreq/(ffreq*s[i].spf));
+	    if (s[i].units) {
+		printf("        \"units\": %s,\n", p = strjson(s[i].units));
+		SFREE(p);
+	    }
+	    else
+		printf("        \"units\": null,\n");
+	    printf("        \"gain\": %g,\n",
+		   s[i].gain ? s[i].gain : WFDB_DEFGAIN);
+	    printf("        \"adcres\": %d,\n", s[i].adcres);
+	    printf("        \"adczero\": %d,\n", s[i].adczero);
+	    printf("        \"baseline\": %d\n", s[i].baseline);
+	    printf("      }%s", i < nsig-1 ? ",\n" : "\n    ],\n");
+	}
+    }
+    else
+	printf("    \"signal\": null,\n");
+
     if (info = getinfo(recpath)) {
-	printf(",\n    \"note\": [\n      %s", p = strjson(info));
+	printf("    \"note\": [\n      %s", p = strjson(info));
 	while (info = getinfo((char *)NULL)) {
 	    printf(",\n      %s", p = strjson(info));
 	    SFREE(p);
 	}
-	printf("    ]");
+	printf("\n    ],\n");
     }
     else
-	printf(",\n    \"note\": null");
+	printf("    \"note\": null,\n");
 
-    printf("\n  },");
+    printf("  },\n");
     lwpass();
 }
 

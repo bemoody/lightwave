@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	29 January 2013  version 0.36
+//			Last revised:	29 January 2013  version 0.37
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -45,6 +45,9 @@ var db = '';	// name of the selected database
 var record = '';// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by slist()
 var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
+var aduration;  // length of longest annotation set, in ticks
+var sduration;  // length of signals, in ticks
+var tf;		// record length, in ticks (max of aduration and sduration)
 var annotators = ''; // annotators for the selected database, from alist()
 var ann = [];   // annotations read and cached by read_annotations()
 var nann = 0;	// number of annotators, set by read_annotations()
@@ -170,26 +173,39 @@ function strtim(s) {
     return t*tfreq;
 }
 
-function show_summary() {
-    var itext = '', ia, ii, is;
+function html_escape(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
 
+function show_summary() {
+    var itext = '', ia, ii, is, rdurstr;
+
+    if (recinfo.duration) sduration = strtim(recinfo.duration);
+    else sduration = 0;
+    tf = (aduration > sduration) ? aduration : sduration;
+    rdurstr = timstr(tf);
     itext += '<h3>Summary</h3>\n<table>\n'
-        + ' <tr><td>Record length</td><td>' + recinfo.duration + '</td></tr>\n';
+        + ' <tr><td>Record length</td><td>' + rdurstr + '</td></tr>\n';
     if (recinfo.start) {
-	itext += ' <tr><td>Start</td><td>' + recinfo.start + '</td></tr>\n'
-	    + ' <tr><td>End</td><td>' + recinfo.end + '</td></tr>\n';
+	itext += ' <tr><td>Start</td><td>' + recinfo.start + '</td></tr>\n';
+//	    + ' <tr><td>End</td><td>' + recinfo.end + '</td></tr>\n';
     }
     itext += ' <tr><td>Clock frequency&nbsp;</td><td>' + tfreq
 	+ ' ticks per second</td></tr>\n';
 
-    if (ann.length > 0) {
-	for (ia = 0; ia < ann.length; ia++) {
+    if (nann > 0) {
+	for (ia = 0; ia < nann; ia++) {
 	    itext += '<tr><td>Annotator: ' + ann[ia].name + '</td><td>'
 		+ '(' + ann[ia].annotation.length + ' annotations)</td></tr>\n';
 	}
     }
-    if (signals.length > 0) {
-	for (is = 0; is < signals.length; is++) {
+    if (signals) {
+	for (is = 0; is < nsig; is++) {
 	    itext += '<tr><td>Signal: ' + signals[is].name + '</td><td>';
 	    if (signals[is].tps == 1)
 		itext += signals[is].tps + ' tick per sample; ';
@@ -208,7 +224,7 @@ function show_summary() {
     if (recinfo.note) {
 	itext += '<tr><td style="vertical-align: top;">Notes:</td><td><pre>';
 	for (ii = 0; ii < recinfo.note.length; ii++) {
-	    itext += recinfo.note[ii] + '\n';
+	    itext += html_escape(recinfo.note[ii]) + '\n';
 	}
 	itext += '</pre></td></tr>\n';
     }
@@ -254,7 +270,7 @@ function show_tables() {
 	$('#anndata').empty();
 
     if ($('#viewsig').attr('checked')) {
-	if (signals.length > 0) {
+	if (signals) {
 	    var sig = [];
 	    for (i = is = 0; i < signals.length; i++) {
 		var sname = signals[i].name;
@@ -573,7 +589,7 @@ function update_output() {
 }
 
 // Retrieve one or more complete annotation files for the selected record.
-function read_annotations() {
+function read_annotations(t0) {
     nann = 0;	// new record -- (re)fill the cache
     if (annotators.length) {
 	var annreq = '', i;
@@ -592,7 +608,18 @@ function read_annotations() {
 		    if (ann[nann].name == annotators[j].name)
 			ann[nann].desc = annotators[j].desc;
 	    }
+	    for (i = 0; i < ann.length; i++) {
+		var len, t;
+		aduration = 0;
+		len = ann[i].annotation.length;
+		if (len > 0) var t = ann[i].annotation[len-1].t;
+		if (t > aduration) aduration = t;
+	    }
+	    slist(t0);
 	});
+    }
+    else {
+	slist(t0);
     }
 }
 
@@ -600,20 +627,20 @@ function read_annotations() {
 function read_signals(t, update) {
     var i, trace = '', sigreq = '';
 
-    if (!signals) return;
-    for (i = 0; i < signals.length; i++) {
-	if (s_visible[signals[i].name] == 1) {
-	    trace = find_trace(db, record, signals[i].name, t);
-	    if (trace) {
-		trace.id = tid++;	// found, mark as recently used
-	    }
-	    else {		
-		var s = signals[i].name;
-		sigreq += '&signal=' + encodeURIComponent(s);  // add to request
+    if (signals) {
+	for (i = 0; i < signals.length; i++) {
+	    if (s_visible[signals[i].name] == 1) {
+		trace = find_trace(db, record, signals[i].name, t);
+		if (trace) {
+		    trace.id = tid++;	// found, mark as recently used
+		}
+		else {		
+		    var s = signals[i].name;
+		    sigreq += '&signal=' + encodeURIComponent(s);
+		}
 	    }
 	}
     }
-
     if (sigreq) {
 	url = server + '?action=fetch&db='
 	    + db + '&record=' + record + sigreq
@@ -653,7 +680,6 @@ function fetch_text() {
 }
 
 function go_here(t) {
-    var tf = strtim(recinfo.duration);
     if (t >= tf) { t = tf; $('.fwd').attr('disabled', 'disabled'); }
     else { $('.fwd').removeAttr('disabled'); }
     if (t <= 0) { t = 0; $('.rev').attr('disabled', 'disabled'); }
@@ -688,12 +714,12 @@ function gofwd() {
     var t = strtim(t0) + dt*tfreq;
     go_here(t);
     t += dt*tfreq;
-    if (t < strtim(recinfo.duration))
+    if (t < tf)
 	read_signals(t, false);	  // prefetch the next window
 }
 
 function goend() {
-    var t = Math.floor((strtim(recinfo.duration)-1)/(dt*tfreq));
+    var t = Math.floor((tf-1)/(dt*tfreq));
     go_here(t*dt*tfreq);
 }
 
@@ -873,6 +899,10 @@ function slist(t0) {
 		    s_visible[signals[i].name] = mag[signals[i].name] = 1;
 		init_tpool(nsig * 4);
 	    }
+	    else {
+		signals = null;
+		nsig = 0;
+	    }
 	}
 	$('#tabs').tabs("enable");
 	show_summary();
@@ -886,13 +916,12 @@ function slist(t0) {
     });
 };
 
-// When a new record is selected, reload signals and show the first 10 seconds.
+// When a new record is selected, reload data and show the first 10 seconds.
 function newrec() {
     record = $('[name=record]').val();
     var prompt = 'Reading annotations for ' + db + '/' + record;
     $('#prompt').html(prompt);
-    read_annotations();
-    slist("0");
+    read_annotations("0");
     prompt = 'Click on the <b>View/edit</b> tab to view ' + db + '/' + record;
     $('#prompt').html(prompt);
 }
@@ -1070,28 +1099,7 @@ function parse_url() {
 	    $.getJSON(url, function(data) {
 		if (data.success) annotators = data.annotator;
 		else annotators = '';
-		url = server + '?action=info&db=' + db + '&record=' + record
-		    + '&callback=?';
-		nann = 0;	// new record -- (re)fill the cache
-		if (annotators.length) {
-		    var annreq = '', i;
-		    for (i = 0; i < annotators.length; i++)
-			annreq += '&annotator=' + annotators[i].name;
-		    url = server + '?action=fetch&db=' + db + '&record='
-			+ record + annreq + '&dt=0&callback=?';
-		    $.getJSON(url, function(data) {
-			for (i = 0; i < data.fetch.annotator.length; i++) {
-			    ann[nann] = data.fetch.annotator[i];
-			    a_visible[ann[nann].name] = 1;
-			    ann[nann].opacity = 1;
-			    for (var j = 0; j < annotators.length; j++)
-				if (ann[nann].name == annotators[j].name)
-				    ann[nann].desc = annotators[j].desc;
-			    nann++;
-			}
-			slist(t0);
-		    });
-		}
+		read_annotations(t0);
 	    });
 	}
     }
