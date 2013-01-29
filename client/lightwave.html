@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	24 January 2013   version 0.33
+			Last revised:	28 January 2013   version 0.34
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -32,14 +32,17 @@ code, which runs within the browser to provide low-latency interaction with the
 user).  The other .css and .js files are recent unmodified versions of standard
 jQuery and jQuery UI components.
 -->
-<body style='display: none; background-color:#fff'>
+<body style='background-color:#fff'>
 
 <noscript>
+</body>
+<body style='display: block'>
 <p>LightWAVE requires a Javascript-enabled browser.
 The <a href="http://physionet.org/cgi-bin/ATM">PhysioBank ATM</a>
 provides some of the functions of LightWAVE without Javascript.
 </noscript>
 
+<div id="top" style='display: none'>
 <div class="js">
 <div id="tabs">
 <ul>
@@ -51,18 +54,21 @@ provides some of the functions of LightWAVE without Javascript.
 </ul>
 
 <form id="lwform">
-<div id="choose">
- <h1>LightWAVE [local]</h1>
 
+<!-- *** 'Choose input' panel *** -->
+
+<div id="choose">
  <table>
   <tr id="dblist"><td colspan=2>Loading LightWAVE ...</td></tr>
 
-  <tr id="rlist"><td>&nbsp;</td></tr>
+  <tr id="rlist"><td colspan=2>&nbsp;</td></tr>
 
   <tr><td colspan=2 align="center" id="prompt">
      First visit? Click on the <b>Help</b> tab above.</td></tr>
  </table>
 </div>
+
+<!-- *** 'View/edit' panel *** -->
 
 <div id="view">
  <table width="100%">
@@ -88,15 +94,6 @@ record to the start of the window, then click '&#x21b4;'"
 		   title="search for next 'Find' target">Search &#9655;</button>
       <button class="eor" tabindex="7"
 		    title="end of record">&#9655;|</button>
-      &nbsp;&nbsp;<button class="stretch"
-		    title="enlarge the highlighted signal">&#9650;</button>
-      <button class="reset"
-		    title="reset the highlighted signal">=</button>
-      <button class="shrink"
-		    title="reduce the highlighted signal">&#9660;</button>
-    &nbsp;&nbsp;<span id="tz">
-      <button class="torz"
-	            title="tracking off / zooming on">t/Z</button></span>
     </td>
     </span>
     <td align=right>
@@ -115,38 +112,82 @@ record to the start of the window, then click '&#x21b4;'"
   and MSIE 9+ have built-in support for SVG and work well with
   LightWAVE.
  <![endif]-->
+
+ <table width="100%">
+  <tr>
+    <td align=left>
+       &nbsp;&nbsp;<button class="stretch"
+		    title="enlarge the highlighted signal">&#9650;</button>
+      <button class="reset"
+		    title="reset the highlighted signal">=</button>
+      <button class="shrink"
+		    title="reduce the highlighted signal">&#9660;</button>
+    &nbsp;&nbsp;<span id="tz">
+      <button class="torz"
+	            title="tracking off / zooming on">t/Z</button></span>
+   </td>
+  </tr>
+ </table>
 </div>
+
+<!-- *** 'Tables' panel *** -->
 
 <div id="tables">
  <table width="100%">
   <tr>
+  <tr><td align=left>
+      <input type="checkbox" id="viewann" />View annotations as text&nbsp;&nbsp;
+      <input type="checkbox" id="viewsig" />View signals as text</td></tr>
     <td align=left>Go to:
       <input type="text" name="t0" placeholder="HH:MM:SS" size="10"
 	     title="Enter the elapsed time from the start of the
-record to the start of the data tables, then click 'Text'">
+record to the start of the data tables, then click '&#x21b4;'">
       &nbsp;<button class="sor" title="start of record">|&lt;</button>
-      &nbsp;<button class="rev" title="previous window">&lt;</button>
-      &nbsp;<button id="ftext" title="(re)print data">Text</button>
-      &nbsp;<button class="fwd" title="next window">&gt;</button>
+      &nbsp;<button class="rev" title="previous 10 seconds">&lt;</button>
+      <button id="ftext" tabindex="2"
+	  title="show annotations/signals from the
+signal window if selected above">&#x21b4;</button>
+      &nbsp;<button class="fwd" title="next 10 seconds">&gt;</button>
       &nbsp;<button class="eor" title="end of record">&gt;|</button></td>
     <td align=right>
       <span class="recann"></span><br><span class="pointer"></span></td>
   </tr>
  </table>
+<hr>
  <div id="info"></div>
- <div id="textdata"></div>
+<hr>
+ <div id="anndata"></div>
+ <div id="sigdata"></div>
 </div>
 
+<!-- *** 'Settings' panel *** -->
+
 <div id="settings">
+
+ <table width="100%">
+  <tr>
+    <td align="left">Server:
+      <span id="server"><input type="text" name="server" size="50"
+	title="URL of LightWAVE server (reload to restore default)"></span>
+      <span id="sversion">&nbsp;</span>
+    </td>
+    <td align="right"><div class="recann"><div>
+    </td>
+  </tr>
+  <tr>
+    <td align="left">Client: lightwave [local]</td><td>&nbsp;</td>
+  </tr>
+ </table>
+
  <div id="calibrate-display" style='height: 1in; left: -100%;
       position: absolute; top: -100%; width: 1in;'></div>
 
- Server: <span id="server"><input type="text" name="server" size="50"
-		title="URL of LightWAVE server (reload to restore default)">
- </span>
 </div>
 
+<!-- *** 'Help' panel *** -->
+
 <div id="help">
+
  <table width="100%">
   <tr><td align="left">
    <button id="help_about" title="About LightWAVE: what it is, getting started,
@@ -162,6 +203,7 @@ and links to more information">Main help</button>
 </div>
 
 </form>
+</div>
 </div>
 </body>
 </html>

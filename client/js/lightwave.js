@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	24 January 2013  version 0.33
+//			Last revised:	28 January 2013  version 0.34
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -80,7 +80,7 @@ function init_tpool(ntrace) {
 
 // Replace the least-recently-used trace with the contents of s
 function set_trace(db, record, s) {
-    var idmin = tid, imin, j, len, p, v;
+    var idmin = tid, imin, j, len, p, v, vmean, vmid, vmax, vmin, w;
 
     // set properties of s that are not properties from server response
     s.id = tid++;
@@ -90,8 +90,21 @@ function set_trace(db, record, s) {
     // restore amplitudes from first differences sent by server
     len = s.samp.length;
     v = s.samp;
-    for (j = p = 0; j < len; j++)
+    vmean = vmax = vmin = v[0];
+    for (j = p = 0; j < len; j++) {
 	p = v[j] += p;
+	if (p > vmax) vmax = p;
+	else if (p < vmin) vmin = p;
+	vmean += +p;
+    }
+
+    // calculate the local baseline (a weighted sum of mid-range and mean)
+    vmean /= len;
+    vmid = (vmax + vmin)/2;
+    if (vmid > vmean) w = (vmid - vmean)/(vmax - vmean);
+    else if (vmid < vmean) w = (vmean - vmid)/(vmean - vmin);
+    else w = 1;
+    s.zbase = vmid + w*(vmean - vmin);
 
     // find the least-recently-used trace
     for (var i = 0; i < tpool.length; i++) {
@@ -154,8 +167,8 @@ function strtim(s) {
     return t*tfreq;
 }
 
-function show_tables() {
-    var atext = '', itext = '', stext = '', ia, ii, is;
+function show_summary() {
+    var itext = '', ia, ii, is;
 
     itext += '<h3>Summary</h3>\n<table>\n'
         + ' <tr><td>Record length</td><td>' + recinfo.duration + '</td></tr>\n';
@@ -189,78 +202,92 @@ function show_tables() {
 		+ signals[is].baseline + '</td></tr>\n';
 	}
     }
-    if (recinfo.info) {
-	itext += '<tr><td style="vertical-align: top;">Notes</td><td><pre>';
-	for (ii = 0; ii < recinfo.info.length; ii++) {
-	    itext += recinfo.info[ii] + '\n';
+    if (recinfo.note) {
+	itext += '<tr><td style="vertical-align: top;">Notes:</td><td><pre>';
+	for (ii = 0; ii < recinfo.note.length; ii++) {
+	    itext += recinfo.note[ii] + '\n';
 	}
 	itext += '</pre></td></tr>\n';
     }
     itext += '</table>';
     $('#info').html(itext);
+}
 
-    if (ann.length > 0) 
-	atext += '<h3>Annotations</h3>\n';
-    for (ia = 0; ia < nann; ia++) {
-	if (a_visible[ann[ia].name] == 0) {
-	    atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
-	}
-	else {
-	    var a = ann[ia].annotation;
-	    atext += '<p><b>Annotator:</b> ' + ann[ia].name
-		  + ' (' + a.length + ' annotations)<br>\n';
-	    atext += '<p><table class="dtable">\n<tr>'
-		+ '<th>Time (elapsed)&nbsp;</th><th>Type</th><th>Sub&nbsp;</th>'
-		+ '<th>Chan</th><th>Num&nbsp;</th><th>Aux</th></tr>\n';
-	    for (var i = 0; i < a.length; i++) {
-		if (a[i].t < ts0) continue;
-		else if (a[i].t > tsf) break;
-		atext += '<tr><td>' + mstimstr(a[i].t) + '</td><td>'
-		    + a[i].a + '</td><td>' + a[i].s + '</td><td>'
-		    + a[i].c + '</td><td>' + a[i].n + '</td><td>';
-		if (a[i].x) { atext += a[i].x; }
-		atext +=  '</td></tr>\n';
+function show_tables() {
+    var atext = '', stext = '', ia, is;
+
+    if ($('#viewann').prop('checked')) {
+        if (ann.length > 0) 
+		atext += '<h3>Annotations</h3>\n';
+	for (ia = 0; ia < nann; ia++) {
+	    if (a_visible[ann[ia].name] == 0) {
+		atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
 	    }
-	    atext += '</table>\n</div></div>\n';
-	    atext += '</table>\n<p>\n';
-	}
-    }
-    $('#textdata').html(atext);
-
-    if (signals.length > 0) {
-	var sig = [];
-	for (i = is = 0; i < signals.length; i++) {
-	    var sname = signals[i].name;
-	    if (s_visible[sname])
-		sig[is++] = find_trace(db, record, sname, ts0);
-	}
-
-	stext = '<h3>Signals</h3>\n';
-	stext += '<p><table class="dtable">\n<tr><th>Time (elapsed)&nbsp;</th>';
-	for (i = 0; i < is; i++)
-	    stext += '<th>' + sig[i].name + '&nbsp;</th>';
-	stext += '\n<tr><th></th>';
-	for (i = 0; i < is; i++) {
-	    u = sig[i].units;
-	    if (!u) u = '[mV]';
-	    stext += '<th><i>(' + u + ')</i></th>';
-	}
-	var t = ts0;
-	for (var i = 0; t < tsf; i++, t++) {
-	    stext += '</tr>\n<tr><td>' + mstimstr(t);
-	    for (var j = 0; j < is; j++) {
-		stext += '</td><td>';
-		if (t%sig[j].tps == 0) {
-		    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
-			sig[j].gain;
-		    stext += v.toFixed(3);
+	    else {
+		var a = ann[ia].annotation;
+		atext += '<p><b>Annotator:</b> ' + ann[ia].name
+		    + ' (' + a.length + ' annotations)<br>\n';
+		atext += '<p><table class="dtable">\n<tr>'
+		    + '<th>Time (elapsed)&nbsp;</th><th>Type</th>'
+		    + '<th>Sub&nbsp;</th><th>Chan</th><th>Num&nbsp;</th>'
+		    + '<th>Aux</th></tr>\n';
+		for (var i = 0; i < a.length; i++) {
+		    if (a[i].t < ts0) continue;
+		    else if (a[i].t > tsf) break;
+		    atext += '<tr><td>' + mstimstr(a[i].t) + '</td><td>'
+			+ a[i].a + '</td><td>' + a[i].s + '</td><td>'
+			+ a[i].c + '</td><td>' + a[i].n + '</td><td>';
+		    if (a[i].x) { atext += a[i].x; }
+		    atext +=  '</td></tr>\n';
 		}
+		atext += '</table>\n</div></div>\n';
+		atext += '</table>\n<p>\n';
 	    }
-	    stext += '</td>';
 	}
-	stext += '</tr>\n</table>\n';
+	atext += '<hr>\n';
+	$('#anndata').html(atext);
     }
-    $('#textdata').append(stext);
+    else
+	$('#anndata').empty();
+
+    if ($('#viewsig').attr('checked')) {
+	if (signals.length > 0) {
+	    var sig = [];
+	    for (i = is = 0; i < signals.length; i++) {
+		var sname = signals[i].name;
+		if (s_visible[sname])
+		    sig[is++] = find_trace(db, record, sname, ts0);
+	    }
+	    
+	    stext = '<h3>Signals</h3>\n<p><table class="dtable">\n'
+		+ '<tr><th>Time (elapsed)&nbsp;</th>';
+	    for (i = 0; i < is; i++)
+		stext += '<th>' + sig[i].name + '&nbsp;</th>';
+	    stext += '\n<tr><th></th>';
+	    for (i = 0; i < is; i++) {
+		u = sig[i].units;
+		if (!u) u = '[mV]';
+		stext += '<th><i>(' + u + ')</i></th>';
+	    }
+	    var t = ts0;
+	    for (var i = 0; t < tsf; i++, t++) {
+		stext += '</tr>\n<tr><td>' + mstimstr(t);
+		for (var j = 0; j < is; j++) {
+		    stext += '</td><td>';
+		    if (t%sig[j].tps == 0) {
+			v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
+			    sig[j].gain;
+			stext += v.toFixed(3);
+		    }
+		}
+		stext += '</td>';
+	    }
+	    stext += '</tr>\n</table>\n';
+	}
+	$('#sigdata').html(stext);
+    }
+    else
+	$('#sigdata').empty();
 }
 
 var tracking = false;
@@ -489,7 +516,7 @@ function show_plot() {
 		+ sname + '</text>\n';
 	    var s = trace.samp;
 	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
-	    var z = trace.base*g - y0;
+	    var z = trace.zbase*g - y0;
 	    var v = Math.round(g*s[0] - z);
 	    // move to start of trace
 	    svs += '<path stroke="black" fill="none" stroke-width="';
@@ -810,7 +837,8 @@ function slist(t0) {
     $('.recann').html(db + '/' + record);
     document.title = title;
     $('#info').empty();
-    $('#textdata').empty();
+    $('#anndata').empty();
+    $('#sigdata').empty();
     $('#plotdata').empty();
     var url = server + '?action=info&db=' + db + '&record=' + record
 	+ '&callback=?';
@@ -828,20 +856,21 @@ function slist(t0) {
 	    }
 	}
 	$('#tabs').tabs("enable");
+	show_summary();
 	$('#tabs').tabs("select", "#view");
 	out_format = 'plot';
 	if (t0 != '') t = strtim(t0);
 	t0 = timstr(t);
 	$('[name=t0]').val(t0);
 	go_here(t);
-	$("body").show();
+	$('#top').show();
     });
 };
 
 // When a new record is selected, reload signals and show the first 10 seconds.
 function newrec() {
     record = $('[name=record]').val();
-     var prompt = 'Reading annotations for ' + db + '/' + record;
+    var prompt = 'Reading annotations for ' + db + '/' + record;
     $('#prompt').html(prompt);
     read_annotations();
     slist("0");
@@ -863,7 +892,7 @@ function alist() {
 function rlist() {
     var rlist = '';
     url = server + '?action=rlist&callback=?&db=' + db;
-    $('#rlist').html('Reading list of records in ' + db);
+    $('#rlist').html('<td colspan=2>Reading list of records in ' + db + '</td>');
     $.getJSON(url, function(data) {
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
@@ -889,7 +918,8 @@ function newdb() {
     $('#tabs').tabs({disabled:[1,2]});
     $('#rlist').empty();
     $('#info').empty();
-    $('#textdata').empty();
+    $('#anndata').empty();
+    $('#sigdata').empty();
     $('#plotdata').empty();
     alist();
     rlist();
@@ -921,6 +951,7 @@ function dblist() {
 		data.database[i].name + ')</option>\n';
 	    dblist += '</select></td>\n';
 	    $('#dblist').html(dblist)
+	    $('#sversion').html("&nbsp;version " + data.version);
 	    $('#db').on("change", newdb); // invoke newdb when db changes
 	}
 	else
@@ -980,7 +1011,7 @@ function parse_url() {
     var n = s.length, t = 0, t0 = '0';
     if (n != 2) {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
-	$("body").show();
+	$('#top').show();
 	$('[name=server]').val(server);     // set default server URL
 	dblist();	// no query, get the list of databases
 	return;
@@ -997,7 +1028,7 @@ function parse_url() {
 	    var title = 'LightWAVE: ' + db;
 	    document.title = title;
 	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
-	    $("body").show();
+	    $('#top').show();
 	    $('[name=server]').val(server);     // set default server URL
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#dblist').html(dblist);
