@@ -11,14 +11,18 @@
 
 <ul>
 <li><b>Signals not visible/not centered.</b><br>
-There are at least three bugs that cause this symptom:
+There are at least four bugs that cause this symptom:
 <ul>
 <li> <s>In records that have no signals (e.g., crisdb records) a null response
 from the server is not handled properly in the client.</s>
-<li> In records with incorrectly specified adczero (e.g., qtdb/sel100),
-the signals may be rendered off-screen.
+<li> <s>In records with incorrectly specified adczero (e.g., qtdb/sel100),
+the signals may be rendered off-screen.</s>
 <li> In records with sampling frequencies less than 0.1 Hz, there is at
 most one sample in the window, and nothing is drawn as a result.
+<li> If the signal name contains a "+" (or probably other characters that
+have special meanings in query strings, such as "#", "%", "?", "/", "&", "!")
+the signal name will be mangled in transit to the server, and the server won't
+retrieve samples of it.
 </ul>
 
 <li><b>LightWAVE doesn't work in Internet Explorer.</b><br>

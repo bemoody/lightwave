@@ -80,7 +80,7 @@ function init_tpool(ntrace) {
 
 // Replace the least-recently-used trace with the contents of s
 function set_trace(db, record, s) {
-    var idmin = tid, imin, j, len, p, v, vmean, vmid, vmax, vmin, w;
+    var idmin = tid, imin, j, len, ni, p, v, vmean, vmid, vmax, vmin, w;
 
     // set properties of s that are not properties from server response
     s.id = tid++;
@@ -91,15 +91,18 @@ function set_trace(db, record, s) {
     len = s.samp.length;
     v = s.samp;
     vmean = vmax = vmin = v[0];
-    for (j = p = 0; j < len; j++) {
+    for (j = ni = p = 0; j < len; j++) {
 	p = v[j] += p;
-	if (p > vmax) vmax = p;
-	else if (p < vmin) vmin = p;
-	vmean += +p;
+	if (p == -32768) ni++;  // invalid sample: don't count it
+	else {
+	    if (p > vmax) vmax = p;
+	    else if (p < vmin) vmin = p;
+	    vmean += +p;
+	}
     }
 
     // calculate the local baseline (a weighted sum of mid-range and mean)
-    vmean /= len;
+    vmean /= len - ni;
     vmid = (vmax + vmin)/2;
     if (vmid > vmean) w = (vmid - vmean)/(vmax - vmean);
     else if (vmid < vmean) w = (vmean - vmid)/(vmean - vmin);
@@ -275,9 +278,12 @@ function show_tables() {
 		for (var j = 0; j < is; j++) {
 		    stext += '</td><td>';
 		    if (t%sig[j].tps == 0) {
-			v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
-			    sig[j].gain;
-			stext += v.toFixed(3);
+			if (v == -32768) stext += '-';
+			else {
+			    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
+				sig[j].gain;
+			    stext += v.toFixed(3);
+			}
 		    }
 		}
 		stext += '</td>';
@@ -532,8 +538,10 @@ function show_plot() {
 	    if (tmax > dt * tfreq) tmax = dt * tfreq;
 	    // add remaining samples to the trace
 	    for (var i = 0; t < tmax; i++, t += tps) {
-		v = Math.round(g*s[i] - z);
-		svs += ' ' + t*ts + ',' + v;
+		if (s[i] != -32768) {
+		    v = Math.round(g*s[i] - z);
+		    svs += ' ' + t*ts + ',' + v;
+		}
 	    }
 	    svs += '" />\n';
 	}
