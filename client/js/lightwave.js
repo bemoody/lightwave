@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	28 January 2013  version 0.34
+//			Last revised:	29 January 2013  version 0.36
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -60,15 +60,15 @@ var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
 var target = '';// search target, set in Find... dialog
 var atarget = '';// annotator to be searched, set in Find... dialog
-var g_visible = 1; // grid (1: on, 0: off)
-var m_visible = 1; // annotation marker bars (1: on, 0: off)
-var a_visible = [];
-var s_visible = [];
-var x_cursor = 0;
+var g_visible = 1; // visibility flag for grid (1: on, 0: off)
+var m_visible = 1; // visibility flag for annotation marker bars (1: on, 0: off)
+var a_visible = []; // visibility flags for annotators
+var s_visible = []; // visibility flags for signals
+var x_cursor = 0;  // SVG cursor x-coordinate (see show_time())
 var mag = [];   // magnification of signals in plots
-var help_main = 'about.html';
-var svc = '';
-var svg = '';
+var help_main = 'about.html'; // initial and main help topic
+var svc = '';   // SVG code to draw the cursor (see show_time())
+var svg = '';   // SVG code to draw the signal window (see show_plot())
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -278,10 +278,10 @@ function show_tables() {
 		for (var j = 0; j < is; j++) {
 		    stext += '</td><td>';
 		    if (t%sig[j].tps == 0) {
-			if (v == -32768) stext += '-';
+			var vi = sig[j].samp[i/sig[j].tps];
+			if (vi == -32768) stext += '-';
 			else {
-			    v = (sig[j].samp[i/sig[j].tps]-sig[j].base)/
-				sig[j].gain;
+			    v = (vi - sig[j].base)/ sig[j].gain;
 			    stext += v.toFixed(3);
 			}
 		    }
@@ -530,18 +530,24 @@ function show_plot() {
 		svs += '10';
 	    else
 		svs += '6';
-	    svs += '" d="M0,' + v + ' L';
+	    svs += '" d="';  // + 'M0,' + v + ' L';
 	    var t = 0;
 	    var tps = trace.tps;
 	    var tmax = s.length * tps;
 	    var ts = 1000/tfreq;
+	    var pv = false;
 	    if (tmax > dt * tfreq) tmax = dt * tfreq;
 	    // add remaining samples to the trace
 	    for (var i = 0; t < tmax; i++, t += tps) {
 		if (s[i] != -32768) {
 		    v = Math.round(g*s[i] - z);
-		    svs += ' ' + t*ts + ',' + v;
+		    if (pv) svs += ' ' + t*ts + ',' + v;
+		    else svs += ' M' + t*ts + ',' + v
+			      + ' L' + t*ts + ',' + v;
+		    pv = true;
 		}
+		else
+		    pv = false;
 	    }
 	    svs += '" />\n';
 	}
@@ -571,8 +577,10 @@ function read_annotations() {
     nann = 0;	// new record -- (re)fill the cache
     if (annotators.length) {
 	var annreq = '', i;
-	for (i = 0; i < annotators.length; i++)
-	    annreq += '&annotator=' + annotators[i].name;
+	for (i = 0; i < annotators.length; i++) {
+	    var a = annotators[i].name;
+	    annreq += '&annotator=' + encodeURIComponent(a);
+	}
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
 	    + '&dt=0&callback=?';
 	$.getJSON(url, function(data) {
@@ -599,7 +607,10 @@ function read_signals(t, update) {
 	    if (trace) {
 		trace.id = tid++;	// found, mark as recently used
 	    }
-	    else sigreq += '&signal=' + signals[i].name;  // add to request
+	    else {		
+		var s = signals[i].name;
+		sigreq += '&signal=' + encodeURIComponent(s);  // add to request
+	    }
 	}
     }
 
