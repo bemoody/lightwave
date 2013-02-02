@@ -1,5 +1,5 @@
 /* file: lightwave.css	G. Moody	18 November 2012
-			Last revised:	30 December 2012  version 0.15
+			Last revised:	 1 February 2013  version 0.38
 */
 
 body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -28,3 +28,7 @@ div.notice { width: 90%; margin: auto; padding: 2em; background: #cdf; }
 	background: #fff;
 	border-width: 0px 1px 1px 1px;
 }
+
+.ui-slider { width: 10em; height: .2em; margin-top: .3em; }
+.ui-slider-handle { width: .7em !important; height: .55em !important;
+		  margin-top: .1em; }

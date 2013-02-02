@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	29 January 2013  version 0.37
+//			Last revised:	 1 February 2013  version 0.38
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -89,6 +89,7 @@ function set_trace(db, record, s) {
     s.id = tid++;
     s.db = db;
     s.record = record;
+    s.dt = dt;
 
     // restore amplitudes from first differences sent by server
     len = s.samp.length;
@@ -128,7 +129,8 @@ function find_trace(db, record, signame, t) {
 	if (tpool[i].name == signame &&
 	    tpool[i].t0 == t &&
 	    tpool[i].record == record &&
-	    tpool[i].db == db) {
+	    tpool[i].db == db &&
+	    tpool[i].dt >= dt) {
 	    return tpool[i];
 	}
     }
@@ -314,41 +316,26 @@ function show_tables() {
 
 var tracking = false;
 
-function zoom_or_track() {
+function toggle_edit() {
     var btext;
 
     tracking = !tracking;
-    if (tracking) {
-	btext = '<button class=\"torz\"'
-	    + 'title=\"tracking on / zooming off\">T/z</button></span>';
-    }
-    else {
-	btext = '<button class=\"torz\"'
-	    + 'title=\"tracking off | zooming on\">t/Z</button></span>';
-    }
-    $('#tz').html(btext);
-    if (tracking) {
-	$('svg').mousemove(function(e){
+    if (!tracking) $('#editdata').empty();
+    $('svg').mousemove(function(e){
+	if (tracking) {
 	    var x = e.pageX;
 	    show_time(x);
-	});
-    }
-    else {
-	$('svg').svgPan('viewport');
-    }
-    $('.torz').on("click", zoom_or_track);
+	}
+    });
 }
 
 function handle_svg_events() {
-    if (tracking) {
-	$('svg').mousemove(function(e){
+    $('svg').mousemove(function(e){
+	if (tracking) {
 	    var x = e.pageX;
 	    show_time(x);
-	});
-    }
-    else {
-	$('svg').svgPan('viewport');
-    }
+	}
+    });
 
     $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
@@ -391,11 +378,47 @@ function handle_svg_events() {
     });
 }
 
+var width, height, swl, sww, swr;  // View/edit graphics dimensions, in pixels
+var svgw = 1000*dt, svgh = svgw/2; // Grid dimensions, in (arbitrary) SVG coords
+var svgl = svgw/8;	  	   // Left column width, in SVG coords
+var svgr = svgw/24;		   // Right column width, in SVG coords
+var svgt = 12*dt;		   // Top margin in SVG coords (y-translation)
+var svgtw = svgl + svgw + svgr;    // Total available width in SVG coords
+var svgf = 12*dt;		   // font-size for signal/annotation labels
+var svgtf = 10*dt;		   // Small font-size for timestamps
+var svgc = 5*dt;		   // Size for small elements (circles, etc.)
+var adx1 = 2*dt;
+var adx2 = 4*dt;
+var adx4 = 8*dt;
+var ady1 = 10*dt;
+var ady2 = 20*dt;
+
+function set_sw_width(seconds) {
+    dt = seconds;
+    svgw = 1000*dt;
+    svgh = svgw/2;
+    svgl = svgw/8;
+    svgr = svgw/24;
+    svgtw = svgl + svgw + svgr;
+    svgf = 12*dt;
+    svgtf = 10*dt;
+    svgc = 5*dt;
+    adx1 = 2*dt;
+    adx2 = 4*dt;
+    adx4 = 8*dt;
+    ady1 = 10*dt;
+    ady2 = 20*dt;
+}
+
 function show_plot() {
-    var width = $('#plotdata').width();
-    var height = width*0.525;
+    width = $('#plotdata').width();  // total available width in View/edit panel
+    swl = Math.round(width*svgl/svgtw);    // left column width
+    sww = Math.round(width*svgw/svgtw);   // signal window width
+    swr = width - (swl + sww);	     // right column width
+    height = Math.round(0.55*sww);   // signal window height
+
     // calculate baselines for signals and annotators
-    var dy = Math.round(5000/(nsig + nann + 1));
+    var dy = Math.round(svgh/(nsig + nann + 1));
     var y = dy;
     var y0s = [];	// signal baselines
     var y0a = [];	// annotator baselines
@@ -409,50 +432,67 @@ function show_plot() {
 	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
 	+ ' width="' + width + '" height="' + height
 	+ '" preserveAspectRatio="xMidYMid meet">\n';
-    svg += '<g id="viewport" '
-	+ 'transform="scale(' + width/11500 + '),translate(1000,100)">\n';
+    svg += '<g id="viewport" transform="scale(' + width/svgtw
+	+ '),translate(' + svgl + ',' + svgt + ')">\n';
     
     // cursor
     svg += '<g id="cursor"></g>';
 
     // background grid
     var grd = '<g id="grid">\n';
-    grd += '<circle cx="-120" cy="5000" r="50" stroke="rgb(200,100,100)"'
+    grd += '<circle cx="-' + svgf + '" cy="' + svgh
+	+ '" r="' + svgc +'" stroke="rgb(200,100,100)"'
         + ' stroke-width="4" fill="red" fill-opacity="' + g_visible + '"/>';
     if (g_visible == 0) {
 	grd += '<title>(click to show grid)</title></g>';
     }
     else {
-	grd += '<title>(click to hide grid)</title>'
+	grd += '<title>(click to hide grid)</title></g>'
 	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
 	    + ' d="M0,0 ';
-	for (var x = 0; x <= 10000; x += 200) {
+	var uparrow = ' l-' + adx1 + ',' + ady1 + 'l' + adx2 + ',0 l-' + adx1
+	    + ',-' + ady1 +  'm200,-';
+	for (var x = 0; x <= svgw; x += 200) {
 	    if (x%1000 == 0)
-		grd += 'l0,5000 l-20,100 l40,0 l-20,-100 m200,-5000 ';
+		grd += 'l0,' + svgh + uparrow + svgh;
 	    else
-		grd += 'l0,5000 m200,-5000 ';
+		grd += 'l0,' + svgh + ' m200,-' + svgh;
 	}
 	grd += 'M0,0 '
-	for (var y = 0; y <= 5000; y += 200)
-	    grd += 'l10000,0 m-10000,200 ';
-	grd += '" /></g>\n';
+	for (var y = 0; y <= svgh; y += 200)
+	    grd += 'l' + svgw + ',0 m-' + svgw +',200 ';
+	grd += '" />\n';
     }
 
     // timestamps
+    var svgts = svgh + 20*dt;
     var tsm = (ts0 + +tsf)/2;
-    tst = '<g id="times">\n<text x="0" y="5200" font-size="100" fill="red"'
-	+ ' style="text-anchor: middle;">' + timstr(ts0) + '</text>\n'
-	+ '<text x="5000" y="5200" font-size="100" fill="red"'
-	+ ' style="text-anchor: middle;">' + timstr(tsm) + '</text>\n'
-	+ '<text x="10000" y="5200" font-size="100" fill="red"'
-	+ ' style="text-anchor: middle;">' + timstr(tsf) + '</text>\n</g>\n';
+
+    tst = '<g id="times">\n<text x="0" y="' + svgts + '" font-size="' + svgtf
+	+ '" fill="red" style="text-anchor: start;">' + timstr(ts0) + '</text>'
+	+ '\n';
+
+    if (dt%2 == 0) {
+	tst += 	'\n<text x="' + svgw/2 + '" y="' + svgts + '" font-size="'
+	    + svgtf + '" fill="red" style="text-anchor: middle;">'
+	    + timstr(tsm) + '</text>\n';
+    }
+
+    tst += '<text x="' + svgw + '" y="' + svgts + '" font-size="' + svgtf
+	+ '" fill="red" style="text-anchor: end;">' + timstr(tsf) + '</text>'
+	+ '</g>\n';
     
     // annotator names and annotations
     sva = '<g id="mrkr">\n';
-    sva += '<circle cx="-120" cy="0" r="50" stroke="rgb(0,0,200)"'
+    sva += '<circle cx="-' + svgf + '" cy="0" r="' + svgc
+	+ '" stroke="rgb(0,0,200)"'
         + ' stroke-width="4" fill="blue" fill-opacity="' + m_visible + '"/>';
-    if (m_visible == 0) sva += '<title>(click to show marker bars)</title>';
-    else sva += '<title>(click to hide marker bars)</title>';
+    if (m_visible == 0)
+	sva += '<title>(click to show marker bars)</title></g>';
+    else
+	sva += '<title>(click to hide marker bars)</title></g>';
+    var downarrow = ',0 l-' + adx1 + ',-' + ady1 + ' l' + adx2 + ',0 l-' + adx1
+	+ ',' + ady1 + ' V';
     for (ia = 0; ia < nann; ia++) {
 	var y0 = y0a[ia];
 	var aname = ann[ia].name;
@@ -467,11 +507,11 @@ function show_plot() {
 		sva += ' (click to hide)</title><text'
 	    }
 	    sva += ' x="-50" y="' + y0
-		+ '" font-size="120" fill="blue" font-style="italic"'
+		+ '" font-size="' + svgf + '" fill="blue" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
 	    if (aname == annselected)
 		sva += ' font-weight="bold"';
-	    sva += '>' + aname + '</text>\n';
+	    sva += '>' + aname + '</text></g>\n';
 	    var a = ann[ia].annotation;
 	    for (var i = 0; i < a.length; i++) {
 		if (a[i].t < ts0) continue;
@@ -479,8 +519,8 @@ function show_plot() {
 		var x, y, y1, txt;
 		x = Math.round((a[i].t - ts0)*1000/tfreq);
 		if (a[i].x && (a[i].a == '+' || a[i].a == '"')) {
-		    if (a[i].a == '+') y = y0+120;
-		    else y = y0-120;
+		    if (a[i].a == '+') y = y0+svgf;
+		    else y = y0-svgf;
 		    txt = '' + a[i].x;
 		}
 		else {
@@ -493,14 +533,14 @@ function show_plot() {
 		    y1 = y - 150;
 		    sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
 			+ ' fill="blue" + opacity="' + m_visible
-			+ '" d="M' + x + ',0 l-20,-100 l40,0 l-20,100 V' + y1
-			+ ' m0,210 V5000" />\n';
+			+ '" d="M' + x + downarrow + y1
+			+ ' m0,210 V' + svgh + '" />\n';
 		}
 		sva += '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"';
 		if (aname == annselected)
 		    sva += ' font-weight="bold"';
-		sva += ' font-size="120" fill="rgb(0,0,200)">'
+		sva += ' font-size="' + svgf + '" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
 	    }
 	}
@@ -510,9 +550,8 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0 + '"'
 		+ ' font-size="120" fill="rgb(150,150,200)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ aname + '</text>\n';
+		+ aname + '</text></g>\n';
 	}
-	sva += '</g>\n';
     }
 
     // signal names and traces
@@ -533,9 +572,9 @@ function show_plot() {
 		svs += ' (click to hide)</title><text'
 	    }
 	    svs += ' x="-50" y="' + y0
-		+ '" font-size="120" fill="black" font-style="italic"'
+		+ '" font-size="' + svgf + '" fill="black" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ sname + '</text>\n';
+		+ sname + '</text></g>\n';
 	    var s = trace.samp;
 	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
 	    var z = trace.zbase*g - y0;
@@ -572,12 +611,12 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0 + '"'
 		+ ' font-size="120" fill="rgb(128,128,128)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ sname + '</text>\n';
+		+ sname + '</text></g>\n';
 	}
-	svs += '</g>\n';
     }
 
     svg += grd + tst + sva + svs;
+    $('#editdata').empty();
     $('#plotdata').html(svg + '</svg>\n');
     $('.pointer').html('&nbsp;');
     handle_svg_events();    // Handle user input in the signal window
@@ -863,16 +902,25 @@ function show_time(x) {
     var m = viewport.getScreenCTM();
     x_cursor = (x - m.e)/m.a;
     if (x_cursor < 0) x_cursor = 0;
-    else if (x_cursor > 10000) x_cursor = 10000;
+    else if (x_cursor > svgw) x_cursor = svgw;
     var t = ts0 + x_cursor*tfreq/1000;
     var ts = mstimstr(t);
     $('.pointer').html(ts);
 
-    svc = '<path stroke="rgb(0,100,200)" stroke-width="4"'
-	+ ' opacity="0.75" fill="blue"'
-	+ ' d="M' + x_cursor
-	+ ',0 l-40,-100 l80,0 l-40,100 V5000 l-40,100 l80,0 l -40,-100" />';
-    $('#plotdata').html(svg + svc + '</svg>\n');
+    svc = null;
+    svc = '<div style="width: ' + sww + 'px; height: ' + height
+	+ 'px; margin-left: ' + swl + 'px;">'
+	+ '<svg width="' + sww + '" height="' + height
+	+ '" preserveAspectRatio="xMidYMid meet">\n'
+	+ '<g transform="scale(' + sww/svgw + '),translate(0,' + svgt
+	+ ')" id="crs">'
+	+ '<path stroke="rgb(0,100,200)" stroke-width="4" fill="blue" d="M'
+	+ x_cursor + ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	+ ',' + ady1 + ' V' + svgh
+	+ ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	+ ',-' + ady1 + '" />';
+	+ '</g></svg></div>';
+    $('#editdata').html(svc);
     handle_svg_events();
 }
 
@@ -1042,10 +1090,26 @@ function set_handlers() {
     $('.stretch').attr('disabled', 'disabled');
     $('.reset').attr('disabled', 'disabled');
     $('.shrink').attr('disabled', 'disabled');
-    $('.torz').on("click", zoom_or_track);
-    
+
+    $(function() {
+	$('#dtslider').slider({
+	    value: 10,
+	    min: 5,
+	    max: 60,
+	    step: 5,
+	    slide: function(event, ui) {
+		$('#swidth').val(ui.value);
+		dt = ui.value;
+		set_sw_width(dt);
+		go_here(ts0);
+	    }
+	});
+	$('#swidth').val($('#swidth').slider('value'));
+    });
+     
     // on Settings tab:
     $('[name=server]').on("change", set_server);      // go to selected location
+    $('#allow_edit').on("change", toggle_edit);
 
     // on Help tab:
     $('#help_about').on("click", help);    // return to 'about' (main help doc)

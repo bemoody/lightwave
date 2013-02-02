@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	28 January 2013   version 0.34
+			Last revised:	 1 February 2013   version 0.38
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -82,18 +82,19 @@ record to the start of the window, then click '&#x21b4;'"
 		    title="refresh signal window">&#x21b4;</button>
       &nbsp;<button class="sor" tabindex="8"
 		    title="start of record">|&#9665;</button>
-      <button class="srev" tabindex="5"
-	   title="search for previous 'Find' target">&#9665; Search</button>
       <button class="rev" tabindex="4"
 		    title="previous window">&#9665;</button>
-      <button class="find" tabindex="9"
-		    title="define search target">Find...</button>
       <button class="fwd" tabindex="3"
 		    title="next window">&#9655;</button>
-      <button class="sfwd" tabindex="6"
-		   title="search for next 'Find' target">Search &#9655;</button>
       <button class="eor" tabindex="7"
 		    title="end of record">&#9655;|</button>
+      &nbsp;&nbsp;
+      <button class="srev" tabindex="5"
+	   title="search for previous 'Find' target">&#9665; Search</button>
+      <button class="find" tabindex="9"
+		    title="define search target">Find...</button>
+      <button class="sfwd" tabindex="6"
+		   title="search for next 'Find' target">Search &#9655;</button>
     </td>
     </span>
     <td align=right>
@@ -103,8 +104,10 @@ record to the start of the window, then click '&#x21b4;'"
 
  <div id="findbox" title="Find..."></div>
 
- <div id="plotdata" tabindex="0"></div>
- <!--[if lt IE 9]>
+ <div id="editdata" style="position: absolute"></div>
+ <div style="position: relative; margin-top: -1.2em"></div>
+ <div id="plotdata"></div>
+  <!--[if lt IE 9]>
   <p> MSIE versions 8 and earlier do not support LightWAVE's SVG graphics.
   MSIE 6, 7, and 8 can be used to run modern web apps such as LightWAVE if you
   install <a href="http://www.google.com/chromeframe">Google Chrome Frame</a>
@@ -122,10 +125,13 @@ record to the start of the window, then click '&#x21b4;'"
 		    title="reset the highlighted signal">=</button>
       <button class="shrink"
 		    title="reduce the highlighted signal">&#9660;</button>
-    &nbsp;&nbsp;<span id="tz">
-      <button class="torz"
-	            title="tracking off / zooming on">t/Z</button></span>
-   </td>
+    </td>
+
+    <td align=right><div style="font-size: 10px;">
+	<label for="dtslider">Window duration:</label>
+	<input type="text" id="swidth" value="10"
+	       style="border: 0; width: 2em; font-weight: bold"/>seconds</div>
+	<div id="dtslider"></div></td>
   </tr>
  </table>
 </div>
@@ -177,10 +183,19 @@ signal window if selected above">&#x21b4;</button>
   <tr>
     <td align="left">Client: lightwave [local]</td><td>&nbsp;</td>
   </tr>
+  <tr>
+    <td align="right">
+      <span title="(not yet implemented!)">
+	<input type="checkbox" id="allow_edit" />Allow editing
+      </span>
+    </td>
+  <tr>
  </table>
 
- <div id="calibrate-display" style='height: 1in; left: -100%;
-      position: absolute; top: -100%; width: 1in;'></div>
+<!--
+ <div id="calibrate-display" style='width: 1in; height: 1in;
+      border: 2px solid red'></div>
+-->
 
 </div>
 

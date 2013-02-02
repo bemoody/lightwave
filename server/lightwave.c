@@ -478,10 +478,10 @@ void info(void)
 	    printf(",\n      %s", p = strjson(info));
 	    SFREE(p);
 	}
-	printf("\n    ],\n");
+	printf("\n    ]\n");
     }
     else
-	printf("    \"note\": null,\n");
+	printf("    \"note\": null\n");
 
     printf("  },\n");
     lwpass();
