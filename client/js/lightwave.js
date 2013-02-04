@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 1 February 2013  version 0.38
+//			Last revised:	 3 February 2013  version 0.39
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -44,11 +44,11 @@ var url;	// request sent to server (server + request-specific string)
 var db = '';	// name of the selected database
 var record = '';// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by slist()
-var tfreq;      // ticks per second (LCM of sampling frequencies of signals)
-var aduration;  // length of longest annotation set, in ticks
-var sduration;  // length of signals, in ticks
-var tf;		// record length, in ticks (max of aduration and sduration)
-var annotators = ''; // annotators for the selected database, from alist()
+var tickfreq;      // ticks per second (LCM of sampling frequencies of signals)
+var adt_ticks;  // length of longest annotation set, in ticks
+var sdt_ticks;  // length of signals, in ticks
+var rdt_ticks;		// record length, in ticks (max of adt_ticks and sdt_ticks)
+var ann_set = ''; // annotators for the selected database, from alist()
 var ann = [];   // annotations read and cached by read_annotations()
 var nann = 0;	// number of annotators, set by read_annotations()
 var annselected = '';// name of annotator to be highlighted, if any
@@ -56,9 +56,10 @@ var signals;    // signals for the selected record, from slist()
 var nsig = 0;	// number of signals, set by read_signals()
 var sigselected = '';// name of signal to be highlighted, if any
 var out_format; // 'plot' or 'text', set by button handler functions
-var dt = 10;    // window width in seconds
-var ts0 = -1;   // time of the first sample in the signal window, in samples
-var tsf;	// time of the first sample after the signal window, in samples
+var dt_sec = 10;    // window width in seconds
+var dt_ticks;    // window width in ticks
+var t0_ticks = -1;   // time of the first sample in the signal window, in ticks
+var tf_ticks;	// time of the first sample after the signal window, in ticks
 var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
 var target = '';// search target, set in Find... dialog
@@ -89,7 +90,7 @@ function set_trace(db, record, s) {
     s.id = tid++;
     s.db = db;
     s.record = record;
-    s.dt = dt;
+    s.dt_sec = dt_sec;
 
     // restore amplitudes from first differences sent by server
     len = s.samp.length;
@@ -130,7 +131,7 @@ function find_trace(db, record, signame, t) {
 	    tpool[i].t0 == t &&
 	    tpool[i].record == record &&
 	    tpool[i].db == db &&
-	    tpool[i].dt >= dt) {
+	    tpool[i].dt_sec >= dt_sec) {
 	    return tpool[i];
 	}
     }
@@ -139,7 +140,7 @@ function find_trace(db, record, signame, t) {
 
 // Convert argument (in samples) to a string in HH:MM:SS format.
 function timstr(t) {
-    var ss = Math.floor(t/tfreq);
+    var ss = Math.floor(t/tickfreq);
     var mm  = Math.floor(ss/60);    ss %= 60;
     var hh  = Math.floor(mm/60);    mm %= 60;
     if (ss < 10) ss = '0' + ss;
@@ -151,7 +152,7 @@ function timstr(t) {
 
 // Convert argument (in samples) to a string in HH:MM:SS.mmm format.
 function mstimstr(t) {
-    var mmm = Math.floor(1000*t/tfreq) % 1000;
+    var mmm = Math.floor(1000*t/tickfreq) % 1000;
     if (mmm < 100) {
 	if (mmm < 10) mmm = '.00' + mmm;
 	else mmm = '.0' + mmm;
@@ -172,7 +173,7 @@ function strtim(s) {
       case 3: t = 3600*c[0] + 60*c[1] + +c[2]; break;
       default: t = 0;
     }
-    return t*tfreq;
+    return t*tickfreq;
 }
 
 function html_escape(s) {
@@ -187,17 +188,17 @@ function html_escape(s) {
 function show_summary() {
     var itext = '', ia, ii, is, rdurstr;
 
-    if (recinfo.duration) sduration = strtim(recinfo.duration);
-    else sduration = 0;
-    tf = (aduration > sduration) ? aduration : sduration;
-    rdurstr = timstr(tf);
+    if (recinfo.duration) sdt_ticks = strtim(recinfo.duration);
+    else sdt_ticks = 0;
+    rdt_ticks = (adt_ticks > sdt_ticks) ? adt_ticks : sdt_ticks;
+    rdurstr = timstr(rdt_ticks);
     itext += '<h3>Summary</h3>\n<table>\n'
         + ' <tr><td>Record length</td><td>' + rdurstr + '</td></tr>\n';
     if (recinfo.start) {
 	itext += ' <tr><td>Start</td><td>' + recinfo.start + '</td></tr>\n';
 //	    + ' <tr><td>End</td><td>' + recinfo.end + '</td></tr>\n';
     }
-    itext += ' <tr><td>Clock frequency&nbsp;</td><td>' + tfreq
+    itext += ' <tr><td>Clock frequency&nbsp;</td><td>' + tickfreq
 	+ ' ticks per second</td></tr>\n';
 
     if (nann > 0) {
@@ -253,8 +254,8 @@ function show_tables() {
 		    + '<th>Sub&nbsp;</th><th>Chan</th><th>Num&nbsp;</th>'
 		    + '<th>Aux</th></tr>\n';
 		for (var i = 0; i < a.length; i++) {
-		    if (a[i].t < ts0) continue;
-		    else if (a[i].t > tsf) break;
+		    if (a[i].t < t0_ticks) continue;
+		    else if (a[i].t > tf_ticks) break;
 		    atext += '<tr><td>' + mstimstr(a[i].t) + '</td><td>'
 			+ a[i].a + '</td><td>' + a[i].s + '</td><td>'
 			+ a[i].c + '</td><td>' + a[i].n + '</td><td>';
@@ -277,7 +278,7 @@ function show_tables() {
 	    for (i = is = 0; i < signals.length; i++) {
 		var sname = signals[i].name;
 		if (s_visible[sname])
-		    sig[is++] = find_trace(db, record, sname, ts0);
+		    sig[is++] = find_trace(db, record, sname, t0_ticks);
 	    }
 	    
 	    stext = '<h3>Signals</h3>\n<p><table class="dtable">\n'
@@ -290,8 +291,8 @@ function show_tables() {
 		if (!u) u = '[mV]';
 		stext += '<th><i>(' + u + ')</i></th>';
 	    }
-	    var t = ts0;
-	    for (var i = 0; t < tsf; i++, t++) {
+	    var t = t0_ticks;
+	    for (var i = 0; t < tf_ticks; i++, t++) {
 		stext += '</tr>\n<tr><td>' + mstimstr(t);
 		for (var j = 0; j < is; j++) {
 		    stext += '</td><td>';
@@ -373,41 +374,41 @@ function handle_svg_events() {
 	else {
 	    s_visible[sname] = 0;
 	}
-	read_signals(ts0, true);
+	read_signals(t0_ticks, true);
 	show_plot();
     });
 }
 
 var width, height, swl, sww, swr;  // View/edit graphics dimensions, in pixels
-var svgw = 1000*dt, svgh = svgw/2; // Grid dimensions, in (arbitrary) SVG coords
+var svgw = 1000*dt_sec, svgh = svgw/2; // Grid dimensions, in (arbitrary) SVG coords
 var svgl = svgw/8;	  	   // Left column width, in SVG coords
 var svgr = svgw/24;		   // Right column width, in SVG coords
-var svgt = 12*dt;		   // Top margin in SVG coords (y-translation)
+var svgt = 12*dt_sec;		   // Top margin in SVG coords (y-translation)
 var svgtw = svgl + svgw + svgr;    // Total available width in SVG coords
-var svgf = 12*dt;		   // font-size for signal/annotation labels
-var svgtf = 10*dt;		   // Small font-size for timestamps
-var svgc = 5*dt;		   // Size for small elements (circles, etc.)
-var adx1 = 2*dt;
-var adx2 = 4*dt;
-var adx4 = 8*dt;
-var ady1 = 10*dt;
-var ady2 = 20*dt;
+var svgf = 12*dt_sec;		   // font-size for signal/annotation labels
+var svgtf = 10*dt_sec;		   // Small font-size for timestamps
+var svgc = 5*dt_sec;		   // Size for small elements (circles, etc.)
+var adx1 = 2*dt_sec;
+var adx2 = 4*dt_sec;
+var adx4 = 8*dt_sec;
+var ady1 = 10*dt_sec;
+var ady2 = 20*dt_sec;
 
 function set_sw_width(seconds) {
-    dt = seconds;
-    svgw = 1000*dt;
+    dt_sec = seconds;
+    svgw = 1000*dt_sec;
     svgh = svgw/2;
     svgl = svgw/8;
     svgr = svgw/24;
     svgtw = svgl + svgw + svgr;
-    svgf = 12*dt;
-    svgtf = 10*dt;
-    svgc = 5*dt;
-    adx1 = 2*dt;
-    adx2 = 4*dt;
-    adx4 = 8*dt;
-    ady1 = 10*dt;
-    ady2 = 20*dt;
+    svgf = 12*dt_sec;
+    svgtf = 10*dt_sec;
+    svgc = 5*dt_sec;
+    adx1 = 2*dt_sec;
+    adx2 = 4*dt_sec;
+    adx4 = 8*dt_sec;
+    ady1 = 10*dt_sec;
+    ady2 = 20*dt_sec;
 }
 
 function show_plot() {
@@ -465,21 +466,21 @@ function show_plot() {
     }
 
     // timestamps
-    var svgts = svgh + 20*dt;
-    var tsm = (ts0 + +tsf)/2;
+    var svgts = svgh + 20*dt_sec;
+    var tsm = (t0_ticks + +tf_ticks)/2;
 
     tst = '<g id="times">\n<text x="0" y="' + svgts + '" font-size="' + svgtf
-	+ '" fill="red" style="text-anchor: start;">' + timstr(ts0) + '</text>'
+	+ '" fill="red" style="text-anchor: start;">' + timstr(t0_ticks) + '</text>'
 	+ '\n';
 
-    if (dt%2 == 0) {
+    if (dt_sec%2 == 0) {
 	tst += 	'\n<text x="' + svgw/2 + '" y="' + svgts + '" font-size="'
 	    + svgtf + '" fill="red" style="text-anchor: middle;">'
 	    + timstr(tsm) + '</text>\n';
     }
 
     tst += '<text x="' + svgw + '" y="' + svgts + '" font-size="' + svgtf
-	+ '" fill="red" style="text-anchor: end;">' + timstr(tsf) + '</text>'
+	+ '" fill="red" style="text-anchor: end;">' + timstr(tf_ticks) + '</text>'
 	+ '</g>\n';
     
     // annotator names and annotations
@@ -514,10 +515,10 @@ function show_plot() {
 	    sva += '>' + aname + '</text></g>\n';
 	    var a = ann[ia].annotation;
 	    for (var i = 0; i < a.length; i++) {
-		if (a[i].t < ts0) continue;
-		else if (a[i].t > tsf) break;
+		if (a[i].t < t0_ticks) continue;
+		else if (a[i].t > tf_ticks) break;
 		var x, y, y1, txt;
-		x = Math.round((a[i].t - ts0)*1000/tfreq);
+		x = Math.round((a[i].t - t0_ticks)*1000/tickfreq);
 		if (a[i].x && (a[i].a == '+' || a[i].a == '"')) {
 		    if (a[i].a == '+') y = y0+svgf;
 		    else y = y0-svgf;
@@ -559,7 +560,7 @@ function show_plot() {
     for (is = 0; is < nsig; is++) {
 	var y0 = y0s[is];
 	var sname = signals[is].name;
-	var trace = find_trace(db, record, sname, ts0);
+	var trace = find_trace(db, record, sname, t0_ticks);
 	
 	svs += '<g id="sig;;' + sname + '">\n';
 	if (trace && s_visible[sname] == 1) {
@@ -589,9 +590,9 @@ function show_plot() {
 	    var t = 0;
 	    var tps = trace.tps;
 	    var tmax = s.length * tps;
-	    var ts = 1000/tfreq;
+	    var ts = 1000/tickfreq;
 	    var pv = false;
-	    if (tmax > dt * tfreq) tmax = dt * tfreq;
+	    if (tmax > dt_ticks) tmax = dt_ticks;
 	    // add remaining samples to the trace
 	    for (var i = 0; t < tmax; i++, t += tps) {
 		if (s[i] != -32768) {
@@ -628,12 +629,12 @@ function update_output() {
 }
 
 // Retrieve one or more complete annotation files for the selected record.
-function read_annotations(t0) {
+function read_annotations(t0_string) {
     nann = 0;	// new record -- (re)fill the cache
-    if (annotators.length) {
+    if (ann_set.length) {
 	var annreq = '', i;
-	for (i = 0; i < annotators.length; i++) {
-	    var a = annotators[i].name;
+	for (i = 0; i < ann_set.length; i++) {
+	    var a = ann_set[i].name;
 	    annreq += '&annotator=' + encodeURIComponent(a);
 	}
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
@@ -643,22 +644,22 @@ function read_annotations(t0) {
 		ann[nann] = data.fetch.annotator[i];
 		a_visible[ann[nann].name] = 1;
 		ann[nann].opacity = 1;
-		for (var j = 0; j < annotators.length; j++)
-		    if (ann[nann].name == annotators[j].name)
-			ann[nann].desc = annotators[j].desc;
+		for (var j = 0; j < ann_set.length; j++)
+		    if (ann[nann].name == ann_set[j].name)
+			ann[nann].desc = ann_set[j].desc;
 	    }
 	    for (i = 0; i < ann.length; i++) {
 		var len, t;
-		aduration = 0;
+		adt_ticks = 0;
 		len = ann[i].annotation.length;
 		if (len > 0) var t = ann[i].annotation[len-1].t;
-		if (t > aduration) aduration = t;
+		if (t > adt_ticks) adt_ticks = t;
 	    }
-	    slist(t0);
+	    slist(t0_string);
 	});
     }
     else {
-	slist(t0);
+	slist(t0_string);
     }
 }
 
@@ -681,9 +682,14 @@ function read_signals(t, update) {
 	}
     }
     if (sigreq) {
-	url = server + '?action=fetch&db='
-	    + db + '&record=' + record + sigreq
-	    + '&t0=' + t/tfreq + '&dt=' + dt + '&callback=?';
+	url = server
+	    + '?action=fetch'
+	    + '&db=' + db
+	    + '&record=' + record
+	    + sigreq
+	    + '&t0=' + t/tickfreq
+	    + '&dt=' + dt_sec
+	    + '&callback=?';
 	$.getJSON(url, function(data) {
 	    var fetch = data.fetch;
 	    if (fetch && fetch.hasOwnProperty('signal')) {
@@ -701,10 +707,10 @@ function read_signals(t, update) {
 function fetch() {
     var title = 'LW: ' + db + '/' + record;
     document.title = title;
-    var t0 = $('[name=t0]').val();
-    ts0 = strtim(t0);
-    tsf = ts0 + dt*tfreq;
-    read_signals(ts0, true); // read signals not previously cached, if any
+    var t0_string = $('[name=t0]').val();
+    t0_ticks = strtim(t0_string);
+    tf_ticks = t0_ticks + dt_ticks;
+    read_signals(t0_ticks, true); // read signals not previously cached, if any
 }
 
 // Button handlers
@@ -719,15 +725,40 @@ function fetch_text() {
 }
 
 function go_here(t) {
-    if (t >= tf) { t = tf; $('.fwd').attr('disabled', 'disabled'); }
-    else { $('.fwd').removeAttr('disabled'); }
-    if (t <= 0) { t = 0; $('.rev').attr('disabled', 'disabled'); }
-    else { $('.rev').removeAttr('disabled'); }
-    var t0 = timstr(t);
-    $('[name=t0]').val(t0);
-    if (out_format == 'text') fetch();
-    else fetch_plot();
-    if (tsf >= tf) { $('.fwd').attr('disabled', 'disabled'); }
+    if (t >= rdt_ticks) {
+	t = rdt_ticks;
+	$('.fwd').attr('disabled', 'disabled');
+	$('.eor').attr('disabled', 'disabled');
+	$('.sfwd').attr('disabled', 'disabled');
+    }
+    else {
+	$('.fwd').removeAttr('disabled');
+	$('.eor').removeAttr('disabled');
+	if (target) $('.sfwd').removeAttr('disabled');
+    }
+    if (t <= 0) {
+	t = 0;
+	$('.rev').attr('disabled', 'disabled');
+	$('.sor').attr('disabled', 'disabled');
+	$('.srev').attr('disabled', 'disabled');
+    }
+    else {
+	$('.rev').removeAttr('disabled');
+	$('.sor').removeAttr('disabled');
+	if (target) $('.srev').removeAttr('disabled');
+    }
+    tf_ticks = t + dt_ticks;
+    var t0_string = timstr(t);
+    $('[name=t0]').val(t0_string);
+    if (out_format == 'text')
+	fetch();
+    else
+	fetch_plot();
+    if (tf_ticks >= rdt_ticks) {
+	$('.fwd').attr('disabled', 'disabled');
+	$('.eor').attr('disabled', 'disabled');
+	$('.sfwd').attr('disabled', 'disabled');
+    }
 }
 
 function gostart() {
@@ -735,31 +766,31 @@ function gostart() {
 }
 
 function gorev() {
-    var t0 = $('[name=t0]').val();
-    var t = strtim(t0) - dt*tfreq;
+    var t0_string = $('[name=t0]').val();
+    var t = strtim(t0_string) - dt_ticks;
     go_here(t);
-    t -= dt*tfreq;
+    t -= dt_ticks;
     if (t >= 0) read_signals(t, false);  // prefetch the previous window
 }
 	 
 function go_to() {
-    var t0 = $('[name=t0]').val();
-    var t = strtim(t0);
+    var t0_string = $('[name=t0]').val();
+    var t = strtim(t0_string);
     go_here(t);
 }
 
 function gofwd() {
-    var t0 = $('[name=t0]').val();
-    var t = strtim(t0) + dt*tfreq;
+    var t0_string = $('[name=t0]').val();
+    var t = strtim(t0_string) + dt_ticks;
     go_here(t);
-    t += dt*tfreq;
-    if (t < tf)
+    t += dt_ticks;
+    if (t < rdt_ticks)
 	read_signals(t, false);	  // prefetch the next window
 }
 
 function goend() {
-    var t = Math.floor((tf-1)/(dt*tfreq));
-    go_here(t*dt*tfreq);
+    var t = Math.floor((rdt_ticks-1)/(dt_ticks));
+    go_here(t*dt_ticks);
 }
 
 function srev() {
@@ -774,17 +805,17 @@ function srev() {
     }
     if (i >= nann) return;
 
-    for (i = na - 1; i >= 0 && sa[i].t > ts0; i--)
+    for (i = na - 1; i >= 0 && sa[i].t > t0_ticks; i--)
 	;
 
     for ( ; i >= 0 && sa[i].a != target; i--)
 	;
 
     if (i >= 0) {
-	var t = sa[i].t - (sa[i].t % (dt * tfreq));
+	var t = sa[i].t - (sa[i].t % dt_ticks);
 	go_here(t);
     }
-    else alert(target + ' not found in ' + atarget + ' before ' + timstr(ts0));
+    else alert(target + ' not found in ' + atarget + ' before ' + timstr(t0_ticks));
 }
 
 function sfwd() {
@@ -799,17 +830,17 @@ function sfwd() {
     }
     if (i >= nann) return;
 
-    for (i = 0; i < na && sa[i].t < tsf; i++)
+    for (i = 0; i < na && sa[i].t < tf_ticks; i++)
 	;
 
     for ( ; i < na && sa[i].a != target; i++)
 	;
 
     if (i < na) {
-	var t = sa[i].t - (sa[i].t % (dt * tfreq));
+	var t = sa[i].t - (sa[i].t % dt_ticks);
 	go_here(t);
     }
-    else alert(target + ' not found in ' + atarget + ' after ' + timstr(tsf));
+    else alert(target + ' not found in ' + atarget + ' after ' + timstr(tf_ticks));
 }
 
 // Set target for searches.
@@ -827,12 +858,12 @@ function find() {
 	if (atarget === '') {
 	    content += 	'<option value=\"\" selected>--Choose one--</option>\n';
 	}
-	for (var i = 0; i < annotators.length; i++) {
-	    content += '<option value=\"' + annotators[i].name + '\"';
-	    if (atarget === annotators[i].name) {
+	for (var i = 0; i < ann_set.length; i++) {
+	    content += '<option value=\"' + ann_set[i].name + '\"';
+	    if (atarget === ann_set[i].name) {
 		content += ' selected';
 	    }
-	    content += '>' + annotators[i].name + '</option>\n';
+	    content += '>' + ann_set[i].name + '</option>\n';
 	}
 	content += '</select></td>\n';
     }
@@ -849,13 +880,15 @@ function find() {
 	    if (nann > 1) {
 		atarget = $('[name=atarget]').val();
 	    }
-	    else atarget = annotators[0].name;
+	    else atarget = ann_set[0].name;
 	}
     });
     $('#findbox').dialog({
 	close: function(event, ui){
-	    $('.srev').removeAttr('disabled');
-	    $('.sfwd').removeAttr('disabled');
+	    if (t0_ticks > 0)
+		$('.srev').removeAttr('disabled');
+	    if (tf_ticks <= rdt_ticks)
+		$('.sfwd').removeAttr('disabled');
 	}
     });
 }
@@ -903,7 +936,7 @@ function show_time(x) {
     x_cursor = (x - m.e)/m.a;
     if (x_cursor < 0) x_cursor = 0;
     else if (x_cursor > svgw) x_cursor = svgw;
-    var t = ts0 + x_cursor*tfreq/1000;
+    var t = t0_ticks + x_cursor*tickfreq/1000;
     var ts = mstimstr(t);
     $('.pointer').html(ts);
 
@@ -925,7 +958,7 @@ function show_time(x) {
 }
 
 // Load the list of signals for the selected record.
-function slist(t0) {
+function slist(t0_string) {
     var title = 'LW: ' + db + '/' + record, t = 0;
     $('.recann').html(db + '/' + record);
     document.title = title;
@@ -939,7 +972,8 @@ function slist(t0) {
     $.getJSON(url, function(data) {
 	if (data) {
 	    recinfo = data.info;
-	    tfreq = recinfo.tfreq;
+	    tickfreq = recinfo.tfreq;
+	    dt_ticks = dt_sec * tickfreq;
 	    if (recinfo.signal) {
 		signals = recinfo.signal;
 		nsig = signals.length;
@@ -956,9 +990,9 @@ function slist(t0) {
 	show_summary();
 	$('#tabs').tabs("select", "#view");
 	out_format = 'plot';
-	if (t0 != '') t = strtim(t0);
-	t0 = timstr(t);
-	$('[name=t0]').val(t0);
+	if (t0_string != '') t = strtim(t0_string);
+	t0_string = timstr(t);
+	$('[name=t0]').val(t0_string);
 	go_here(t);
 	$('#top').show();
     });
@@ -978,8 +1012,8 @@ function newrec() {
 function alist() {
     url = server + '?action=alist&callback=?&db=' + db;
     $.getJSON(url, function(data) {
-	if (data.success) annotators = data.annotator;
-	else annotators = '';
+	if (data.success) ann_set = data.annotator;
+	else ann_set = '';
     });
 };
 
@@ -1071,9 +1105,9 @@ function set_handlers() {
     //  on View/edit and Tables tabs:
     $('#fplot').on("click", fetch_plot);   // get data and plot them
     $('#ftext').on("click", fetch_text);   // get data and print them
-    $('.fwd').on("click", gofwd);	   // advance by dt and plot or print
+    $('.fwd').on("click", gofwd);	   // advance by dt_sec and plot or print
     $('[name=t0]').on("blur", go_to);      // go to selected location
-    $('.rev').on("click", gorev);	   // go back by dt and plot or print
+    $('.rev').on("click", gorev);	   // go back by dt_sec and plot or print
     $('.sor').on("click", gostart);	   // go to start of record
     $('.eor').on("click", goend);	   // go to end of record
     $('.srev').on("click", srev);	   // search for previous 'Find' target
@@ -1093,18 +1127,19 @@ function set_handlers() {
 
     $(function() {
 	$('#dtslider').slider({
-	    value: 10,
+	    value: dt_sec,
 	    min: 5,
 	    max: 60,
 	    step: 5,
 	    slide: function(event, ui) {
 		$('#swidth').val(ui.value);
-		dt = ui.value;
-		set_sw_width(dt);
-		go_here(ts0);
+		dt_sec = ui.value;
+		dt_ticks = dt_sec * tickfreq;
+		set_sw_width(dt_sec);
+		go_here(t0_ticks);
 	    }
 	});
-	$('#swidth').val($('#swidth').slider('value'));
+	$('#swidth').val(dt_sec);
     });
      
     // on Settings tab:
@@ -1120,7 +1155,7 @@ function set_handlers() {
 // Check for query string in URL, decode and run query or queries if present
 function parse_url() {
     var s = window.location.href.split("?");
-    var n = s.length, t = 0, t0 = '0';
+    var n = s.length, t = 0, t0_string = '0';
     if (n != 2) {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
@@ -1133,7 +1168,7 @@ function parse_url() {
 	var v = q[n].split("=");
 	if (v[0] == 'db') db = v[1];
 	else if (v[0] == 'record') record = v[1];
-	else if (v[0] == 't0') t0 = v[1];
+	else if (v[0] == 't0') t0_string = v[1];
     }
     if (db !== '') {
 	if (record === '') {
@@ -1161,9 +1196,9 @@ function parse_url() {
 	    $('#rlist').html(rlist);
 	    url = server + '?action=alist&callback=?&db=' + db;
 	    $.getJSON(url, function(data) {
-		if (data.success) annotators = data.annotator;
-		else annotators = '';
-		read_annotations(t0);
+		if (data.success) ann_set = data.annotator;
+		else ann_set = '';
+		read_annotations(t0_string);
 	    });
 	}
     }
