@@ -7,14 +7,13 @@
 <link rel="stylesheet" href="css/jquery-ui.min.css">
 <link rel="stylesheet" href="css/lightwave.css">
 <script src="js/jquery.min.js"></script>
-<script src="js/jquery-svgpan.js"></script>
 <script src="js/jquery-ui.min.js"></script>
 <script src="js/lightwave.js"></script>
 <noscript><style>.js { display: none; }</style></noscript>
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	 4 February 2013   version 0.39
+			Last revised:	 4 February 2013   version 0.40
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -74,13 +73,16 @@ provides some of the functions of LightWAVE without Javascript.
  <table width="100%">
   <tr>
     <td><div style="font-size: 14px; text-align: center">Go to:
-      <input type="text" name="t0" value="" tabindex="1"
+      <input type="text" name="t0" class="t0_str" value="" tabindex="1"
 	     title="Enter the elapsed time from the start of the
 record to the start of the window, then click '&#x21b4;'"
 	     placeholder="HH:MM:SS" size="10">
-      <button id="fplot" tabindex="2"
-		    title="refresh signal window">&#x21b4;</button>
-      &nbsp;<button class="sor" tabindex="8"
+      <button class="go_to" tabindex="2"
+		    title="refresh signal window">&#x21b4;</button></div>
+    </td>
+
+    <td><div style="font-size: 14px; text-align: center">
+      <button class="sor" tabindex="8"
 		    title="start of record">|&#9665;</button>
       <button class="rev" tabindex="4"
 		    title="previous window">&#9665;</button>
@@ -88,7 +90,7 @@ record to the start of the window, then click '&#x21b4;'"
 		    title="next window">&#9655;</button>
       <button class="eor" tabindex="7"
 		    title="end of record">&#9655;|</button>
-      &nbsp;&nbsp;<br>
+      <br>
       <button class="srev" tabindex="5"
 	   title="search for previous 'Find' target">&#9665; Search</button>
       <button class="find" tabindex="9"
@@ -142,23 +144,41 @@ record to the start of the window, then click '&#x21b4;'"
 
 <div id="tables">
  <table width="100%">
-  <tr>
   <tr><td align=left>
-      <input type="checkbox" id="viewann" />View annotations as text&nbsp;&nbsp;
-      <input type="checkbox" id="viewsig" />View signals as text</td></tr>
-    <td align=left>Go to:
-      <input type="text" name="t0" placeholder="HH:MM:SS" size="10"
+      <div style="font-size: 14px; text-align: center">Go to:
+      <input type="text" name="t0" class="t0_str" value="" tabindex="1"
 	     title="Enter the elapsed time from the start of the
-record to the start of the data tables, then click '&#x21b4;'">
-      &nbsp;<button class="sor" title="start of record">|&lt;</button>
-      &nbsp;<button class="rev" title="previous 10 seconds">&lt;</button>
-      <button id="ftext" tabindex="2"
+record to the start of the window, then click '&#x21b4;'"
+	     placeholder="HH:MM:SS" size="10">
+      <button class="go_to" tabindex="2"
 	  title="show annotations/signals from the
-signal window if selected above">&#x21b4;</button>
-      &nbsp;<button class="fwd" title="next 10 seconds">&gt;</button>
-      &nbsp;<button class="eor" title="end of record">&gt;|</button></td>
+signal window if selected below">&#x21b4;</button>
+      <br>
+      <input type="checkbox" id="viewann" />View annotations as text&nbsp;&nbsp;
+      <input type="checkbox" id="viewsig" />View signals as text
+    </div></td>
+
+    <td><div style="font-size: 14px; text-align: center">
+      <button class="sor" tabindex="8"
+		    title="start of record">|&#9665;</button>
+      <button class="rev" tabindex="4"
+		    title="previous window">&#9665;</button>
+      <button class="fwd" tabindex="3"
+		    title="next window">&#9655;</button>
+      <button class="eor" tabindex="7"
+		    title="end of record">&#9655;|</button>
+      <br>
+      <button class="srev" tabindex="5"
+	   title="search for previous 'Find' target">&#9665; Search</button>
+      <button class="find" tabindex="9"
+		    title="define search target">Find...</button>
+      <button class="sfwd" tabindex="6"
+		   title="search for next 'Find' target">Search &#9655;</button>
+      </div>
+    </td>
+    </span>
     <td align=right>
-      <span class="recann"></span><br><span class="pointer"></span></td>
+      <span class="recann"></span><br><span class="pointer">&nbsp;</span></td>
   </tr>
  </table>
 <hr>

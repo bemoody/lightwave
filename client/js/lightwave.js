@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 3 February 2013  version 0.39
+//			Last revised:	 4 February 2013  version 0.40
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -55,7 +55,7 @@ var annselected = '';// name of annotator to be highlighted, if any
 var signals;    // signals for the selected record, from slist()
 var nsig = 0;	// number of signals, set by read_signals()
 var sigselected = '';// name of signal to be highlighted, if any
-var out_format; // 'plot' or 'text', set by button handler functions
+var current_tab; // name of the currently selected tab
 var dt_sec = 10;    // window width in seconds
 var dt_ticks;    // window width in ticks
 var t0_ticks = -1;   // time of the first sample in the signal window, in ticks
@@ -124,7 +124,7 @@ function set_trace(db, record, s) {
     tpool[imin] = s; // replace it
 }
 
-// Find a trace in the cache, if it exists
+// Find a trace in the cache
 function find_trace(db, record, signame, t) {
     for (var i = 0; i < tpool.length; i++) {
 	if (tpool[i].name == signame &&
@@ -291,6 +291,7 @@ function show_tables() {
 		if (!u) u = '[mV]';
 		stext += '<th><i>(' + u + ')</i></th>';
 	    }
+
 	    var t = t0_ticks;
 	    for (var i = 0; t < tf_ticks; i++, t++) {
 		stext += '</tr>\n<tr><td>' + mstimstr(t);
@@ -322,6 +323,7 @@ function toggle_edit() {
 
     tracking = !tracking;
     if (!tracking) $('#editdata').empty();
+
     $('svg').mousemove(function(e){
 	if (tracking) {
 	    var x = e.pageX;
@@ -624,8 +626,8 @@ function show_plot() {
 }
 
 function update_output() {
-    if (out_format == 'plot') show_plot();
-    else if (out_format == 'text') show_tables();
+    if (current_tab == 'View/edit') show_plot();
+    else if (current_tab == 'Tables') show_tables();
 }
 
 // Retrieve one or more complete annotation files for the selected record.
@@ -703,30 +705,16 @@ function read_signals(t, update) {
     else if (update) update_output();
 }
 
-// Handle a request for data to display as a plot or tables.
-function fetch() {
-    var title = 'LW: ' + db + '/' + record;
-    document.title = title;
-    var t0_string = $('[name=t0]').val();
-    t0_ticks = strtim(t0_string);
-    tf_ticks = t0_ticks + dt_ticks;
-    read_signals(t0_ticks, true); // read signals not previously cached, if any
+// Prefetch data for later use.
+function prefetch(t_ticks) {
+    if (t_ticks < 0) t_ticks = 0;
+    if (t_ticks < rdt_ticks) read_signals(t_ticks, false);
 }
 
 // Button handlers
-function fetch_plot() {
-    out_format = 'plot';
-    fetch();
-}
-
-function fetch_text() {
-    out_format = 'text';
-    fetch();
-}
-
-function go_here(t) {
-    if (t >= rdt_ticks) {
-	t = rdt_ticks;
+function go_here(t_ticks) {
+    if (t_ticks >= rdt_ticks) {
+	t_ticks = rdt_ticks;
 	$('.fwd').attr('disabled', 'disabled');
 	$('.eor').attr('disabled', 'disabled');
 	$('.sfwd').attr('disabled', 'disabled');
@@ -736,8 +724,8 @@ function go_here(t) {
 	$('.eor').removeAttr('disabled');
 	if (target) $('.sfwd').removeAttr('disabled');
     }
-    if (t <= 0) {
-	t = 0;
+    if (t_ticks <= 0) {
+	t_ticks = 0;
 	$('.rev').attr('disabled', 'disabled');
 	$('.sor').attr('disabled', 'disabled');
 	$('.srev').attr('disabled', 'disabled');
@@ -747,13 +735,15 @@ function go_here(t) {
 	$('.sor').removeAttr('disabled');
 	if (target) $('.srev').removeAttr('disabled');
     }
-    tf_ticks = t + dt_ticks;
-    var t0_string = timstr(t);
-    $('[name=t0]').val(t0_string);
-    if (out_format == 'text')
-	fetch();
-    else
-	fetch_plot();
+
+    var title = 'LW: ' + db + '/' + record;
+    document.title = title;
+    var t0_string = timstr(t_ticks);
+    $('.t0_str').val(t0_string);
+    t0_ticks = t_ticks;
+    tf_ticks = t_ticks + dt_ticks;
+    read_signals(t0_ticks, true); // read signals not previously cached, if any
+
     if (tf_ticks >= rdt_ticks) {
 	$('.fwd').attr('disabled', 'disabled');
 	$('.eor').attr('disabled', 'disabled');
@@ -766,26 +756,26 @@ function gostart() {
 }
 
 function gorev() {
-    var t0_string = $('[name=t0]').val();
-    var t = strtim(t0_string) - dt_ticks;
-    go_here(t);
-    t -= dt_ticks;
-    if (t >= 0) read_signals(t, false);  // prefetch the previous window
+    var t0_string = $('.t0_str').val();
+    var t_ticks = strtim(t0_string) - dt_ticks;
+    go_here(t_ticks);
+    prefetch(t_ticks - dt_ticks);
 }
 	 
 function go_to() {
-    var t0_string = $('[name=t0]').val();
-    var t = strtim(t0_string);
-    go_here(t);
+    var t0_string;
+    if (current_tab == 'View/edit') t0_string = $('#view .t0_str').val();
+    else if (current_tab == 'Tables') t0_string = $('#tables .t0_str').val();
+    $('.t0_str').val(t0_string);
+    var t_ticks = strtim(t0_string);
+    go_here(t_ticks);
 }
 
 function gofwd() {
-    var t0_string = $('[name=t0]').val();
-    var t = strtim(t0_string) + dt_ticks;
-    go_here(t);
-    t += dt_ticks;
-    if (t < rdt_ticks)
-	read_signals(t, false);	  // prefetch the next window
+    var t0_string = $('.t0_str').val();
+    var t_ticks = strtim(t0_string) + dt_ticks;
+    go_here(t_ticks);
+    prefetch(t_ticks + +dt_ticks);
 }
 
 function goend() {
@@ -794,8 +784,9 @@ function goend() {
 }
 
 function srev() {
-    var na = 0, sa = '', i;
+    var na = 0, sa = '', i, t;
 
+    // find the annotation set
     for (i = 0; i < nann; i++) {
 	if (ann[i].name == atarget) {
 	    sa = ann[i].annotation;
@@ -803,24 +794,51 @@ function srev() {
 	    break;
 	}
     }
-    if (i >= nann) return;
+    if (i >= nann) return;  // annotation set not found
 
+    // find the last annotation in the set before the signal window
     for (i = na - 1; i >= 0 && sa[i].t > t0_ticks; i--)
 	;
 
-    for ( ; i >= 0 && sa[i].a != target; i--)
+    // find the previous annotation matching the target
+    for ( ; i >= 0 && sa[i].a != target && sa[i].x != target; i--)
 	;
 
+    // if a match was found ...
     if (i >= 0) {
-	var t = sa[i].t - (sa[i].t % dt_ticks);
-	go_here(t);
+	t = sa[i].t - (sa[i].t % dt_ticks);
+	go_here(t);	// show it
+
+	// find the last annotation in the set before the new signal window
+	for ( ; i >= 0 && sa[i].t > t; i--)
+	    ;
+
+	// find and cache the previous match, if any
+	for ( ; i >= 0 && sa[i].a != target && sa[i].x != target; i--)
+	    ;
+	// if another match was found ...
+	if (i >= 0) {
+	    t = sa[i].t - (sa[i].t % dt_ticks);
+	    prefetch(t);  // cache it
+	    return;
+	}
+	else {
+	    // otherwise, disable further reverse searches
+	    $('.srev').attr('disabled', 'disabled');
+	    return;
+	}
     }
-    else alert(target + ' not found in ' + atarget + ' before ' + timstr(t0_ticks));
+    else {  // no match found, disable further reverse searches
+	$('.srev').attr('disabled', 'disabled');
+	alert(target + ' not found in ' + atarget
+	      + ' before ' + timstr(t0_ticks));
+    }
 }
 
 function sfwd() {
-    var na = 0, sa = '', i;
+    var na = 0, sa = '', i, t;
 
+    // find the annotation set
     for (i = 0; i < nann; i++) {
 	if (ann[i].name == atarget) {
 	    sa = ann[i].annotation;
@@ -828,19 +846,45 @@ function sfwd() {
 	    break;
 	}
     }
-    if (i >= nann) return;
+    if (i >= nann) return;  // annotation set not found
 
+    // find the first annotation in the set after the signal window
     for (i = 0; i < na && sa[i].t < tf_ticks; i++)
 	;
 
-    for ( ; i < na && sa[i].a != target; i++)
+    // find the next annotation matching the target
+    for ( ; i < na && sa[i].a != target && sa[i].x != target; i++)
 	;
 
+    // if a match was found ...
     if (i < na) {
-	var t = sa[i].t - (sa[i].t % dt_ticks);
-	go_here(t);
+	t = sa[i].t - (sa[i].t % dt_ticks);
+	go_here(t);	// show it
+
+	// find the first annotation in the set after the new signal window
+	t += +dt_ticks;
+	for ( ; i < na && sa[i].t < t; i++)
+	    ;
+	// find and cache the next match, if any
+	for ( ; i < na && sa[i].a != target && sa[i].x != target; i++)
+	    ;
+	// if another match was found ...
+	if (i < na) {
+	    t = sa[i].t - (sa[i].t % dt_ticks);
+	    prefetch(t);  // cache it
+	    return;
+	}
+	else {
+	    // otherwise, disable further forward searches
+	    $('.sfwd').attr('disabled', 'disabled');
+	    return;
+	}
     }
-    else alert(target + ' not found in ' + atarget + ' after ' + timstr(tf_ticks));
+    else {  // no match found, disable further forward searches
+	$('.sfwd').attr('disabled', 'disabled');
+	alert(target + ' not found in ' + atarget
+	      + ' after ' + timstr(tf_ticks));
+    }
 }
 
 // Set target for searches.
@@ -989,10 +1033,9 @@ function slist(t0_string) {
 	$('#tabs').tabs("enable");
 	show_summary();
 	$('#tabs').tabs("select", "#view");
-	out_format = 'plot';
 	if (t0_string != '') t = strtim(t0_string);
 	t0_string = timstr(t);
-	$('[name=t0]').val(t0_string);
+	$('.t0_str').val(t0_string);
 	go_here(t);
 	$('#top').show();
     });
@@ -1099,20 +1142,23 @@ function set_handlers() {
 	beforeLoad: function(event, ui) {
 	    if (ui.tab.data("loaded")) { event.preventDefault(); return; }
 	    ui.jqXHR.success(function() { ui.tab.data("loaded", true); });
+	},
+	select: function(event, ui) {
+	    current_tab = $(ui.tab).text();
 	}
     });
     // Button handlers
     //  on View/edit and Tables tabs:
-    $('#fplot').on("click", fetch_plot);   // get data and plot them
-    $('#ftext').on("click", fetch_text);   // get data and print them
-    $('.fwd').on("click", gofwd);	   // advance by dt_sec and plot or print
-    $('[name=t0]').on("blur", go_to);      // go to selected location
-    $('.rev').on("click", gorev);	   // go back by dt_sec and plot or print
-    $('.sor').on("click", gostart);	   // go to start of record
-    $('.eor').on("click", goend);	   // go to end of record
-    $('.srev').on("click", srev);	   // search for previous 'Find' target
-    $('.sfwd').on("click", sfwd);	   // search for next 'Find' target
-    $('.find').on("click", find);	   // open 'Find' dialog
+    $('.go_to').on("click", go_to);      // go to selected location
+    $('.t0_str').on("blur", go_to);       // go to selected location
+//    $('[name=t0]').on("blur", go_to);    // go to selected location
+    $('.fwd').on("click", gofwd);	 // advance by dt_sec and plot or print
+    $('.rev').on("click", gorev);	 // go back by dt_sec and plot or print
+    $('.sor').on("click", gostart);	 // go to start of record
+    $('.eor').on("click", goend);	 // go to end of record
+    $('.srev').on("click", srev);	 // search for previous 'Find' target
+    $('.sfwd').on("click", sfwd);	 // search for next 'Find' target
+    $('.find').on("click", find);	 // open 'Find' dialog
     $('.stretch').on("click", stretch_signal);
     $('.reset').on("click", reset_signal);
     $('.shrink').on("click", shrink_signal);
@@ -1155,7 +1201,9 @@ function set_handlers() {
 // Check for query string in URL, decode and run query or queries if present
 function parse_url() {
     var s = window.location.href.split("?");
-    var n = s.length, t = 0, t0_string = '0';
+    var n = s.length, t = 0;
+    
+    t0_string = '0';
     if (n != 2) {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
@@ -1168,7 +1216,9 @@ function parse_url() {
 	var v = q[n].split("=");
 	if (v[0] == 'db') db = v[1];
 	else if (v[0] == 'record') record = v[1];
-	else if (v[0] == 't0') t0_string = v[1];
+	else if (v[0] == 't0') {
+	    t0_string = v[1];
+	}
     }
     if (db !== '') {
 	if (record === '') {
@@ -1187,6 +1237,8 @@ function parse_url() {
 	    $('#tabs').tabs("remove",0);
 	    var title = 'LW: ' + db + '/' + record;
 	    document.title = title;
+	    $('.t0_str').val(t0_string);
+	    current_tab = 'View/edit';
 	    help_main = 'followed-link.html';
 	    $('.recann').html(db + '/' + record);
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
