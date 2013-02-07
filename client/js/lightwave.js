@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 4 February 2013  version 0.40
+//			Last revised:	 7 February 2013  version 0.41
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -36,7 +36,7 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
-// server is the first part of every AJAX request.  Change it if you are
+// 'server' is the first part of every AJAX request.  Change it if you are
 // not using the public LightWAVE server.
 var server = 'http://physionet.org/cgi-bin/lightwave';
 
@@ -44,10 +44,10 @@ var url;	// request sent to server (server + request-specific string)
 var db = '';	// name of the selected database
 var record = '';// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by slist()
-var tickfreq;      // ticks per second (LCM of sampling frequencies of signals)
+var tickfreq;   // ticks per second (LCM of sampling frequencies of signals)
 var adt_ticks;  // length of longest annotation set, in ticks
 var sdt_ticks;  // length of signals, in ticks
-var rdt_ticks;		// record length, in ticks (max of adt_ticks and sdt_ticks)
+var rdt_ticks;	// record length, in ticks (max of adt_ticks and sdt_ticks)
 var ann_set = ''; // annotators for the selected database, from alist()
 var ann = [];   // annotations read and cached by read_annotations()
 var nann = 0;	// number of annotators, set by read_annotations()
@@ -55,10 +55,10 @@ var annselected = '';// name of annotator to be highlighted, if any
 var signals;    // signals for the selected record, from slist()
 var nsig = 0;	// number of signals, set by read_signals()
 var sigselected = '';// name of signal to be highlighted, if any
-var current_tab; // name of the currently selected tab
-var dt_sec = 10;    // window width in seconds
-var dt_ticks;    // window width in ticks
-var t0_ticks = -1;   // time of the first sample in the signal window, in ticks
+var current_tab;// name of the currently selected tab
+var dt_sec = 10;// window width in seconds
+var dt_ticks;   // window width in ticks
+var t0_ticks = -1; // time of the first sample in the signal window, in ticks
 var tf_ticks;	// time of the first sample after the signal window, in ticks
 var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
@@ -68,7 +68,7 @@ var g_visible = 1; // visibility flag for grid (1: on, 0: off)
 var m_visible = 1; // visibility flag for annotation marker bars (1: on, 0: off)
 var a_visible = []; // visibility flags for annotators
 var s_visible = []; // visibility flags for signals
-var x_cursor = 0;  // SVG cursor x-coordinate (see show_time())
+var x_cursor = 0; // SVG cursor x-coordinate (see show_time())
 var mag = [];   // magnification of signals in plots
 var help_main = 'about.html'; // initial and main help topic
 var svc = '';   // SVG code to draw the cursor (see show_time())
@@ -86,19 +86,20 @@ function init_tpool(ntrace) {
 function set_trace(db, record, s) {
     var idmin = tid, imin, j, len, ni, p, v, vmean, vmid, vmax, vmin, w;
 
-    // set properties of s that are not properties from server response
+    len = s.samp.length;
+
+    // set additional properties of s that were not supplied by the server
     s.id = tid++;
     s.db = db;
     s.record = record;
-    s.dt_sec = dt_sec;
+    s.tf = s.t0 + len*s.tps;
 
     // restore amplitudes from first differences sent by server
-    len = s.samp.length;
     v = s.samp;
     vmean = vmax = vmin = v[0];
     for (j = ni = p = 0; j < len; j++) {
 	p = v[j] += p;
-	if (p == -32768) ni++;  // invalid sample: don't count it
+	if (p == -32768) ni++; // ignore invalid samples in baseline calculation
 	else {
 	    if (p > vmax) vmax = p;
 	    else if (p < vmin) vmin = p;
@@ -128,10 +129,8 @@ function set_trace(db, record, s) {
 function find_trace(db, record, signame, t) {
     for (var i = 0; i < tpool.length; i++) {
 	if (tpool[i].name == signame &&
-	    tpool[i].t0 == t &&
-	    tpool[i].record == record &&
-	    tpool[i].db == db &&
-	    tpool[i].dt_sec >= dt_sec) {
+	    tpool[i].t0 <= t && t < tpool[i].tf &&
+	    tpool[i].record == record && tpool[i].db == db) {
 	    return tpool[i];
 	}
     }
@@ -173,7 +172,7 @@ function strtim(s) {
       case 3: t = 3600*c[0] + 60*c[1] + +c[2]; break;
       default: t = 0;
     }
-    return t*tickfreq;
+    return Math.round(t*tickfreq);
 }
 
 function html_escape(s) {
@@ -194,10 +193,8 @@ function show_summary() {
     rdurstr = timstr(rdt_ticks);
     itext += '<h3>Summary</h3>\n<table>\n'
         + ' <tr><td>Record length</td><td>' + rdurstr + '</td></tr>\n';
-    if (recinfo.start) {
+    if (recinfo.start)
 	itext += ' <tr><td>Start</td><td>' + recinfo.start + '</td></tr>\n';
-//	    + ' <tr><td>End</td><td>' + recinfo.end + '</td></tr>\n';
-    }
     itext += ' <tr><td>Clock frequency&nbsp;</td><td>' + tickfreq
 	+ ' ticks per second</td></tr>\n';
 
@@ -382,7 +379,7 @@ function handle_svg_events() {
 }
 
 var width, height, swl, sww, swr;  // View/edit graphics dimensions, in pixels
-var svgw = 1000*dt_sec, svgh = svgw/2; // Grid dimensions, in (arbitrary) SVG coords
+var svgw = 1000*dt_sec, svgh = svgw/2; // Grid dimensions, in SVG coords
 var svgl = svgw/8;	  	   // Left column width, in SVG coords
 var svgr = svgw/24;		   // Right column width, in SVG coords
 var svgt = 12*dt_sec;		   // Top margin in SVG coords (y-translation)
@@ -450,13 +447,16 @@ function show_plot() {
 	grd += '<title>(click to show grid)</title></g>';
     }
     else {
+	var x0s = (1000-Math.floor((t0_ticks % tickfreq)*1000/tickfreq))%1000;
+	var x0r = x0s%200;
+	var x0q = Math.floor(x0s/200)*200;
 	grd += '<title>(click to hide grid)</title></g>'
 	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
-	    + ' d="M0,0 ';
+	    + ' d="M' + x0r + ',0 ';
 	var uparrow = ' l-' + adx1 + ',' + ady1 + 'l' + adx2 + ',0 l-' + adx1
 	    + ',-' + ady1 +  'm200,-';
-	for (var x = 0; x <= svgw; x += 200) {
-	    if (x%1000 == 0)
+	for (var x = 0; x + x0r <= svgw; x += 200) {
+	    if (x%1000 == x0q)
 		grd += 'l0,' + svgh + uparrow + svgh;
 	    else
 		grd += 'l0,' + svgh + ' m200,-' + svgh;
@@ -469,22 +469,25 @@ function show_plot() {
 
     // timestamps
     var svgts = svgh + 20*dt_sec;
-    var tsm = (t0_ticks + +tf_ticks)/2;
+    var tsm = (t0_ticks + +tf_ticks + x0s*tickfreq/500)/2;
 
-    tst = '<g id="times">\n<text x="0" y="' + svgts + '" font-size="' + svgtf
-	+ '" fill="red" style="text-anchor: start;">' + timstr(t0_ticks) + '</text>'
-	+ '\n';
+    tst = '<g id="times">\n<text x="' + x0s + '" y="' + svgts
+	+ '" font-size="' + svgtf + '" fill="red" style="text-anchor: middle;">'
+	+ timstr(t0_ticks + x0s*tickfreq/1000) + '</text>\n';
 
     if (dt_sec%2 == 0) {
-	tst += 	'\n<text x="' + svgw/2 + '" y="' + svgts + '" font-size="'
-	    + svgtf + '" fill="red" style="text-anchor: middle;">'
+	tst += 	'\n<text x="' + (x0s + +svgw/2) + '" y="' + svgts
+	    + '" font-size="' + svgtf
+	    + '" fill="red" style="text-anchor: middle;">'
 	    + timstr(tsm) + '</text>\n';
     }
 
-    tst += '<text x="' + svgw + '" y="' + svgts + '" font-size="' + svgtf
-	+ '" fill="red" style="text-anchor: end;">' + timstr(tf_ticks) + '</text>'
-	+ '</g>\n';
-    
+    if (x0s == 0) {
+	tst += '<text x="' + svgw + '" y="' + svgts + '" font-size="' + svgtf
+	    + '" fill="red" style="text-anchor: middle;">' + timstr(tf_ticks)
+	    + '</text></g>\n';
+    }
+
     // annotator names and annotations
     sva = '<g id="mrkr">\n';
     sva += '<circle cx="-' + svgf + '" cy="0" r="' + svgc
@@ -550,8 +553,8 @@ function show_plot() {
 	else {
 	    sva += '<title>' + ann[ia].desc
 	    	+ ' (click for highlighted view)</title>'
-		+ '<text x="-50" y="' + y0 + '"'
-		+ ' font-size="120" fill="rgb(150,150,200)" font-style="italic"'
+		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
+		+ '" fill="rgb(150,150,200)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
 		+ aname + '</text></g>\n';
 	}
@@ -578,10 +581,15 @@ function show_plot() {
 		+ '" font-size="' + svgf + '" fill="black" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
 		+ sname + '</text></g>\n';
+
 	    var s = trace.samp;
+	    var tps = trace.tps;
+	    var i;
+	    var imin = (t0_ticks - trace.t0)/tps;
+	    var imax = Math.min(s.length, dt_ticks/tps + imin);
 	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
 	    var z = trace.zbase*g - y0;
-	    var v = Math.round(g*s[0] - z);
+	    var v = Math.round(g*s[imin] - z);
 	    // move to start of trace
 	    svs += '<path stroke="black" fill="none" stroke-width="';
 	    if (sname == sigselected)
@@ -590,29 +598,45 @@ function show_plot() {
 		svs += '6';
 	    svs += '" d="';  // + 'M0,' + v + ' L';
 	    var t = 0;
-	    var tps = trace.tps;
-	    var tmax = s.length * tps;
-	    var ts = 1000/tickfreq;
+	    var tnext = t0_ticks;
+	    var tf = Math.min(tf_ticks, rdt_ticks);
+	    var x = 0;
+	    var xstep = 1000/tickfreq;
 	    var pv = false;
-	    if (tmax > dt_ticks) tmax = dt_ticks;
-	    // add remaining samples to the trace
-	    for (var i = 0; t < tmax; i++, t += tps) {
-		if (s[i] != -32768) {
-		    v = Math.round(g*s[i] - z);
-		    if (pv) svs += ' ' + t*ts + ',' + v;
-		    else svs += ' M' + t*ts + ',' + v
-			      + ' L' + t*ts + ',' + v;
-		    pv = true;
+	    while (tnext < tf) {
+		if (tnext > t0_ticks) {
+		    trace = find_trace(db, record, sname, tnext);
+		    if (trace === null) {
+			read_signals(t0_ticks, true);
+			return;
+		    }
+		    s = trace.samp;
+		    imin = (tnext - trace.t0)/tps;
+		    imax = Math.min(s.length, (tf - tnext)/tps + imin);
 		}
-		else
-		    pv = false;
+		for (i = imin; i < imax; i++) {
+		    if (s[i] != -32768) {
+			v = Math.round(g*s[i] - z);
+			if (pv)
+			    svs += ' '  + x + ',' + v;
+			else
+			    svs += ' M' + x + ',' + v
+			        +  ' L' + x + ',' + v;
+			pv = true;
+		    }
+		    else
+			pv = false;
+		    t += tps;
+		    x = t*xstep;
+		}
+		tnext = trace.tf;
 	    }
 	    svs += '" />\n';
 	}
 	else {	// signal is hidden, show label only
 	    svs += '<title>' + sname + ' (click for highlighted view)</title>'
-		+ '<text x="-50" y="' + y0 + '"'
-		+ ' font-size="120" fill="rgb(128,128,128)" font-style="italic"'
+		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
+		+ '" fill="rgb(128,128,128)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
 		+ sname + '</text></g>\n';
 	}
@@ -666,19 +690,26 @@ function read_annotations(t0_string) {
 }
 
 // Retrieve one or more signal segments starting at t for the selected record.
-function read_signals(t, update) {
-    var i, trace = '', sigreq = '';
+function read_signals(t0, update) {
+    var i, trace = '', sigreq = '', t, tf, tr = t0 + dt_ticks;
 
     if (signals) {
 	for (i = 0; i < signals.length; i++) {
 	    if (s_visible[signals[i].name] == 1) {
-		trace = find_trace(db, record, signals[i].name, t);
-		if (trace) {
-		    trace.id = tid++;	// found, mark as recently used
-		}
-		else {		
-		    var s = signals[i].name;
-		    sigreq += '&signal=' + encodeURIComponent(s);
+		t = t0;
+		tf = t + dt_ticks;
+		while (t < tf) {
+		    trace = find_trace(db, record, signals[i].name, t);
+		    if (trace) {
+			trace.id = tid++;	// found, mark as recently used
+			t = trace.tf;
+		    }
+		    else {		
+			if (t < tr) tr = t; // must read samples from t to tf
+			sigreq += '&signal='
+			    + encodeURIComponent(signals[i].name);
+			break;
+		    }
 		}
 	    }
 	}
@@ -689,7 +720,7 @@ function read_signals(t, update) {
 	    + '&db=' + db
 	    + '&record=' + record
 	    + sigreq
-	    + '&t0=' + t/tickfreq
+	    + '&t0=' + tr/tickfreq
 	    + '&dt=' + dt_sec
 	    + '&callback=?';
 	$.getJSON(url, function(data) {
@@ -751,6 +782,16 @@ function go_here(t_ticks) {
     }
 }
 
+function scrollrev() {
+    t0_ticks -= Math.round(dt_ticks/300);
+    go_here(t0_ticks);
+}
+
+function scrollfwd() {
+    t0_ticks += Math.round(dt_ticks/300);
+    go_here(t0_ticks);
+}
+
 function gostart() {
     go_here(0);
 }
@@ -806,7 +847,8 @@ function srev() {
 
     // if a match was found ...
     if (i >= 0) {
-	t = sa[i].t - (sa[i].t % dt_ticks);
+	var halfdt = Math.floor(dt_ticks/2);
+	t = sa[i].t - halfdt;
 	go_here(t);	// show it
 
 	// find the last annotation in the set before the new signal window
@@ -818,7 +860,7 @@ function srev() {
 	    ;
 	// if another match was found ...
 	if (i >= 0) {
-	    t = sa[i].t - (sa[i].t % dt_ticks);
+	    t = sa[i].t - halfdt;
 	    prefetch(t);  // cache it
 	    return;
 	}
@@ -858,7 +900,8 @@ function sfwd() {
 
     // if a match was found ...
     if (i < na) {
-	t = sa[i].t - (sa[i].t % dt_ticks);
+	var halfdt = Math.floor(dt_ticks/2);
+	t = sa[i].t - halfdt;
 	go_here(t);	// show it
 
 	// find the first annotation in the set after the new signal window
@@ -870,7 +913,7 @@ function sfwd() {
 	    ;
 	// if another match was found ...
 	if (i < na) {
-	    t = sa[i].t - (sa[i].t % dt_ticks);
+	    t = sa[i].t - halfdt;
 	    prefetch(t);  // cache it
 	    return;
 	}
@@ -1150,9 +1193,24 @@ function set_handlers() {
     // Button handlers
     //  on View/edit and Tables tabs:
     $('.go_to').on("click", go_to);      // go to selected location
-    $('.t0_str').on("blur", go_to);       // go to selected location
-//    $('[name=t0]').on("blur", go_to);    // go to selected location
     $('.fwd').on("click", gofwd);	 // advance by dt_sec and plot or print
+
+    var intervalId = null;
+    $('.scrollfwd').on("click", function() {
+	if (intervalId) { clearInterval(intervalId); intervalId = null; }
+	else {
+	    var dti = 50+dt_ticks*nsig/1000;
+	    intervalId = setInterval(scrollfwd, dti);
+	}
+    });
+    $('.scrollrev').on("click", function() {
+	if (intervalId) { clearInterval(intervalId); intervalId = null; }
+	else {
+	    var dti = 50+dt_ticks*nsig/1000;
+	    intervalId = setInterval(scrollrev, dti);
+	}
+    });
+
     $('.rev').on("click", gorev);	 // go back by dt_sec and plot or print
     $('.sor').on("click", gostart);	 // go to start of record
     $('.eor').on("click", goend);	 // go to end of record

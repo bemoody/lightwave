@@ -308,9 +308,7 @@
        y="38.257271"
        id="text3009"
        sodipodi:linespacing="100%"
-       transform="scale(1.2516389,0.79895247)">
-      <animate attributeName="opacity" begin="0s" dur="4s" from="0" to="1" fill="freeze" />
-      <tspan
+       transform="scale(1.2516389,0.79895247)"><tspan
          sodipodi:role="line"
          id="tspan3011"
          x="276.46494"

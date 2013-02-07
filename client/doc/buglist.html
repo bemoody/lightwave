@@ -25,6 +25,16 @@ the signal name will be mangled in transit to the server, and the server won't
 retrieve samples of it.</s>
 </ul>
 
+<li><b>Autoplay freezes after several minutes.</b><br>
+This is probably the result of a memory leak.  Until this bug is fixed,
+exit the browser and reopen the record if this problem occurs.
+
+<li><b>The Tables panel doesn't always show all of the samples in the signal
+window.</b><br>
+The implementation of autoplay mode required modifications to the code for
+collecting samples that have been read from the server.  These modifications
+have been made in the View/edit code, but not yet in the Tables code.
+
 <li><b>LightWAVE doesn't work in Internet Explorer.</b><br>
 Yes, it does.  But unless you have IE 9 or 10, you <em>must</em> install
 the free <a href="http://www.google.com/chromeframe">Google Chrome
