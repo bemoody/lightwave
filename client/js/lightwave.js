@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	 7 February 2013  version 0.41
+//			Last revised:	10 February 2013  version 0.42
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -785,6 +785,7 @@ function go_here(t_ticks) {
 function scrollrev() {
     t0_ticks -= Math.round(dt_ticks/300);
     go_here(t0_ticks);
+    prefetch(Math.floor((t0_ticks - 1)/dt_ticks) * dt_ticks);
 }
 
 function scrollfwd() {
@@ -824,6 +825,57 @@ function goend() {
     go_here(t*dt_ticks);
 }
 
+function match(sa, i) {
+    var m = false;
+
+    switch (target) {
+    case '*':
+	m = true;
+	break;
+    case '*v':
+	switch (sa[i].a) {
+	case 'V':
+	case 'E':
+	case 'r':
+	    m = true;
+	    break;
+	}
+	break;
+    case '*s':
+	switch (sa[i].a) {
+	case 'S':
+	case 'A':
+	case 'a':
+	case 'J':
+	case 'e':
+	case 'j':
+	case 'n':
+	    m = true;
+	    break;
+	}
+	break;
+    case '*n':
+	switch (sa[i].a) {
+	case 'N':
+	case 'L':
+	case 'R':
+	case 'B':
+	case 'F':
+	case '/':
+	case 'f':
+	case 'Q':
+	case '?':
+	    m = true;
+	    break;
+	}
+	break;
+    default:
+	if (sa[i].a == target || sa[i].x == target)
+	    m= true;
+    }
+    return m;
+}
+
 function srev() {
     var na = 0, sa = '', i, t;
 
@@ -842,7 +894,7 @@ function srev() {
 	;
 
     // find the previous annotation matching the target
-    for ( ; i >= 0 && sa[i].a != target && sa[i].x != target; i--)
+    for ( ; i >= 0 && !match(sa, i); i--)
 	;
 
     // if a match was found ...
@@ -856,7 +908,7 @@ function srev() {
 	    ;
 
 	// find and cache the previous match, if any
-	for ( ; i >= 0 && sa[i].a != target && sa[i].x != target; i--)
+	for ( ; i >= 0 && !match(sa, i); i--)
 	    ;
 	// if another match was found ...
 	if (i >= 0) {
@@ -895,7 +947,7 @@ function sfwd() {
 	;
 
     // find the next annotation matching the target
-    for ( ; i < na && sa[i].a != target && sa[i].x != target; i++)
+    for ( ; i < na && !match(sa, i); i++)
 	;
 
     // if a match was found ...
@@ -909,7 +961,7 @@ function sfwd() {
 	for ( ; i < na && sa[i].t < t; i++)
 	    ;
 	// find and cache the next match, if any
-	for ( ; i < na && sa[i].a != target && sa[i].x != target; i++)
+	for ( ; i < na && !match(sa, i); i++)
 	    ;
 	// if another match was found ...
 	if (i < na) {
@@ -932,50 +984,65 @@ function sfwd() {
 
 // Set target for searches.
 function find() {
+    var content = '', i;
     if (nann < 1) {
 	alert('No annotations to search!');
 	return;
     }
-
-    var content = '<p>Search for: <input type="text"'
-	+ ' name="target" id="target" value="' + target + '"'
-	+ ' title="Enter an annotation mnemonic (N, V, S, ...)" size="4"></p>';
-    if (nann > 1) {
-	content += '<br>In annotator: <select name=\"atarget\">\n';
-	if (atarget === '') {
-	    content += 	'<option value=\"\" selected>--Choose one--</option>\n';
+    else if (nann == 1) {
+	atarget = ann[0].name;
+	content = '<div title= \"' + ann[0].desc + '">In: '
+	    + ann[0].name + '</div>';
+    }
+    else {
+	content = '<div title="Select a set of annotations to search">'
+	    + 'In:&nbsp;<select name=\"atarget\" id=\"atarget\">\n';
+	for (i = 0; i < ann_set.length; i++) {
+	    if (atarget === ann[i].name) break;
 	}
-	for (var i = 0; i < ann_set.length; i++) {
-	    content += '<option value=\"' + ann_set[i].name + '\"';
-	    if (atarget === ann_set[i].name) {
+	if (i >= ann_set.length) atarget = ann[0].name;
+	for (i = 0; i < ann_set.length; i++) {
+	    content += '<option value=\"' + ann[i].name + '\" title =\"'
+		+ ann[i].desc + '\" ';
+	    if (atarget === ann[i].name) {
 		content += ' selected';
 	    }
-	    content += '>' + ann_set[i].name + '</option>\n';
+	    content += '>' + ann[i].name + '</option>\n';
 	}
-	content += '</select></td>\n';
+	content += '</select></div>\n';
     }
-    $('#findbox').dialog("open").html(content);
-    $('#findbox').dialog({
-	open: function(event, ui){
-	    $('.srev').attr('disabled', 'disabled');
-	    $('.sfwd').attr('disabled', 'disabled');
+    $('#annsets').html(content);
+    $('#target').val(target);
+    $('#target, #atarget').on("change", function() {
+	target = $('#target').val();
+	if (nann > 1) {
+	    atarget = $('#atarget').val();
 	}
-    });
-    $('#findbox').dialog({
-	beforeClose: function(event, ui){
-	    target = $('#target').val();
-	    if (nann > 1) {
-		atarget = $('[name=atarget]').val();
-	    }
-	    else atarget = ann_set[0].name;
-	}
-    });
-    $('#findbox').dialog({
-	close: function(event, ui){
+	else atarget = ann[0].name;
+	if (target != '' && atarget != '') {
 	    if (t0_ticks > 0)
 		$('.srev').removeAttr('disabled');
 	    if (tf_ticks <= rdt_ticks)
 		$('.sfwd').removeAttr('disabled');
+	}
+    });
+    
+    $('#findbox').dialog("open");
+    $('#findbox').dialog({ resizable: true});    
+    $('#findbox').dialog({
+	resizable: true,
+	beforeClose: function(event, ui) {
+	    target = $('#target').val();
+	    if (nann > 1) atarget = $('#atarget').val();
+	    else atarget = ann[0].name;
+	},
+	close: function(event, ui) {
+	    if (target != '' && atarget != '') {
+		if (t0_ticks > 0)
+		    $('.srev').removeAttr('disabled');
+		if (tf_ticks <= rdt_ticks)
+		    $('.sfwd').removeAttr('disabled');
+	    }
 	}
     });
 }
@@ -1087,6 +1154,7 @@ function slist(t0_string) {
 // When a new record is selected, reload data and show the first 10 seconds.
 function newrec() {
     record = $('[name=record]').val();
+    $('#findbox').dialog("close");
     var prompt = 'Reading annotations for ' + db + '/' + record;
     $('#prompt').html(prompt);
     read_annotations("0");
@@ -1133,6 +1201,7 @@ function newdb() {
     document.title = title;
     $('#tabs').tabs({disabled:[1,2]});
     $('#rlist').empty();
+    $('#annsets').empty();
     $('#info').empty();
     $('#anndata').empty();
     $('#sigdata').empty();
