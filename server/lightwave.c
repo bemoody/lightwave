@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	29 January 2013  version 0.37
+			Last revised:	12 February 2013  version 0.43
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -145,6 +145,8 @@ void prep_signals()
 	SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
 	nsig = isigopen(recpath, s, nsig);
     } 
+    else
+	return;
 
     /* Make reasonably sure that signal names are distinct (see below). */
     force_unique_signames();
@@ -428,6 +430,10 @@ void info(void)
     WFDB_Time t;
 
     prep_signals();
+    if (nsig < 0) {
+	lwfail("The '.hea' file could not be read");
+	return;
+    }
     printf("{ \"info\":\n");
     printf("  { \"db\": %s,\n", p = strjson(db)); SFREE(p);
     printf("    \"record\": %s,\n", p = strjson(record)); SFREE(p);

@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	10 February 2013  version 0.42
+//			Last revised:	12 February 2013  version 0.43
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -60,6 +60,7 @@ var dt_sec = 10;// window width in seconds
 var dt_ticks;   // window width in ticks
 var t0_ticks = -1; // time of the first sample in the signal window, in ticks
 var tf_ticks;	// time of the first sample after the signal window, in ticks
+var tickint;    // interval between timestamps on plot
 var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
 var target = '';// search target, set in Find... dialog
@@ -73,6 +74,9 @@ var mag = [];   // magnification of signals in plots
 var help_main = 'about.html'; // initial and main help topic
 var svc = '';   // SVG code to draw the cursor (see show_time())
 var svg = '';   // SVG code to draw the signal window (see show_plot())
+var requests = 0; // count of AJAX requests since last page load
+var pending = 0;  // count of pending AJAX requests
+var intervalId = null; // autoscroll timer
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -469,6 +473,18 @@ function show_plot() {
 
     // timestamps
     var svgts = svgh + 20*dt_sec;
+    var ttick = Math.floor(t0_ticks/tickint) * tickint;
+    if (ttick < t0_ticks) ttick += tickint;
+
+    var tst = '<g id="times">\n';
+    while (ttick <= tf_ticks) {
+	var xtick = Math.round((ttick - t0_ticks)*1000/tickfreq);
+	tst += '<text x="' + xtick + '" y="' + svgts + '" font-size="' + svgtf
+	    + '" fill="red" style="text-anchor: middle;">'
+	    + timstr(ttick) + '</text>\n';
+	ttick += tickint;
+    }
+/*
     var tsm = (t0_ticks + +tf_ticks + x0s*tickfreq/500)/2;
 
     tst = '<g id="times">\n<text x="' + x0s + '" y="' + svgts
@@ -487,6 +503,9 @@ function show_plot() {
 	    + '" fill="red" style="text-anchor: middle;">' + timstr(tf_ticks)
 	    + '</text></g>\n';
     }
+*/
+    tst += '</g>\n';
+
 
     // annotator names and annotations
     sva = '<g id="mrkr">\n';
@@ -606,9 +625,25 @@ function show_plot() {
 	    while (tnext < tf) {
 		if (tnext > t0_ticks) {
 		    trace = find_trace(db, record, sname, tnext);
-		    if (trace === null) {
-			read_signals(t0_ticks, true);
-			return;
+		    if (trace == null) {
+			if (pending < 1) {
+			    read_signals(t0_ticks, true);
+			    return;
+			}
+			else if (pending < 4) {
+			    setTimeout(function() {
+				trace = find_trace(db, record, sname, tnext);
+			    },1000);  // try again after a second
+			    return;
+			}
+			else {
+			    if (intervalId) {
+				clearInterval(intervalId);
+				intervalId = null;
+			    }
+			    alert_server_error();
+			    return;
+			}
 		    }
 		    s = trace.samp;
 		    imin = (tnext - trace.t0)/tps;
@@ -654,6 +689,35 @@ function update_output() {
     else if (current_tab == 'Tables') show_tables();
 }
 
+function toggle_show_status() {
+    $('#status').toggle();
+}
+
+function toggle_show_log() {
+    $('#log').toggle();
+}
+
+function clear_log() {
+    requests = 0; pending = 0;
+    $('#log').empty();
+}
+
+function show_status(requestp) {
+    var status;
+
+    if (requestp) {
+	requests++; pending++;
+	if ((requests % 100) == 0)
+	    $('#log').empty();   // don't allow log to grow without bounds
+    }
+    else {
+	pending--;
+    }
+    status = 'Requests: ' + requests + '&nbsp;&nbsp;Pending: ' + pending;
+    $('#status').html(status);
+    if (requestp) $('#log').prepend(url + '<br>\n');
+}
+
 // Retrieve one or more complete annotation files for the selected record.
 function read_annotations(t0_string) {
     nann = 0;	// new record -- (re)fill the cache
@@ -665,6 +729,7 @@ function read_annotations(t0_string) {
 	}
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
 	    + '&dt=0&callback=?';
+	show_status(true);
 	$.getJSON(url, function(data) {
 	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
 		ann[nann] = data.fetch.annotator[i];
@@ -682,6 +747,7 @@ function read_annotations(t0_string) {
 		if (t > adt_ticks) adt_ticks = t;
 	    }
 	    slist(t0_string);
+	    show_status(false);
 	});
     }
     else {
@@ -723,6 +789,7 @@ function read_signals(t0, update) {
 	    + '&t0=' + tr/tickfreq
 	    + '&dt=' + dt_sec
 	    + '&callback=?';
+	show_status(true);
 	$.getJSON(url, function(data) {
 	    var fetch = data.fetch;
 	    if (fetch && fetch.hasOwnProperty('signal')) {
@@ -731,6 +798,7 @@ function read_signals(t0, update) {
 		    set_trace(db, record, s[i]);
 	    }
 	    if (update) update_output();
+	    show_status(false);
 	});
     }
     else if (update) update_output();
@@ -773,6 +841,10 @@ function go_here(t_ticks) {
     $('.t0_str').val(t0_string);
     t0_ticks = t_ticks;
     tf_ticks = t_ticks + dt_ticks;
+    if (dt_sec < 10) tickint = tickfreq;
+    else if (dt_sec < 35) tickint = 5 * tickfreq;
+    else tickint = 10 * tickfreq;
+
     read_signals(t0_ticks, true); // read signals not previously cached, if any
 
     if (tf_ticks >= rdt_ticks) {
@@ -1120,9 +1192,10 @@ function slist(t0_string) {
     $('#anndata').empty();
     $('#sigdata').empty();
     $('#plotdata').empty();
-    var url = server + '?action=info&db=' + db + '&record=' + record
-	+ '&callback=?';
     nsig = 0;
+    url = server + '?action=info&db=' + db + '&record=' + record
+	+ '&callback=?';
+    show_status(true);
     $.getJSON(url, function(data) {
 	if (data) {
 	    recinfo = data.info;
@@ -1148,10 +1221,11 @@ function slist(t0_string) {
 	$('.t0_str').val(t0_string);
 	go_here(t);
 	$('#top').show();
+	show_status(false);
     });
 };
 
-// When a new record is selected, reload data and show the first 10 seconds.
+// When a new record is selected, reload data and show the first dt_sec seconds.
 function newrec() {
     record = $('[name=record]').val();
     $('#findbox').dialog("close");
@@ -1165,9 +1239,11 @@ function newrec() {
 // Load the list of annotators in the selected database.
 function alist() {
     url = server + '?action=alist&callback=?&db=' + db;
+    show_status(true);
     $.getJSON(url, function(data) {
 	if (data.success) ann_set = data.annotator;
 	else ann_set = '';
+	show_status(false);
     });
 };
 
@@ -1176,7 +1252,9 @@ function alist() {
 function rlist() {
     var rlist = '';
     url = server + '?action=rlist&callback=?&db=' + db;
-    $('#rlist').html('<td colspan=2>Reading list of records in ' + db + '</td>');
+    $('#rlist').html('<td colspan=2>Reading list of records in ' + db
+		     + '</td>');
+    show_status(true);
     $.getJSON(url, function(data) {
 	if (data) {
 	    rlist += '<td align=right>Record:</td>' + 
@@ -1190,6 +1268,7 @@ function rlist() {
 	$('#rlist').html(rlist);
 	// fetch the list of signals when the user selects a record
 	$('[name=record]').on("change", newrec);
+	show_status(false);
     });
 };
 
@@ -1224,6 +1303,7 @@ function dblist() {
     $('#dblist').html('<td colspan=2>Loading list of databases ...</td>')
     url = server + '?action=dblist&callback=?';
     var timer = setTimeout(alert_server_error, 10000);
+    show_status(true);
     $.getJSON(url, function(data) {
 	clearTimeout(timer);
 	if (data && data.database && data.database.length > 0) {
@@ -1241,13 +1321,19 @@ function dblist() {
 	}
 	else
 	    alert_server_error();
+	show_status(false);
     });
+}
+
+function resize_lightwave() {
+    $('#helpframe').attr('height', $(window).height() - 180 + 'px');
+    show_plot(); // redraw signal window if resized
 }
 
 // Set up user interface event handlers.
 function set_handlers() {
     $('#lwform').on("submit", false);      // disable form submission
-    $(window).resize(show_plot);           // redraw signal window if resized
+    $(window).resize(resize_lightwave);
     // Allow the browser to redraw content from its cache when switching tabs
     // (using jQuery UI 1.9 interface; use 'cache: true' with older jQuery UI)
     $('#tabs').tabs({
@@ -1264,21 +1350,21 @@ function set_handlers() {
     $('.go_to').on("click", go_to);      // go to selected location
     $('.fwd').on("click", gofwd);	 // advance by dt_sec and plot or print
 
-    var intervalId = null;
     $('.scrollfwd').on("click", function() {
 	if (intervalId) { clearInterval(intervalId); intervalId = null; }
 	else {
 	    var dti = 50+dt_ticks*nsig/1000;
 	    intervalId = setInterval(scrollfwd, dti);
 	}
-    });
+    }); // toggle forward autoscrolling
+
     $('.scrollrev').on("click", function() {
 	if (intervalId) { clearInterval(intervalId); intervalId = null; }
 	else {
 	    var dti = 50+dt_ticks*nsig/1000;
 	    intervalId = setInterval(scrollrev, dti);
 	}
-    });
+    }); // toggle reverse autoscrolling
 
     $('.rev').on("click", gorev);	 // go back by dt_sec and plot or print
     $('.sor').on("click", gostart);	 // go to start of record
@@ -1308,6 +1394,9 @@ function set_handlers() {
 		$('#swidth').val(ui.value);
 		dt_sec = ui.value;
 		dt_ticks = dt_sec * tickfreq;
+		if (dt_sec < 10) tickint = tickfreq;
+		else if (dt_sec < 35) tickint = 5 * tickfreq;
+		else tickint = 10 * tickfreq;
 		set_sw_width(dt_sec);
 		go_here(t0_ticks);
 	    }
@@ -1317,9 +1406,13 @@ function set_handlers() {
      
     // on Settings tab:
     $('[name=server]').on("change", set_server);      // go to selected location
+    $('#show_status').on("change", toggle_show_status);
+    $('#show_log').on("change", toggle_show_log);
+    $('#clear_log').on("click", clear_log);
     $('#allow_edit').on("change", toggle_edit);
 
     // on Help tab:
+    $('#helpframe').attr('height', $(window).height() - 180 + 'px');
     $('#help_about').on("click", help);    // return to 'about' (main help doc)
     $('#help_topics').on("click", help_topics);  // show help topics
     $('#help_contacts').on("click", help_contacts); // show contacts
@@ -1374,10 +1467,12 @@ function parse_url() {
 	    rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
 	    $('#rlist').html(rlist);
 	    url = server + '?action=alist&callback=?&db=' + db;
+	    show_status(true);
 	    $.getJSON(url, function(data) {
 		if (data.success) ann_set = data.annotator;
 		else ann_set = '';
 		read_annotations(t0_string);
+		show_status(false);
 	    });
 	}
     }

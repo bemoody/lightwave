@@ -51,9 +51,9 @@ to set up your own data repository, using PhysioNet and its
 <h3>Who would want a locally hosted LightWAVE server?</h3>
 
 <p>
-A locally hosted server is needed if you wish to use LightWAVE on a
-machine that has no Internet connection.  (For example, some of the
-early development of LightWAVE was done on a notebook PC while flying
+A locally hosted server and a local data repository are needed if you wish to
+use LightWAVE on a machine that has no Internet connection.  (For example, some
+of the early development of LightWAVE was done on a notebook PC while flying
 across the Pacific!)
 
 <p>
@@ -117,7 +117,7 @@ the word "here" in the message to join the project.
 href="https://physionet.org/works/LightWAVE/files">
 https://physionet.org/works/LightWAVE/files</a>), find and download the most
 recent set of sources.  Each version is available as a tarball (e.g.,
-<tt>lightwave-0.15.tar.gz</tt>) that can be downloaded as a single file and
+<tt>lightwave-0.43.tar.gz</tt>) that can be downloaded as a single file and
 unpacked, or you can download individual files from the most recent version
 from the <tt>lightwave</tt> subdirectory.  For downloading hints, see <a
 href="http://physionet.org/faq.shtml#downloading-binaries">How can I download
@@ -155,7 +155,7 @@ Currently, these components include:
 (This list may be incomplete; consult the <tt>Makefile</tt> for any
 additions.)
 
-<p> As the instructions note, you may need to change the
+<p> As the comments near the top of the file note, you may need to change the
 values of some parameters that are defined in <tt>Makefile</tt> to
 match your installation.
 
@@ -174,7 +174,7 @@ contains <tt>Makefile</tt>, and run the command
 The output of this command should look something like this:
 
 <pre>
-    gcc -g -DLWDIR=\"/home/physionet/html/lightwave\" server/lightwave.c -o lightwave -lcgi -lwfdb
+    gcc -g -DLWDIR=\"/home/physionet/html/lightwave\" -DLWVER=\"0.43\" -DLW_WFDB=\""/usr/local/database http://physionet.org/physiobank/database"\" server/lightwave.c -o lightwave -lcgi -lwfdb
     mkdir -p /home/physionet/cgi-bin
     cp -p lightwave /home/physionet/cgi-bin
     rm -f lightwave *~ */*~ */*/*~
@@ -183,7 +183,7 @@ The output of this command should look something like this:
     cp -pr client/* /home/physionet/html/lightwave
     sed s+http://physionet.org/cgi-bin/+/cgi-bin/+ \
      &lt;client/js/lightwave.js &gt;/home/physionet/html/lightwave/js/lightwave.js
-    sed "s/\[local\]/0.23/" &lt;lightwave.html &gt;/home/physionet/html/lightwave/index.html
+    sed "s/\[local\]/0.43/" &lt;lightwave.html &gt;/home/physionet/html/lightwave/index.html
     mv lightwave.html client
 
     LightWAVE has been installed.  If an HTTP server is running,
@@ -215,8 +215,19 @@ If the test with the LightWAVE client doesn't work at all, check that
 Apache (or whatever web server you installed) is running.
 
 <p>
-If the LightWAVE client loads, but displays the message "Loading list
-of databases ..." for a long time, check that:
+If the LightWAVE client loads, but (after about 10 seconds) displays the
+message:
+
+<pre>
+    The LightWAVE server at
+    http://physionet.org/cgi-bin/lightwave
+    is not responding properly.  Please check
+    the network connection.  Select another server
+    on the Settings tab if necessary.
+</pre>
+
+and the suggestions in the message are not sufficient to solve the problem,
+check that:
 
 <ul>
 <li> <tt>lightwave</tt> (the compiled LightWAVE server) is installed in a

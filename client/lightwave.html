@@ -13,7 +13,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	 6 February 2013   version 0.41
+			Last revised:	11 February 2013   version 0.43
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -111,9 +111,13 @@ record to the start of the window, then click '&#x21b4;'"
 
  <div id="findbox" title="Find...">
  <table width="100%">
- <tr><td align="center">Search&nbsp;for:&nbsp;<input type="text" name="target"
-	id="target" value=""
-        title="Enter an annotation mnemonic (N, V, S, ...)" size="4"></td></tr>
+ <tr><td align="center" title="Enter an annotation mnemonic (N, V, S, ...)
+or an 'aux' string, or one of:
+  *v	to match any ventricular ectopic beat
+  *s	to match any supraventricular ectopic beat
+  *n	to match any other beat type
+  *	to match any annotation or marker">Search&nbsp;for:&nbsp;<input
+  type="text" name="target" id="target" value="" size="4"></td></tr>
  <tr><td id="annsets" align="center">&nbsp;</td></tr>
  <tr><td align="center">
  <button class="srev" title="search for previous target">&#9665; Search</button>
@@ -219,7 +223,19 @@ signal window if selected below">&#x21b4;</button>
   <tr>
     <td align="left">Client: lightwave [local]</td><td>&nbsp;</td>
   </tr>
+  <tr><td>&nbsp;</td></tr>
   <tr>
+    <td>
+      <span title="Display counters of total and pending requests">
+	<input type="checkbox" id="show_status" />Show status
+      </span>
+      <br>
+      <span title="Display the request log, most recent first">
+	<input type="checkbox" id="show_log" />Show log
+      </span>
+      <button id="clear_log"
+	      title="Clear the request log and counters">Reset log</button>
+    </td>
     <td align="right">
       <span title="(not yet implemented!)">
 	<input type="checkbox" id="allow_edit" />Allow editing
@@ -250,11 +266,17 @@ and links to more information">Main help</button>
   </tr>
  </table>
 
- <iframe id="helpframe" src="" width="100%" height="500"></iframe>
+ <iframe id="helpframe" src="" width="100%"></iframe>
 </div>
 
 </form>
-</div>
-</div>
+</div>  <!-- end of "tabs" div -->
+
+<div id="status" style="display: none"></div>
+<p>
+<div id="log" style="display: none"></div>
+
+</div>  <!-- end of "js" div -->
+</div>  <!-- end of "top" div -->
 </body>
 </html>

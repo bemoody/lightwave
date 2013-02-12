@@ -27,9 +27,10 @@ to support this function will be described in a future revision of this
 note.</p>
 
 <p>
-The LightWAVE server returns data in <a href="http://www.json.org/">JSON/JSONP</a>
-format in response to well-formed requests from any client (not limited to the
-standard LightWAVE client). A public server is available at
+The LightWAVE server returns data
+in <a href="http://www.json.org/">JSON/JSONP</a> format in response to
+well-formed requests from any client (not limited to the standard LightWAVE
+client). A public server is available at
 <a href="http://physionet.org/cgi-bin/lightwave">http://physionet.org/cgi-bin/lightwave</a>;
 it provides access to all of the 
 <a href="http://physionet.org/faq.shtml#physiobank-formats">WFDB-compatible</a>
@@ -43,8 +44,9 @@ server can be installed as a
 <a href="http://en.wikipedia.org/wiki/Common_Gateway_Interface">CGI</a>
 application on a web server such
 as <a href="http://httpd.apache.org/">Apache</a>, or it can be run as a
-command-line application.  For information about installing the
-server, see the comments in the <tt>Makefile</tt> for the LightWAVE project.
+command-line application.  For detailed instructions,
+see <a href="server-install.html">Installing a local copy of the LightWAVE
+server</a>.
 
 <p>
 Note that <tt>lightwave</tt> is not limited to serving data hosted by
@@ -60,10 +62,10 @@ from the server's local storage if available, or from PhysioNet otherwise.
 When accessed via HTTP, requests are passed to <tt>lightwave</tt> in
 <a href="http://en.wikipedia.org/wiki/Query_string">URL query
 strings</a>, as for other CGI applications.  For example,
-the <tt>dblist</tt> request can be sent to the public server by
+the <b><tt>dblist</tt></b> request can be sent to the public server by
 opening
 <pre>
-    http://physionet.org/cgi-bin/<tt>lightwave</tt>?action=dblist
+    http://physionet.org/cgi-bin/lightwave?action=dblist
 </pre>
 with an HTTP client such as <tt>curl</tt>, <tt>wget</tt>, or any web browser.
 More interesting examples appear below.
@@ -81,97 +83,115 @@ all equivalent:
 </pre>
 
 In command-line mode, <tt>lightwave</tt> prompts for parameters as needed,
-beginning with <tt>action</tt> (see below).  Type the value of each parameter,
+beginning with <b><tt>action</tt></b> (see below).  Type the value of each parameter,
 ending your answer with a newline (press 'Enter').  For parameters that can
-have multiple values (such as <tt>signal</tt>, see below) you will given
+have multiple values (such as <b><tt>signal</tt></b>, see below) you will given
 multiple prompts; enter one value at each prompt, and indicate the end of the
 set of values by entering a newline only.
 
 <p>
-To use <tt>lightwave</tt> within a script, make an interactive test run and
-keep track of what you need to type in response to <tt>lightwave</tt>'s
-prompts in order to obtain the data your script will require.  Then create a
-plain text file containing your responses in the correct order, and use your
-script to supply the contents of this file to <tt>lightwave</tt> via its
-standard input; see the
-<tt>lw-test</tt> script in the source directory for an example.
+To use <tt>lightwave</tt> within a script, make an interactive test run and keep
+track of what you need to type in response to <tt>lightwave</tt>'s prompts in
+order to obtain the data your script will require.  Then create a plain text
+file containing your responses in the correct order, and use your script to
+supply the contents of this file to <tt>lightwave</tt> via its standard input;
+see <tt>check/lw-test</tt> in the LightWAVE source package for an example.
 
 <p>
 <b>Parameters</b>
 
 <p>
-When interacting with <tt>lightwave</tt>, the <tt>action</tt> parameter
+When interacting with <tt>lightwave</tt>, the <b><tt>action</tt></b> parameter
 (see the next section) specifies the request type.  Depending on the
-<tt>action</tt>, one or more of these parameters may be needed to specify the
+<b><tt>action</tt></b>, one or more of these parameters may be needed to specify the
 data of interest:
 
 <dl>
-<dt>db</dt>
+<dt><b><tt>db</tt></b></dt>
 <dd>The (short form) name of the data collection (database), such as
-<tt>edb</tt> (the short form name for the European ST-T Database).
+<b><tt>edb</tt></b> (the short form name for the European ST-T Database).
 Short form names of all of the PhysioBank databases are given in the
 first column of
 <a href="http://physionet.org/physiobank/database/DBS">http://physionet.org/physiobank/database/DBS</a>.
 </dd>
 
-<dt>record</dt>
+<dt><b><tt>record</tt></b></dt>
 <dd>The record name.</dd>
 
-<dt>signal</dt>
-<dd>A signal number.  Signals are numbered 0, 1, 2 ... in each record.</dd>
+<dt><b><tt>signal</tt></b></dt>
+<dd>A signal number or name (as displayed by the standard LightWAVE client).
+Signals are numbered 0, 1, 2 ... in each record.</dd>
 
-<dt>annotator</dt>
+<dt><b><tt>annotator</tt></b></dt>
 <dd>An annotator name.</dd>
 
-<dt>t0</dt>
+<dt><b><tt>t0</tt></b></dt>
 <dd>The starting time (the time interval from the beginning of the record to
 the first sample or annotation of interest).  The value of this parameter can
 be given in seconds, or as a string in H:M:S format.
 Examples: 100 (1 minute 40 seconds); 30:25 (30 minutes 25 seconds); 10:15:20
 (10 hours 15 minutes 20 seconds); 74:01:00 (3 days 2 hours 1 minute).</dd>
 
-<dt>dt</dt>
-<dd>The duration of the time interval of interest.  As for t0, this parameter
-can be given in seconds or as a string.  Avoid specifying a duration longer
-than 1 minute, however, when using the public <tt>lightwave</tt> server to
-retrieve signals.</dd>
+<dt><b><tt>dt</tt></b></dt>
+<dd>The duration of the time interval of interest.  As for <b><tt>t0</tt></b>, this
+parameter can be given in seconds or as a string.  Avoid specifying a duration
+longer than 1 minute, however, when using the public <tt>lightwave</tt> server
+to retrieve signals.</dd>
 </dl>
+
+<p>
+In addition to these, the LightWAVE client passes a <b><tt>callback</tt></b> parameter
+to the server (see <a href="#JSONP">JSONP</a> below).
 
 <p>
 <b>Request types</b>
 
 <p>
-The request type is passed as the value of <tt>action</tt>, and must be
+The request type is passed as the value of <b><tt>action</tt></b>, and must be
 one of:
 
 <dl>
-<dt>dblist</dt>
+<dt><b><tt>dblist</tt></b></dt>
 <dd>Get the list of databases (data collections).  Any other parameters
 passed in the same request are ignored.
 </dd>
 
-<dt>rlist</dt>
-<dd>Get the list of records within a database specified by the <tt>db</tt>
+<dt><b><tt>rlist</tt></b></dt>
+<dd>Get the list of records within a database specified by the <b><tt>db</tt></b>
 parameter.</dd>
 
-<dt>alist</dt>
-<dd>Get the list of annotators within a database specified by the <tt>db</tt>
+<dt><b><tt>alist</tt></b></dt>
+<dd>Get the list of annotators within a database specified by the <b><tt>db</tt></b>
 parameter.</dd>
 
-<dt>info</dt>
+<dt><b><tt>info</tt></b></dt>
 <dd>Get the metadata, including signal names, gains, and sampling
-frequencies, for a record specified by the <tt>db</tt> and <tt>record</tt>
+frequencies, for a record specified by the <b><tt>db</tt></b> and <b><tt>record</tt></b>
 parameters.</dd>
 
-<dt>fetch</dt> <dd>Retrieve data from a record specified by the
-<tt>db</tt> and <tt>record</tt> parameters.  Specify the signal(s) and
-annotator(s) of interest using the <tt>signal</tt> and
-<tt>annotator</tt> parameters, and specify the time interval of
-interest using the <tt>t0</tt> (starting time) parameter and the
-<tt>dt</tt> (duration) parameter.
+<dt><b><tt>fetch</tt></b></dt> <dd>Retrieve data from a record specified by the
+<b><tt>db</tt></b> and <b><tt>record</tt></b> parameters.  Specify the signal(s) and
+annotator(s) of interest using the <b><tt>signal</tt></b> and
+<b><tt>annotator</tt></b> parameters, and specify the time interval of
+interest using the <b><tt>t0</tt></b> (starting time) parameter and the
+<b><tt>dt</tt></b> (duration) parameter.
 
 </dd>
 </dl>
+
+<b>Success or failure?</b>
+
+<p>
+Most responses from the LightWAVE server include a <b><tt>success</tt></b>
+field, which is either <b><tt>true</tt></b> if the server was successful in
+filling the request, or <b><tt>false</tt></b> otherwise.  In the latter case, an
+additional field, <b><tt>error</tt></b>, has a string value that describes the
+reason why the request could not be filled.
+
+<p>
+Since <b><tt>fetch</tt></b> requests can be partially successful, their
+responses do not follow this pattern;  see the comments beneath the
+<b><tt>fetch</tt></b> examples below for details.</p>
 
 <b>Examples of requests</b>
 
@@ -205,11 +225,20 @@ The server responds with
     { "name": "mimic2db/numerics",
       "desc": "MIMIC II Waveform DB, v2 Numerics [deprecated, use v3]"
     }
-  ]
+  ],
+  "version": "0.42",
+  "success": true
 }
 </pre>
-<p>The <tt>name</tt> fields are the short-format names that can be used as
-values of the <tt>db</tt> parameter.</p>
+<p>The <b><tt>name</tt></b> fields are the short-format names that can be used as
+values of the <b><tt>db</tt></b> parameter.</p>  The <b><tt>version</tt></b>
+is the version number of the LightWAVE server, and it will vary.
+<b><tt>success</tt></b> is either <b><tt>true</tt></b>, as shown, or
+<b><tt>false</tt></b> if the server was unable to read the <b><tt>DBS</tt></b>
+file (see the description of the <b><tt>db</tt></b> parameter above) in its
+WFDB path (see the section on <em>Custom data repositories</em> in
+<a href="server-install.html">Installing a local copy of the LightWAVE
+server</a> for information about the WFDB path).</p>
 
 <li> To request the list of records in the MIT-BIH Arrhythmia Database from the
 public <tt>lightwave</tt> server, use the URL
@@ -225,9 +254,16 @@ The server responds with
     <div style="color: blue"><em>... {more records} ...</em></div>
     "233",
     "234"
-  ]
+  ],
+  "success": true
 }
 </pre>
+
+<p><b><tt>success</tt></b> is either <b><tt>true</tt></b>, as shown, or
+<b><tt>false</tt></b> if the server was unable to read
+<b><tt>RECORDS</tt></b> from the directory specified by the value of
+<b><tt>db</tt></b> (in this example, <b><tt>mitdb</tt></b>) in its WFDB
+path.</p>
 
 <li>To request the list of annotators in the QT Database from the public
 <tt>lightwave</tt> server, use the URL
@@ -251,14 +287,18 @@ The server responds with
     { "name": "pu1",
       "desc": "automatically determined boundaries (based on signal 1 only)"
     }
-  ]
+  ],
+  "success": true
 }
 </pre>
 
-<p>The <tt>name</tt> fields can be used as values of the <tt>annotator</tt>
-parameter.</p>
+<p>The <b><tt>name</tt></b> fields can be used as values of the <b><tt>annotator</tt></b> parameter. <b><tt>success</tt></b> is either <b><tt>true</tt></b>, as
+shown, or <b><tt>false</tt></b> if the server was unable to read
+<b><tt>ANNOTATORS</tt></b> from the directory specified by the value of
+<b><tt>db</tt></b> (in this example, <b><tt>qtdb</tt></b>) in its WFDB
+path.</p>
 
-<li>To request the metadata for record <tt>slp67x</tt> of the MIT-BIH
+<li>To request the metadata for record <b><tt>slp67x</tt></b> of the MIT-BIH
 Polysomnographic Database, use the URL
 
 <pre>
@@ -299,34 +339,49 @@ The server responds with
         "adczero": 0,
         "baseline": -808
       }
+    ],
+    "note": [
+      " x M x 24-01-90"
     ]
-  }
+  },
+  "success": true
 }
 </pre>
 
-<p>The <tt>treq</tt> field indicates the number of clock ticks per second,
+<p>The <b><tt>treq</tt></b> field indicates the number of clock ticks per second,
 which is the least common multiple of the sampling frequency of the signals
 included in the record.  In most records, all signals are sampled at
-<tt>tfreq</tt>, and the <tt>tps</tt> (ticks per sample) field is 1 for each
+<b><tt>tfreq</tt></b>, and the <b><tt>tps</tt></b> (ticks per sample) field is 1 for each
 signal.  In multifrequency records, including most EDF-format records, one or
-more signals is sampled at a lower frequency, and <tt>tps</tt> is greater than
+more signals is sampled at a lower frequency, and <b><tt>tps</tt></b> is greater than
 1 for these signals.</p>
 
-<p>If the <tt>start</tt> and <tt>end</tt> times are bracketed, as in the example
+<p>If the <b><tt>start</tt></b> and <b><tt>end</tt></b> times are bracketed, as in the example
 above, they indicate the times of day when the recording began and ended.  For
 many recordings, this information is unavailable, and in such cases
-<tt>start</tt> and <tt>end</tt> are <tt>null</tt>.</p>
+<b><tt>start</tt></b> and <b><tt>end</tt></b> are <b><tt>null</tt></b>.</p>
 
-<p>The <tt>units</tt> field is a string that indicates the physical units of
-the signal, if known (or <tt>null</tt> if unknown).  The <tt>base</tt> is the
-value (in raw units) that corresponds to 0 physical units, and the <tt>gain</tt>
+<p>The <b><tt>units</tt></b> field is a string that indicates the physical units of
+the signal, if known (or <b><tt>null</tt></b> if unknown).  The <b><tt>base</tt></b> is the
+value (in raw units) that corresponds to 0 physical units, and the <b><tt>gain</tt></b>
 is the number of raw units per physical units.  (See the next example.)
 
-<p>The <tt>adcres</tt> and <tt>adczero</tt> fields specify the number of significant bits per sample (the analog-to-digital converter resolution) and the
+<p>The <b><tt>adcres</tt></b> and <b><tt>adczero</tt></b> fields specify the number of significant bits per sample (the analog-to-digital converter resolution) and the
 center of the range (typically zero except for offset binary converters).
 
+<p>The <b><tt>note</tt></b> field may be <b><tt>null</tt></b> if there are no
+notes ("info" strings) for the selected record, or it may contain one or more
+strings, as in this example.  See the home page for the database for information
+about interpreting the notes.  In this case, the note indicates that the subject
+was male ("M"), for example;  often notes contain other useful information
+about the subject, such as age, diagnoses, and medications.
+
+<p><b><tt>success</tt></b> is either <b><tt>true</tt></b>, as
+shown, or <b><tt>false</tt></b> if the server was unable to read
+the <tt>.hea</tt> (or EDF/EDF+) file for the specified record.</p>
+
 <li>To request samples of signals 0 and 1, and annotations from annotators
-<tt>ecg</tt> and <tt>st</tt> from record slp67x of the MIT-BIH Polysomnographic
+<b><tt>ecg</tt></b> and <b><tt>st</tt></b> from record slp67x of the MIT-BIH Polysomnographic
 Database, for a 10-second interval starting 15 minutes after the beginning of the record, use the URL
 
 <pre>
@@ -414,31 +469,31 @@ the request
 is equivalent to the previous request, and the response from the server is
 the same.
 
-<p>The arrays of <tt>signal</tt> and <tt>annotator</tt> objects will be
+<p>The arrays of <b><tt>signal</tt></b> and <b><tt>annotator</tt></b> objects will be
 omitted if no signals or annotators are requested.
 
-<p>In the <tt>signal</tt> objects, the <tt>name</tt>, <tt>units</tt>,
-<tt>gain</tt>, <tt>base</tt>, and <tt>tps</tt> fields are as described in the
-previous example.  The <tt>t0</tt> and <tt>tf</tt> fields indicate the sequence
-number of the first sample in the <tt>samp</tt> array and the sequence number
+<p>In the <b><tt>signal</tt></b> objects, the <b><tt>name</tt></b>, <b><tt>units</tt></b>,
+<b><tt>gain</tt></b>, <b><tt>base</tt></b>, and <b><tt>tps</tt></b> fields are as described in the
+previous example.  The <b><tt>t0</tt></b> and <b><tt>tf</tt></b> fields indicate the sequence
+number of the first sample in the <b><tt>samp</tt></b> array and the sequence number
 of the sample that follows the last sample in the array; sequence numbers begin
-with 0.  The <tt>scale</tt> field indicates the conventional display scale for
-the signal in physical units per cm.  The first element of each <tt>samp</tt>
-array is the amplitude of sample <tt>t0</tt> of the signal in raw units; the
+with 0.  The <b><tt>scale</tt></b> field indicates the conventional display scale for
+the signal in physical units per cm.  The first element of each <b><tt>samp</tt></b>
+array is the amplitude of sample <b><tt>t0</tt></b> of the signal in raw units; the
 remaining elements are the first differences (i.e., the amplitude of sample
-<tt>t0</tt>+<em>n</em> is the sum of the first <em>n+1</em> elements).
+<b><tt>t0</tt></b>+<em>n</em> is the sum of the first <em>n+1</em> elements).
 
 <blockquote> <em>In the example above, the first few elements of the second
-<tt>samp</tt> array are -515, 0, 0, 1, 0, and -2.  The reconstructed raw samples
+<b><tt>samp</tt></b> array are -515, 0, 0, 1, 0, and -2.  The reconstructed raw samples
 are -515, -515, -515, -514, -514, and -516.  To convert these raw
 amplitudes into arterial blood pressure ("ART") measurements in physical units
-("mmHg"), subtract the <tt>base</tt> (-1147) and divide by the <tt>gain</tt>
+("mmHg"), subtract the <b><tt>base</tt></b> (-1147) and divide by the <b><tt>gain</tt></b>
 (7.72857) to get 81.775 ([(-512)-(-1147)]*7.72857), 81.775, 81.775, 81.904,
 81.904, and 81.645.
 
 <p>To determine the times of these samples, first note that the requested start
-time (15 minutes following the start of the record) matches <tt>t0</tt>
-(225000), and that <tt>tps</tt> is 1 for the BP signal (as it is for the other
+time (15 minutes following the start of the record) matches <b><tt>t0</tt></b>
+(225000), and that <b><tt>tps</tt></b> is 1 for the BP signal (as it is for the other
 signals); thus the sampling frequency of the BP signal is 225000/(15*60), or
 250 samples per second, and the times of the six samples are 15:00, 15:00.004,
 15:00.008, 15:00.012, 15:00.016, and 15:00.020.</em> </blockquote>
@@ -450,10 +505,10 @@ faster than data in scaled units and, more significantly, this method does not
 introduce floating-point errors that may accumulate in client-side digital
 signal processing such as filtering and power spectral analysis.
 
-<p> In the <tt>annotator</tt> objects, the <tt>name</tt> field specifies the
-annotator name, and the <tt>annotation</tt> array contains the individual
+<p> In the <b><tt>annotator</tt></b> objects, the <b><tt>name</tt></b> field specifies the
+annotator name, and the <b><tt>annotation</tt></b> array contains the individual
 annotations associated with that annotator.  In the annotations,
-the <tt>t</tt>, <tt>a</tt>, <tt>s</tt>, <tt>c</tt>, <tt>n</tt>, and <tt>x</tt>
+the <b><tt>t</tt></b>, <b><tt>a</tt></b>, <b><tt>s</tt></b>, <b><tt>c</tt></b>, <b><tt>n</tt></b>, and <b><tt>x</tt></b>
 fields are the time, annotation type (mnemonic), subtype, "chan", "num", and
 "aux" fields of the WFDB annotation structures.  See the section
 titled <em>Annotation Structures</em> in
@@ -465,26 +520,38 @@ Annotations</a>;  non-standard types are described on the home pages of the
 databases in which they are found.
 
 <blockquote><em>In the example above, the three annotations belonging to
-annotator <tt>ecg</tt> are all of type '<tt>N</tt>', representing normal QRS
+annotator <b><tt>ecg</tt></b> are all of type '<b><tt>N</tt></b>', representing normal QRS
 complexes in the ECG.  The home page for the MIT-BIH Polysomnographic Database
-notes that annotator <tt>st</tt> contains sleep stage annotations of type
-'<tt>"</tt>' (in JSON notation, shown as <tt>"\""</tt>), with a sleep stage
-mnemonic in the <tt>x</tt> field (<tt>W</tt> in the example, signifying
+notes that annotator <b><tt>st</tt></b> contains sleep stage annotations of type
+'<b><tt>"</tt></b>' (in JSON notation, shown as <b><tt>"\""</tt></b>), with a sleep stage
+mnemonic in the <b><tt>x</tt></b> field (<b><tt>W</tt></b> in the example, signifying
 wakefulness).</em></blockquote>
 
-<p>As a special case, if <tt>t0</tt> and <tt>dt</tt> are 0, the server returns
+<p>As a special case, if <b><tt>t0</tt></b> and <b><tt>dt</tt></b> are 0, the server returns
 all annotations for the requested annotators, and no samples for any requested
 signals.
 
+<p>Unlike the other request types, the response to <b><tt>fetch</tt></b> does
+not include a <b><tt>success</tt></b> field.  If the server was unable to
+obtain requested signal data, <b><tt>fetch.signal</tt></b> is an empty array;
+similarly <b><tt>fetch.annotator</tt></b> is an empty array if none of the
+requested annotations were read.  If no signals were requested,
+<b><tt>fetch.signal</tt></b> is omitted from the response, and if no annotations
+were requested, <b><tt>fetch.annotator</tt></b> is likewise omitted.  If neither
+signals nor annotations were requested, the server returns
+<pre>
+{ "fetch": null }
+</pre>
+
 </ul>
 
-<h3>JSONP</h3>
+<a name="JSONP"><h3>JSONP</h3></a>
 
 <p>
-The LightWAVE server looks in its parameter list for a <tt>callback</tt>
-parameter.  If present, the server takes the value of <tt>callback</tt>
+The LightWAVE server looks in its parameter list for a <b><tt>callback</tt></b>
+parameter.  If present, the server takes the value of <b><tt>callback</tt></b>
 as the name of a function, and "wraps" its JSON output within an invocation
-of the function.  Thus, if the value of <tt>callback</tt> were <tt>foo</tt>,
+of the function.  Thus, if the value of <b><tt>callback</tt></b> were <b><tt>foo</tt></b>,
 the output would appear as
 <pre>
 foo(<em style="color: blue">... {JSON output} ...</em>)
