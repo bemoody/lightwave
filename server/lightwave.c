@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	12 February 2013  version 0.43
+			Last revised:	16 February 2013  version 0.44
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -42,6 +42,7 @@ _______________________________________________________________________________
 #include <stdlib.h>
 #include <libcgi/cgi.h>
 #include <wfdb/wfdblib.h>
+#include "setrepos.c"
 
 #ifndef LWDIR
 #define LWDIR "/home/physionet/html/lightwave"
@@ -69,13 +70,13 @@ double approx_LCM(double x, double y);
 int  fetchannotations(void), fetchsignals(void), ufindsig(char *name);
 void dblist(void), rlist(void), alist(void), info(void), fetch(void),
     force_unique_signames(void), print_file(char *filename),
-    jsonp_end(void), lwpass(void), lwfail(char *error_message),
+    jsonp_end(void), lwpass(void), lwfail(char *error_message), pnwcheck(void),
     prep_signals(void), map_signals(void), prep_annotations(void),
     prep_times(void), cleanup(void);
 
 int main(int argc, char **argv)
 {
-    static char *callback = NULL;
+    static char *callback = NULL, *user;
     int i;
     extern int headers_initialized;
 
@@ -90,10 +91,8 @@ int main(int argc, char **argv)
     wfdbquiet();	  /* suppress WFDB library error messages */
     atexit(cleanup);	/* release allocated memory before exiting */
 
-    /* To add a custom data repository, define LW_WFDB (see Makefile). */
-#ifdef LW_WFDB
-    setwfdb(LW_WFDB);
-#endif
+    /* Define data sources to be accessed via this server. */
+    setrepos();		/* function defined in "setrepos.c" */
 
     if (!(action = get_param("action"))) {
 	print_file(LWDIR "/doc/about.txt");
@@ -362,7 +361,6 @@ void dblist(void)
 	wfdb_fclose(ifile);
     }
     else {
-	printf("{\n");
 	lwfail("The list of databases could not be read");
     }
 }
@@ -720,7 +718,6 @@ int ufindsig(char *p) {
   /* No match found. */
   return (-1);    
 }
-
 
 void cleanup(void)
 {

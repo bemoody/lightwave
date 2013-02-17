@@ -1,6 +1,6 @@
-LWVERSION = 0.43
+LWVERSION = 0.44
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	28 January 2013 (version 0.34)
+#			Last revised:	17 February 2013 (version 0.44)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -83,11 +83,11 @@ LWDIR = $(DocumentRoot)/lightwave
 CC = gcc
 
 # CFLAGS is a set of options for the C compiler.
-CFLAGS = -g -DLWDIR=\"$(LWDIR)\" -DLWVER=\"$(LWVERSION)\" \
+CFLAGS = -O -DLWDIR=\"$(LWDIR)\" -DLWVER=\"$(LWVERSION)\" \
         -DLW_WFDB=\"$(LW_WFDB)\"
 
 # LDFLAGS is a set of options for the linker.
-LDFLAGS = -lcgi -lwfdb
+LDFLAGS = -lcgi -lwfdb -lcurl
 
 # Install both the lightwave server and client on this machine.
 install:	server client
