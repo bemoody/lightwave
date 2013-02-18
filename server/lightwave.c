@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	16 February 2013  version 0.44
+			Last revised:	16 February 2013  version 0.45
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -146,6 +146,12 @@ void prep_signals()
     } 
     else
 	return;
+
+    /* Shorten signal names of the form "record xxx, signal N" to "v[N]" */
+    for (n = 0; n < nsig; n++) {
+	if (strncmp(s[n].desc, "record ", 7) == 0)
+	    sprintf(s[n].desc, "v[%d]", n);
+    }
 
     /* Make reasonably sure that signal names are distinct (see below). */
     force_unique_signames();

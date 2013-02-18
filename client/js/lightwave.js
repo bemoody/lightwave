@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	12 February 2013  version 0.43
+//			Last revised:	18 February 2013  version 0.45
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -42,6 +42,7 @@ var server = 'http://physionet.org/cgi-bin/lightwave';
 
 var url;	// request sent to server (server + request-specific string)
 var db = '';	// name of the selected database
+var sdb = '';	// shortened name of the selected database
 var record = '';// name of the selected record
 var recinfo;    // metadata for the selected record, initialized by slist()
 var tickfreq;   // ticks per second (LCM of sampling frequencies of signals)
@@ -835,7 +836,7 @@ function go_here(t_ticks) {
 	if (target) $('.srev').removeAttr('disabled');
     }
 
-    var title = 'LW: ' + db + '/' + record;
+    var title = 'LW: ' + sdb + '/' + record;
     document.title = title;
     var t0_string = timstr(t_ticks);
     $('.t0_str').val(t0_string);
@@ -1185,8 +1186,9 @@ function show_time(x) {
 
 // Load the list of signals for the selected record.
 function slist(t0_string) {
-    var title = 'LW: ' + db + '/' + record, t = 0;
-    $('.recann').html(db + '/' + record);
+
+    var title = 'LW: ' + sdb + '/' + record, t = 0;
+    $('.recann').html(sdb + '/' + record);
     document.title = title;
     $('#info').empty();
     $('#anndata').empty();
@@ -1229,10 +1231,10 @@ function slist(t0_string) {
 function newrec() {
     record = $('[name=record]').val();
     $('#findbox').dialog("close");
-    var prompt = 'Reading annotations for ' + db + '/' + record;
+    var prompt = 'Reading annotations for ' + sdb + '/' + record;
     $('#prompt').html(prompt);
     read_annotations("0");
-    prompt = 'Click on the <b>View/edit</b> tab to view ' + db + '/' + record;
+    prompt = 'Click on the <b>View/edit</b> tab to view ' + sdb + '/' + record;
     $('#prompt').html(prompt);
 }
 
@@ -1252,7 +1254,7 @@ function alist() {
 function rlist() {
     var rlist = '';
     url = server + '?action=rlist&callback=?&db=' + db;
-    $('#rlist').html('<td colspan=2>Reading list of records in ' + db
+    $('#rlist').html('<td colspan=2>Reading list of records in ' + sdb
 		     + '</td>');
     show_status(true);
     $.getJSON(url, function(data) {
@@ -1275,8 +1277,11 @@ function rlist() {
 // When a new database is selected, reload the annotation and record lists.
 function newdb() {
     db = $('#db').val();
+    var dbparts = db.split('/');
+    if (dbparts.length > 1) sdb = '.../' + dbparts.pop();
+    else sdb = db;
     record = '';
-    var title = 'LightWAVE: ' + db;
+    var title = 'LightWAVE: ' + sdb;
     document.title = title;
     $('#tabs').tabs({disabled:[1,2]});
     $('#rlist').empty();
@@ -1310,10 +1315,15 @@ function dblist() {
 	    dblist = '<td align=right>Database:</td>' + 
 		'<td><select name=\"db\" id=\"db\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
-	    for (i = 0; i < data.database.length; i++)
-	        dblist += '<option value=\"' + data.database[i].name +
-		'\">' + data.database[i].desc + ' (' +
-		data.database[i].name + ')</option>\n';
+	    for (i = 0; i < data.database.length; i++) {
+		var dbi = data.database[i].name;
+		var dbparts = dbi.split('/');
+		var sdbi;
+		if (dbparts.length > 1) sdbi = '.../' + dbparts.pop();
+		else sdbi = dbi;
+	        dblist += '<option value=\"' + dbi +
+		'\">' + data.database[i].desc + ' (' + sdbi + ')</option>\n';
+	    }
 	    dblist += '</select></td>\n';
 	    $('#dblist').html(dblist)
 	    $('#sversion').html("&nbsp;version " + data.version);
@@ -1441,8 +1451,11 @@ function parse_url() {
 	}
     }
     if (db !== '') {
+	var dbparts = db.split('/');
+	if (dbparts.length > 1) sdb = '.../' + dbparts.pop();
+	else sdb = db;
 	if (record === '') {
-	    var title = 'LightWAVE: ' + db;
+	    var title = 'LightWAVE: ' + sdb;
 	    document.title = title;
 	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
 	    $('#top').show();
@@ -1455,12 +1468,12 @@ function parse_url() {
 	else {
 	    $('#tabs').tabs();
 	    $('#tabs').tabs("remove",0);
-	    var title = 'LW: ' + db + '/' + record;
+	    var title = 'LW: ' + sdb + '/' + record;
 	    document.title = title;
 	    $('.t0_str').val(t0_string);
 	    current_tab = 'View/edit';
 	    help_main = 'followed-link.html';
-	    $('.recann').html(db + '/' + record);
+	    $('.recann').html(sdb + '/' + record);
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#server').html(server);
 	    $('#dblist').html(dblist);
