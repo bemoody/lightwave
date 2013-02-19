@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	18 February 2013  version 0.45
+//			Last revised:	19 February 2013  version 0.46
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -89,9 +89,14 @@ function init_tpool(ntrace) {
 
 // Replace the least-recently-used trace with the contents of s
 function set_trace(db, record, s) {
-    var idmin = tid, imin, j, len, ni, p, v, vmean, vmid, vmax, vmin, w;
+    var idmin = tid, imin, j, len, ni, p, trace, v, vmean, vmid, vmax, vmin, w;
 
     len = s.samp.length;
+
+    // do nothing if the trace is already in the pool
+    if ((trace = find_trace(db, record, s.name, s.t0)) &&
+	 trace.tf >= s.t0 + len*s.tps)
+	return;
 
     // set additional properties of s that were not supplied by the server
     s.id = tid++;
@@ -638,10 +643,7 @@ function show_plot() {
 			    return;
 			}
 			else {
-			    if (intervalId) {
-				clearInterval(intervalId);
-				intervalId = null;
-			    }
+			    autoplay_off();
 			    alert_server_error();
 			    return;
 			}
@@ -856,14 +858,48 @@ function go_here(t_ticks) {
 }
 
 function scrollrev() {
-    t0_ticks -= Math.round(dt_ticks/300);
+    t0_ticks -= dt_sec;  // the increment was chosen to divide dt_ticks evenly
+    if (t0_ticks <= 0) {
+	t0_ticks = 0;
+	autoplay_off();
+    }
     go_here(t0_ticks);
-    prefetch(Math.floor((t0_ticks - 1)/dt_ticks) * dt_ticks);
+    if (t0_ticks > 0)
+	prefetch(Math.floor((t0_ticks - 1)/dt_ticks) * dt_ticks);
 }
 
 function scrollfwd() {
-    t0_ticks += Math.round(dt_ticks/300);
+    t0_ticks += dt_sec;
+    if (t0_ticks >= rdt_ticks - dt_ticks)
+	autoplay_off();
     go_here(t0_ticks);
+    if (t0_ticks < rdt_ticks - dt_ticks	&& (t0_ticks % dt_ticks == 0))
+	prefetch(t0_ticks + 2*dt_ticks);
+}
+
+function resize_lightwave() {
+    $('#helpframe').attr('height', $(window).height() - 180 + 'px');
+    show_plot(); // redraw signal window if resized
+}
+
+function autoplay_off() {
+    if (intervalId) { clearInterval(intervalId); intervalId= null; }
+}
+
+function autoplay_fwd() {
+    if (intervalId) autoplay_off();
+    else {
+	var dti = 50+dt_ticks*nsig/1000;
+	intervalId = setInterval(scrollfwd, dti);
+    }
+}
+
+function autoplay_rev() {
+    if (intervalId) autoplay_off();
+    else {
+	var dti = 50+dt_ticks*nsig/1000;
+	intervalId = setInterval(scrollrev, dti);
+    }
 }
 
 function gostart() {
@@ -1167,6 +1203,14 @@ function show_time(x) {
     var ts = mstimstr(t);
     $('.pointer').html(ts);
 
+    svc = '<path stroke="rgb(0,100,200)" stroke-width="4"'
+	+ ' opacity="0.75" fill="blue"' + ' d="M' + x_cursor
+	+ ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	+ ',' + ady1 + ' V' + svgh
+	+ ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	+ ',-' + ady1 + '" />';
+    $('#plotdata').html(svg + svc + '</svg>\n');
+/*
     svc = null;
     svc = '<div style="width: ' + sww + 'px; height: ' + height
 	+ 'px; margin-left: ' + swl + 'px;">'
@@ -1181,7 +1225,8 @@ function show_time(x) {
 	+ ',-' + ady1 + '" />';
 	+ '</g></svg></div>';
     $('#editdata').html(svc);
-    handle_svg_events();
+*/  
+  handle_svg_events();
 }
 
 // Load the list of signals for the selected record.
@@ -1335,11 +1380,6 @@ function dblist() {
     });
 }
 
-function resize_lightwave() {
-    $('#helpframe').attr('height', $(window).height() - 180 + 'px');
-    show_plot(); // redraw signal window if resized
-}
-
 // Set up user interface event handlers.
 function set_handlers() {
     $('#lwform').on("submit", false);      // disable form submission
@@ -1355,51 +1395,34 @@ function set_handlers() {
 	    current_tab = $(ui.tab).text();
 	}
     });
-    // Button handlers
+    // Handlers for buttons and other controls:
     //  on View/edit and Tables tabs:
     $('.go_to').on("click", go_to);      // go to selected location
-    $('.fwd').on("click", gofwd);	 // advance by dt_sec and plot or print
-
-    $('.scrollfwd').on("click", function() {
-	if (intervalId) { clearInterval(intervalId); intervalId = null; }
-	else {
-	    var dti = 50+dt_ticks*nsig/1000;
-	    intervalId = setInterval(scrollfwd, dti);
-	}
-    }); // toggle forward autoscrolling
-
-    $('.scrollrev').on("click", function() {
-	if (intervalId) { clearInterval(intervalId); intervalId = null; }
-	else {
-	    var dti = 50+dt_ticks*nsig/1000;
-	    intervalId = setInterval(scrollrev, dti);
-	}
-    }); // toggle reverse autoscrolling
-
-    $('.rev').on("click", gorev);	 // go back by dt_sec and plot or print
-    $('.sor').on("click", gostart);	 // go to start of record
     $('.eor').on("click", goend);	 // go to end of record
+    $('.rev').on("click", gorev);	 // go back by dt_sec and plot or print
+    $('.scrollrev').on("click", autoplay_rev); // toggle reverse autoscrolling
+    $('.scrollfwd').on("click", autoplay_fwd); // toggle forward autoscrolling
+    $('.fwd').on("click", gofwd);	 // advance by dt_sec and plot or print
+    $('.sor').on("click", gostart);	 // go to start of record
+
     $('.srev').on("click", srev);	 // search for previous 'Find' target
-    $('.sfwd').on("click", sfwd);	 // search for next 'Find' target
     $('.find').on("click", find);	 // open 'Find' dialog
-    $('.stretch').on("click", stretch_signal);
-    $('.reset').on("click", reset_signal);
-    $('.shrink').on("click", shrink_signal);
-    $('#findbox').dialog({autoOpen: false});
+    $('.sfwd').on("click", sfwd);	 // search for next 'Find' target
     // disable search buttons until a target has been defined
     $('.sfwd').attr('disabled', 'disabled');
     $('.srev').attr('disabled', 'disabled');
+
+    $('.stretch').on("click", stretch_signal); // enlarge selected signal
+    $('.reset').on("click", reset_signal);     // reset scale of selected signal
+    $('.shrink').on("click", shrink_signal);   // reduce selected signal
     // disable signal resize buttons until a signal has been selected
     $('.stretch').attr('disabled', 'disabled');
     $('.reset').attr('disabled', 'disabled');
     $('.shrink').attr('disabled', 'disabled');
 
+    // Signal window duration slider on View/edit tab
     $(function() {
-	$('#dtslider').slider({
-	    value: dt_sec,
-	    min: 5,
-	    max: 60,
-	    step: 5,
+	$('#dtslider').slider({ value: dt_sec, min: 5, max: 60, step: 5,
 	    slide: function(event, ui) {
 		$('#swidth').val(ui.value);
 		dt_sec = ui.value;
@@ -1413,9 +1436,12 @@ function set_handlers() {
 	});
 	$('#swidth').val(dt_sec);
     });
-     
+
+    // Find... dialog box
+    $('#findbox').dialog({autoOpen: false});
+
     // on Settings tab:
-    $('[name=server]').on("change", set_server);      // go to selected location
+    $('[name=server]').on("change", set_server); // use another lightwave server
     $('#show_status').on("change", toggle_show_status);
     $('#show_log').on("change", toggle_show_log);
     $('#clear_log').on("click", clear_log);
