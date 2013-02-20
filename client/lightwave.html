@@ -8,12 +8,13 @@
 <link rel="stylesheet" href="css/lightwave.css">
 <script src="js/jquery.min.js"></script>
 <script src="js/jquery-ui.min.js"></script>
+<script src="js/jquery.ui.touch.js"></script>
 <script src="js/lightwave.js"></script>
 <noscript><style>.js { display: none; }</style></noscript>
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	11 February 2013   version 0.43
+			Last revised:	20 February 2013   version 0.47
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -238,7 +239,11 @@ signal window if selected below">&#x21b4;</button>
     </td>
     <td align="right">
       <span title="(not yet implemented!)">
-	<input type="checkbox" id="allow_edit" />Allow editing
+	<input type="checkbox" id="mouse_edit" />Edit using mouse
+      </span>
+      <br>
+      <span title="(not yet implemented!)">
+	<input type="checkbox" id="touch_edit" />Edit on touchscreen
       </span>
     </td>
   <tr>

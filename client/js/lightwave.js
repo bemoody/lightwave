@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	19 February 2013  version 0.46
+//			Last revised:	20 February 2013  version 0.47
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -64,7 +64,7 @@ var tf_ticks;	// time of the first sample after the signal window, in ticks
 var tickint;    // interval between timestamps on plot
 var tpool = []; // cache of 'trace' objects (10-second signal segments)
 var tid = 0;	// next trace id (all traces have id < tid)
-var target = '';// search target, set in Find... dialog
+var target = '*';// search target, set in Find... dialog
 var atarget = '';// annotator to be searched, set in Find... dialog
 var g_visible = 1; // visibility flag for grid (1: on, 0: off)
 var m_visible = 1; // visibility flag for annotation marker bars (1: on, 0: off)
@@ -323,29 +323,41 @@ function show_tables() {
 	$('#sigdata').empty();
 }
 
-var tracking = false;
+var editing = false;
+var has_mouse = false;
 
-function toggle_edit() {
-    var btext;
+function do_edit(e) {
+    var x = e.pageX;
+    show_time(x);
+}
 
-    tracking = !tracking;
-    if (!tracking) $('#editdata').empty();
+function handle_edit() {
+    if (!editing)
+	$('svg').off('click', do_edit).off('mousemove', do_edit);
+    else if (has_mouse)
+	$('svg').off('click', do_edit).on('mousemove', do_edit);
+    else
+	$('svg').off('mousemove', do_edit).on('click', do_edit);
+}
 
-    $('svg').mousemove(function(e){
-	if (tracking) {
-	    var x = e.pageX;
-	    show_time(x);
-	}
-    });
+function toggle_mouse_edit() {
+    $('#touch_edit').attr('checked', false);
+    if (!has_mouse) editing = has_mouse = true;
+    else editing = !editing;
+    $('#mouse_edit').attr('checked', editing);
+    handle_edit();
+}
+
+function toggle_touch_edit() {
+    $('#mouse_edit').attr('checked', false);
+    if (has_mouse) { editing = true; has_mouse = false; }
+    else editing = !editing;
+    $('#touch_edit').attr('checked', editing);
+    handle_edit();
 }
 
 function handle_svg_events() {
-    $('svg').mousemove(function(e){
-	if (tracking) {
-	    var x = e.pageX;
-	    show_time(x);
-	}
-    });
+    handle_edit();
 
     $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
@@ -618,9 +630,9 @@ function show_plot() {
 	    // move to start of trace
 	    svs += '<path stroke="black" fill="none" stroke-width="';
 	    if (sname == sigselected)
-		svs += '10';
+		svs += dt_sec;
 	    else
-		svs += '6';
+		svs += dt_sec/2;
 	    svs += '" d="';  // + 'M0,' + v + ' L';
 	    var t = 0;
 	    var tnext = t0_ticks;
@@ -681,7 +693,6 @@ function show_plot() {
     }
 
     svg += grd + tst + sva + svs;
-    $('#editdata').empty();
     $('#plotdata').html(svg + '</svg>\n');
     $('.pointer').html('&nbsp;');
     handle_svg_events();    // Handle user input in the signal window
@@ -749,6 +760,15 @@ function read_annotations(t0_string) {
 		if (len > 0) var t = ann[i].annotation[len-1].t;
 		if (t > adt_ticks) adt_ticks = t;
 	    }
+	    if (atarget != '') {
+		for (i = 0; i < nann; i++) {
+		    if (atarget === ann[i].name)
+			break;
+		}
+		if (i >= nann)
+		    atarget = '';
+	    }
+	    if (atarget == '') atarget = ann[0].name;
 	    slist(t0_string);
 	    show_status(false);
 	});
@@ -824,7 +844,7 @@ function go_here(t_ticks) {
     else {
 	$('.fwd').removeAttr('disabled');
 	$('.eor').removeAttr('disabled');
-	if (target) $('.sfwd').removeAttr('disabled');
+	if (target && atarget) $('.sfwd').removeAttr('disabled');
     }
     if (t_ticks <= 0) {
 	t_ticks = 0;
@@ -835,7 +855,7 @@ function go_here(t_ticks) {
     else {
 	$('.rev').removeAttr('disabled');
 	$('.sor').removeAttr('disabled');
-	if (target) $('.srev').removeAttr('disabled');
+	if (target && atarget) $('.srev').removeAttr('disabled');
     }
 
     var title = 'LW: ' + sdb + '/' + record;
@@ -1098,6 +1118,10 @@ function find() {
 	alert('No annotations to search!');
 	return;
     }
+    else if ($('#findbox').dialog("isOpen")) {
+	$('#findbox').dialog("close");
+	return;
+    }
     else if (nann == 1) {
 	atarget = ann[0].name;
 	content = '<div title= \"' + ann[0].desc + '">In: '
@@ -1106,11 +1130,11 @@ function find() {
     else {
 	content = '<div title="Select a set of annotations to search">'
 	    + 'In:&nbsp;<select name=\"atarget\" id=\"atarget\">\n';
-	for (i = 0; i < ann_set.length; i++) {
+	for (i = 0; i < nann; i++) {
 	    if (atarget === ann[i].name) break;
 	}
-	if (i >= ann_set.length) atarget = ann[0].name;
-	for (i = 0; i < ann_set.length; i++) {
+	if (i > nann) atarget = ann[0].name;
+	for (i = 0; i < nann; i++) {
 	    content += '<option value=\"' + ann[i].name + '\" title =\"'
 		+ ann[i].desc + '\" ';
 	    if (atarget === ann[i].name) {
@@ -1137,9 +1161,8 @@ function find() {
     });
     
     $('#findbox').dialog("open");
-    $('#findbox').dialog({ resizable: true});    
     $('#findbox').dialog({
-	resizable: true,
+        height: 'auto',
 	beforeClose: function(event, ui) {
 	    target = $('#target').val();
 	    if (nann > 1) atarget = $('#atarget').val();
@@ -1203,30 +1226,15 @@ function show_time(x) {
     var ts = mstimstr(t);
     $('.pointer').html(ts);
 
-    svc = '<path stroke="rgb(0,100,200)" stroke-width="4"'
-	+ ' opacity="0.75" fill="blue"' + ' d="M' + x_cursor
+    svc = '<path stroke="rgb(0,100,0)" stroke-width="' + dt_sec
+	+ '" fill="none"' + ' d="M' + x_cursor
 	+ ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
 	+ ',' + ady1 + ' V' + svgh
 	+ ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
 	+ ',-' + ady1 + '" />';
     $('#plotdata').html(svg + svc + '</svg>\n');
-/*
-    svc = null;
-    svc = '<div style="width: ' + sww + 'px; height: ' + height
-	+ 'px; margin-left: ' + swl + 'px;">'
-	+ '<svg width="' + sww + '" height="' + height
-	+ '" preserveAspectRatio="xMidYMid meet">\n'
-	+ '<g transform="scale(' + sww/svgw + '),translate(0,' + svgt
-	+ ')" id="crs">'
-	+ '<path stroke="rgb(0,100,200)" stroke-width="4" fill="blue" d="M'
-	+ x_cursor + ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
-	+ ',' + ady1 + ' V' + svgh
-	+ ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
-	+ ',-' + ady1 + '" />';
-	+ '</g></svg></div>';
-    $('#editdata').html(svc);
-*/  
-  handle_svg_events();
+
+    handle_svg_events();
 }
 
 // Load the list of signals for the selected record.
@@ -1445,7 +1453,8 @@ function set_handlers() {
     $('#show_status').on("change", toggle_show_status);
     $('#show_log').on("change", toggle_show_log);
     $('#clear_log').on("click", clear_log);
-    $('#allow_edit').on("change", toggle_edit);
+    $('#mouse_edit').on("change", toggle_mouse_edit);
+    $('#touch_edit').on("change", toggle_touch_edit);
 
     // on Help tab:
     $('#helpframe').attr('height', $(window).height() - 180 + 'px');

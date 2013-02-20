@@ -10,41 +10,29 @@
 <h2>LightWAVE bug list</h2>
 
 <ul>
-<li><b>Signals not visible/not centered.</b><br>
-There are at least four bugs that cause this symptom:
-<ul>
-<li> <s>In records that have no signals (e.g., crisdb records) a null response
-from the server is not handled properly in the client.</s>
-<li> <s>In records with incorrectly specified adczero (e.g., qtdb/sel100),
-the signals may be rendered off-screen.</s>
-<li> In records with sampling frequencies less than 0.1 Hz, there is at
-most one sample in the window, and nothing is drawn as a result.
-<li> <s>If the signal name contains a "+" (or other characters that have
-special meanings in query strings, such as "#", "%", "?", "/", "&", "!")
-the signal name will be mangled in transit to the server, and the server won't
-retrieve samples of it.</s>
-</ul>
-
-<li><b>Autoplay freezes after several minutes.</b><br>
-This problem is almost certainly in the client (the server is unaffected).
-It is almost certainly not caused by a memory leak.  Until this bug is fixed,
-exit the browser and reopen the record if this problem occurs.
-
 <li><b>The Tables panel doesn't always show all of the samples in the signal
 window.</b><br>
 The implementation of autoplay mode required modifications to the code for
 collecting samples that have been read from the server.  These modifications
 have been made in the View/edit code, but not yet in the Tables code.
 
+<li><b>Signals not visible/not centered.</b><br>
+In records with sampling frequencies less than 0.1 Hz, there is at
+most one sample in the window, and nothing is drawn as a result.
+
+<li><b>Autoplay freezes after >10 minutes.</b><br>
+It may have been possible to fill the trace pool with redundant copies of
+the same, or nearly the same, data segment, thereby locking out any attempt
+to fetch the next data segment.  Changes in the prefetch strategy in version
+0.46 make this very unlikely.  Exit the browser and reopen the record if this
+problem recurs.
+
 <li><b>LightWAVE doesn't work in Internet Explorer.</b><br>
 Yes, it does.  But unless you have IE 9 or 10, you <em>must</em> install
 the free <a href="http://www.google.com/chromeframe">Google Chrome
 Frame</a> plugin.
 
-<li><b><s>Can't go to times that are not multiples of 10 seconds.</s></b><br>
-
 <li><b>MIMIC II Waveform Database "numerics" records are missing.</b><br>
 LightWAVE needs a record submenu, like the PhysioBank ATM has.
-
 </ul>
 </html>
