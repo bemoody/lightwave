@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	20 February 2013   version 0.47
+			Last revised:	  12 March 2013   version 0.48
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -73,7 +73,7 @@ provides some of the functions of LightWAVE without Javascript.
 <div id="view">
  <table width="100%">
   <tr>
-    <td><div style="font-size: 14px; text-align: center">Go to:
+    <td width="25%"><div style="font-size: 14px; text-align: center">Go to:
       <input type="text" name="t0" class="t0_str" value="" tabindex="1"
 	     title="Enter the elapsed time from the start of the
 record to the start of the window, then click '&#x21b4;'"
@@ -82,15 +82,15 @@ record to the start of the window, then click '&#x21b4;'"
 		    title="refresh signal window">&#x21b4;</button></div>
     </td>
 
-    <td><div style="font-size: 14px; text-align: center">
+    <td width="50%"><div style="font-size: 14px; text-align: center">
       <button class="sor" tabindex="8"
 		    title="start of record">|&#9665;</button>
       <button class="rev" tabindex="4"
 		    title="previous window">&#9665;</button>
       <button class="scrollrev" tabindex="4"
-		    title="smooth scroll (reverse)">&#9664;</button>
+		    title="start/stop scrolling (reverse)">&#9664;</button>
       <button class="scrollfwd" tabindex="4"
-		    title="smooth scroll (forward)">&#9654;</button>
+		    title="start/stop scrolling (forward)">&#9654;</button>
       <button class="fwd" tabindex="3"
 		    title="next window">&#9655;</button>
       <button class="eor" tabindex="7"
@@ -105,7 +105,7 @@ record to the start of the window, then click '&#x21b4;'"
       </div>
     </td>
     </span>
-    <td align=right>
+    <td align=right width="25%">
       <span class="recann"></span><br><span class="pointer">&nbsp;</span></td>
   </tr>
  </table>
@@ -126,7 +126,81 @@ or an 'aux' string, or one of:
  </td></tr></table>
  </div>
 
- <div id="editdata" style="position: absolute"></div>
+ <div id="add_typebox" title="Add a new type to the palette">
+ <table width="100%">
+ <tr title='Annotation types are single-character mnemomics.
+Commonly-used annotation types are:
+
+ N   normal beat (displayed as &bull; once inserted)
+ L   left bundle branch block beat
+ R   right bundle branch block beat
+ A   atrial premature beat
+ a   aberrated atrial premature beat
+ J    nodal (junctional) premature beat
+ S   supraventricular premature beat (A or J)
+ V   premature ventricular contraction
+ r   R-on-T premature ventricular contraction
+ F   fusion of V and N
+ e   atrial escape beat
+ j    nodal (junctional) escape beat
+ n   supraventricular escape beat (e or j)
+ E   ventricular escape beat
+ /    paced beat
+ f    fusion of / and N
+ Q   unclassifiable beat
+
+ +   rhythm change (enter new rhythm in aux)
+ "   comment (enter comment in aux)
+
+ .   [marks a selected annotation for deletion]'>
+<!-- " -->
+   <td align="right">Annotation&nbsp;type:&nbsp;</td>
+   <td align="left"><input type="text" name="edita" id="edita" value=""></td>
+ </tr>
+ <tr title='New rhythm, comment, etc.
+Use annotation type "+" to mark a rhythm change. 
+Standard aux strings for rhythms begin with "(":
+
+ (AB     atrial bigeminy
+ (AFIB   atrial fibrillation
+ (AFL    atrial flutter
+ (B        ventricular bigeminy
+ (BII      second-degree heart block
+ (IVR     idioventricular rhythm
+ (N       normal sinus rhythm
+ (NOD   nodal (A-V junctional) rhythm
+ (P        paced rhythm
+ (PREX  pre-excitation (WPW)
+ (SBR   sinus bradycardia
+ (SVTA  supraventricular tachyarrhythmia
+ (T        ventricular trigeminy
+ (VFL    ventricular flutter
+ (VT     ventricular tachycardia
+
+Mark onset and end of ventricular fibrillation with
+annotation types "[" and "]", not with rhythm change
+annotations.'>
+   <td align="right">Aux&nbsp;string:&nbsp;</td>
+   <td align="left"><input type="text" name="editx" id="editx" value=""></td>
+ </tr>
+ <tr title="Subtype (an integer between -128 and 127)">
+   <td align="right">Subtype:&nbsp;</td>
+   <td align="left"><input type="text" name="edits" id="edits" value=""></td>
+ </tr>
+ <tr title="Chan (an integer between 0 and 255)">
+   <td align="right">Chan:&nbsp;</td>
+   <td align="left"><input type="text" name="editc" id="editc" value=""></td>
+ </tr>
+ <tr title="Num (an integer between -128 and 127)">
+   <td align="right">Num:&nbsp;</td>
+   <td align="left"><input type="text" name="editn" id="editn" value=""></td>
+ </tr>
+</table>
+
+<p>See <a href="http://physionet.org/physiobank/annotations.shtml"
+target="_blank">PhysioBank Annotations</a> for standard annotation types.
+</div>
+
  <div style="position: relative; margin-top: -1.2em"></div>
  <div id="plotdata"></div>
   <!--[if lt IE 9]>
@@ -140,21 +214,70 @@ or an 'aux' string, or one of:
 
  <table width="100%">
   <tr>
-    <td align=left><div style="font-size: 14px">
-       &nbsp;&nbsp;<button class="stretch"
-		    title="enlarge the highlighted signal">&#9650;</button>
-      <button class="reset"
-		    title="reset the highlighted signal">=</button>
-      <button class="shrink"
-		    title="reduce the highlighted signal">&#9660;</button>
+    <td align=left width="25%"><div style="font-size: 14px">
+	<button class="stretch"
+		title="enlarge the highlighted signal">&#9650;</button>
+	<button class="reset"
+		title="reset the highlighted signal">=</button>
+	<button class="shrink"
+		title="reduce the highlighted signal">&#9660;</button>
       </div>
     </td>
 
-    <td align=right><div style="font-size: 10px;">
+   <td align=right width="25%" class="editgroup" style="font-size: 14px">
+      <table title="Annotation palette"
+	   style="text-align: center; vertical-align: middle;
+		  border: 1px dotted gray; padding: 2px">
+	<tr>
+	  <td width="30%" style="text-align: center; vertical-align: middle">
+	    <span>
+	      <button style="background: #8d8" id="add_type"
+		      title="add a new type to the palette"><b>+</b></button>
+	      <button title="copy the selection to the palette" id="copyann"
+		      style="background: #8d8">&#x21b3;</button>
+	    </span>
+	    <button style="color: red; background-color: white"
+		    id="insert_mode" title="set delete mode (click any other
+button in this group for insert mode)">&#9003;</button>
+	  </td>
+	  <td style="text-align: right; vertical-align: middle" id="palette">
+	    <button title="normal beat">&bull;</button>
+	    <button style="background: blue; color: white"
+		    title="premature ventricular contraction">V</button>
+	    <button title="fusion of V and N">F</button>
+	    <button title="normal sinus rhythm">(N</button>
+	    <button title="ventricular bigeminy">(B</button>
+	    <button title="atrial premature beat">A</button>
+	    <button title="ventricular tachycardia">(VT</button>
+	</td></tr>
+      </table>
+    </td>
+
+    <td align=left width="25%" class="editgroup" style="font-size: 14px">
+      <div style="text-align: center; vertical-align: middle">
+	<button title="select the annotation to the left of the edit point"
+		id="jumpleft">&#8676;</button>
+	<button title="move the edit point to the left"
+		id="nudgeleft">&#8612;</button>
+	<button title="move the edit point to the right"
+		id="nudgeright">&#8614;</button>
+	<button title="select the annotation to the right of the edit point"
+		id="jumpright">&#8677;</button><br>
+	<button title="restore state before most recent edit"
+		id="undo">Undo</button>
+	<button id="mark" title="complete pending edit">Mark</button>
+	<button id="redo" title="reapply last edit">Redo</button>
+      </div>
+    </td>
+
+    <td align=right width="25%">
+      <div style="font-size: 10px;">
 	<label for="dtslider">Window duration:</label>
 	<input type="text" id="swidth" value="10"
-	       style="border: 0; width: 2em; font-weight: bold"/>seconds</div>
-	<div id="dtslider"></div></td>
+	       style="border: 0; width: 2em; font-weight: bold"/>seconds
+      </div>
+      <div id="dtslider"></div>
+    </td>
   </tr>
  </table>
 </div>
@@ -227,24 +350,25 @@ signal window if selected below">&#x21b4;</button>
   <tr><td>&nbsp;</td></tr>
   <tr>
     <td>
-      <span title="Display counters of total and pending requests">
-	<input type="checkbox" id="show_status" />Show status
-      </span>
+      <button title="Display counters of total and pending requests"
+	      id="show_status">Show status</button>
       <br>
-      <span title="Display the request log, most recent first">
-	<input type="checkbox" id="show_log" />Show log
-      </span>
-      <button id="clear_log"
-	      title="Clear the request log and counters">Reset log</button>
+      <button title="Display the request log, most recent first"
+	      id="show_requests">Show request log</button>
+      <br><br>
+      <button title="Clear the request log and counters"
+	      id="clear_requests">Reset request log</button>
     </td>
-    <td align="right">
-      <span title="(not yet implemented!)">
-	<input type="checkbox" id="mouse_edit" />Edit using mouse
-      </span>
-      <br>
-      <span title="(not yet implemented!)">
-	<input type="checkbox" id="touch_edit" />Edit on touchscreen
-      </span>
+    <td>
+      <b>Editing</b><br>
+	<button id="editing">Enable editing</button>
+	<br>
+	<button id="shortcuts">Enable mouse shortcuts</button>
+	<br>
+	<button id="new_annset">Set up new annotation set</button>
+	<br><br>
+	<button title="Display the edit log, most recent first"
+		id="show_edits">Show edit log</button>
     </td>
   <tr>
  </table>
@@ -271,7 +395,7 @@ and links to more information">Main help</button>
   </tr>
  </table>
 
- <iframe id="helpframe" src="" width="100%"></iframe>
+ <iframe id="helpframe" src="" width="100%" style="border: none"></iframe>
 </div>
 
 </form>
@@ -279,7 +403,9 @@ and links to more information">Main help</button>
 
 <div id="status" style="display: none"></div>
 <p>
-<div id="log" style="display: none"></div>
+<div id="requests" style="display: none"></div>
+<p>
+<div id="edits" style="display: none"></div>
 
 </div>  <!-- end of "js" div -->
 </div>  <!-- end of "top" div -->

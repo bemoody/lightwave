@@ -10,15 +10,11 @@
 <h2>LightWAVE bug list</h2>
 
 <ul>
-<li><b>The Tables panel doesn't always show all of the samples in the signal
-window.</b><br>
-The implementation of autoplay mode required modifications to the code for
-collecting samples that have been read from the server.  These modifications
-have been made in the View/edit code, but not yet in the Tables code.
-
-<li><b>Signals not visible/not centered.</b><br>
-In records with sampling frequencies less than 0.1 Hz, there is at
-most one sample in the window, and nothing is drawn as a result.
+<li><b>Some signals are not visible.</b><br>
+At least two samples of a given signal must fall within the signal window
+in order for the signal to appear.  For signals sampled at very low rates,
+this condition may not be satisfied.  Increase the window duration using
+the slider at the lower right corner of the <b>View/edit</b> tab.
 
 <li><b>Autoplay freezes after >10 minutes.</b><br>
 It may have been possible to fill the trace pool with redundant copies of
@@ -30,7 +26,7 @@ problem recurs.
 <li><b>LightWAVE doesn't work in Internet Explorer.</b><br>
 Yes, it does.  But unless you have IE 9 or 10, you <em>must</em> install
 the free <a href="http://www.google.com/chromeframe">Google Chrome
-Frame</a> plugin.
+Frame</a> plugin.  The plugin is recommended but not required for IE 9.
 
 <li><b>MIMIC II Waveform Database "numerics" records are missing.</b><br>
 LightWAVE needs a record submenu, like the PhysioBank ATM has.

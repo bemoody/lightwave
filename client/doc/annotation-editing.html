@@ -9,13 +9,365 @@
 
 <h2>Editing annotations with LightWAVE</h2>
 
-<p style="color: red">
-This page describes features that are not yet implemented in LightWAVE!
+<p style="background-color: red; border: 5px solid #800; padding: 2em">
+<b>This page describes features that are not yet implemented in
+LightWAVE!</b>  Although some editing controls may appear to work, only the
+display is affected.  Any edits you make will not be saved.<br><br>
+More of the features described below will appear in the next several
+versions of LightWAVE.
 </p>
 
-<b>Uploading annotations to PhysioNet</b>
+<p>
+LightWAVE allows you to create new sets of annotations, either from
+scratch or by copying and modifying an existing set of annotations.
+
+<h3>Enabling editing</h3>
 
 <p>
+To avoid unintended edits, annotation editing is disabled by default.  To enable
+it, open the <b>Settings</b> tab and touch or click <button>Enable
+editing</button>.  If you use a mouse or trackball, you may also
+click <button>Enable mouse shortcuts</button>, which will allow more efficient
+editing if you have a fast browser.  If you use a touch device for editing, do
+not enable mouse shortcuts.
+
+<p>
+The <em>edit log</em> tracks changes made to an annotation set; it is normally
+hidden, but it can be shown at the bottom of the <b>View/edit</b> tab
+using <button>Show edit log</button>.  Note that each annotation set has its own
+edit log.
+
+<p>
+While the <b>Settings</b> tab is still open, click <button>Set up new annotation
+set</button> if you want to start with an empty set of annotations rather
+than an existing set.  (If the open record is currently unannotated, LightWAVE
+creates an empty new annotation set automatically.)
+
+<h3>Choosing a set of annotations to edit</h3>
+
+<p>
+Switch back to the <b>View/edit</b> tab.  The names of the available annotation
+sets appear in blue to the left of the signal window, and the set that is
+currently open for editing will appear in <b>bold face</b>.  If there are two or
+more sets, the set nearest the top is open initially; this will be the new set
+if there is one.  To choose a different set, click on or next to its name at the
+left of the signal window, until it appears in bold face.  (Clicking on the name
+repeatedly cycles between normal, bold, and hidden modes.)
+
+<p>
+If you reopen a set that you edited in a previous session using the same
+computer and browser, your previous edits will be loaded unless you confirm that
+you wish to discard them and start over.
+
+<p>
+During your editing session, you may switch between annotation sets as often as
+you wish.
+
+<h3>Editing controls</h3>
+
+<p>
+When editing is enabled, two clusters of editing controls appear on the
+<b>View/edit</b> tab, centered below the signal window:
+
+ <table align=center width="50%">
+  <tr>
+    <td align=right width="50%" class="editgroup" style="font-size: 14px">
+      <table title="Annotation palette"
+	   style="text-align: center; vertical-align: middle;
+		  border: 1px dotted gray; padding: 2px">
+	<tr><td width="30%" style="text-align: center; vertical-align: middle">
+	  <span><button style="background: #8d8" id="template"
+		  title="add a new type to the palette"><b>+</b>
+	  </button>
+	  <button style="background: #8d8"
+		  title="copy the selection to the palette">&#x21b3;</button>
+	  <span>
+	  <button style="color: red" id="edit_mode"
+		  title="set delete mode (click any other
+button in this group for insert mode)">&#9003;</button>
+	</td><td style="text-align: right; vertical-align: middle"
+			 id="palette">
+	  <button title="normal beat">&bull;</button>
+	  <button style="background: blue; color: white"
+		  title="premature ventricular contraction">V</button>
+	  <button title="fusion of V and N">F</button>
+	  <button title="normal sinus rhythm">(N</button>
+	  <button title="ventricular bigeminy">(B</button>
+	  <button title="atrial premature beat">A</button>
+	  <button title="ventricular tachycardia">(VT</button>
+	</td></tr>
+      </table>
+    </td>
+    <td align=left width="50%" class="editgroup" style="font-size: 14px">
+      <div style="text-align: center; vertical-align: middle">
+	<button title="select the annotation to the left of the edit point"
+		id="jumpleft">&#8676;</button>
+	<button title="move the edit point to the left"
+		id="nudgeleft">&#8612;</button>
+	<button title="move the edit point to the right"
+		id="nudgeright">&#8614;</button>
+	<button title="select the annotation to the right of the edit point"
+		id="jumpright">&#8677;</button><br>
+	<button title="restore state before most recent edit"
+		id="undo">Undo</button>
+	<button id="mark" title="complete pending edit">Mark</button>
+	<button id="redo" title="reapply last edit">Redo</button>
+      </div>
+    </td>
+  </tr>
+ </table>
+
+<p> The group of buttons at the left is the <b>annotation palette</b>, used to
+choose which type of annotation to insert.  Its contents will vary depending on
+the types of annotations in the currently open annotation set.  In the example
+above, the V annotation has been highlighted (selected).
+
+<p> The cluster at the right includes buttons for selecting annotations
+(<button>&#8676;</button> and <button>&#8677;</button>), for fine control of the
+edit marker position (<button>&#8612;</button> and <button>&#8614;</button>),
+for marking a location or a selected annotation (<button>Mark</button>), and for
+reversing the effect of the last mark (<button>Undo</button>) or restoring it
+(<button>Redo</button>).
+
+<h3>The edit marker bar</h3>
+
+<p> When editing is enabled, the <em>edit marker bar</em> is usually visible
+in the signal window.  The green bar runs vertically across the window, and open
+triangles appear at its ends.  Above the signal window at the right, below the
+name of the currently open record, the time interval from the beginning of the
+record to the position of the bar appears in HH:MM:SS format.
+
+<p> The edit marker bar generally indicates the location where an edit will be
+made.
+
+<h3>Types of edits</h3>
+
+<p>
+There are four basic types of edits, each of which requires actions described
+below:
+
+<dl>
+<dt><b>Inserting a new annotation</b></dt>
+<dd>
+<ol>
+<li> Select an annotation type from the palette.
+<li> Move the edit marker bar to the desired location.
+<li> Mark the location.
+</ol>
+Repeat steps 2 and 3 to insert additional annotations of the same type.
+<p>
+</dd>
+
+<dt><b>Modifying an existing annotation without repositioning it</b></dt>
+<dd>
+<ol>
+<li> Select an annotation type from the palette.
+<li> Select the annotation to be modified.
+<li> Mark the annotation.
+</ol>
+Repeat steps 2 and 3 to modify additional annotations in the same way.
+<p>
+</dd>
+
+<dt><b>Deleting an existing annotation</b></dt>
+<dd>
+<ol>
+<li> Select <button style="color: red">&#9003;</button> from the palette.
+<li> Select the annotation to be deleted.
+<li> Mark the annotation.
+</ol>
+Repeat steps 2 and 3 to delete additional annotations.
+<p>
+</dd>
+
+<dt><b>Repositioning an existing annotation</b></dt>
+<dd>
+<ol>
+<li> Select the annotation to be moved.
+<li> Move the edit marker bar to the desired location.
+<li> Mark the location.
+</ol>
+</dd>
+</dl>
+
+<h3>Selecting an annotation type</h3>
+
+<p>
+In the annotation palette, click or touch the annotation type you want to
+highlight it.
+
+<div style="background-color: #bfb; border: 1px dotted gray; padding: 5px;">
+<p align="center"><b>Expanding the annotation palette</b></p>
+
+If the annotation type you want is not already in the palette, there
+are two ways to add it:
+
+<ul>
+<li> Click or touch <button style="background: #8d8"><b>+</b></button> to
+open an annotation template.  Fill in the template to add a new type to the
+palette.
+
+<li> Select an existing annotation in the signal window, then click or touch
+<button style="background: #8d8">&#x21b3;</button> to copy it to the palette.
+</ul>
+
+When you add a new annotation type to the palette, it is selected immediately.
+If you try to add an annotation type that is already in the palette, it is
+selected, but no new button is added to the palette.  Unused additions may be
+replaced by newer additions.
+</div>
+
+<div style="background-color: #bff; border: 1px dotted gray; padding: 5px;">
+<p align="center"><b>Annotation attributes</b></p>
+
+<p>Annotations have five attributes that can be set in an annotation template:
+
+<dl>
+<dt><b>Annotation type</b></dt>
+<dd>
+For existing annotations, the <em>type</em> is almost always a single character
+displayed in the signal window at the location of the annotation.  (Exception:
+type <b>N</b> annotations are displayed as <b>&bull;</b>;  this reduces visual
+clutter in the common case of annotating cardiac activity, when <b>N</b> marks
+a normal beat.)
+</dd>
+
+<dt><b>Aux string</b></dt>
+<dd>
+This field is usually empty, but it can be a character string providing
+details related to the <em>type</em>.  For example, if <em>type</em> is
+<b>+</b> (indicating a change in cardiac rhythm), the <em>aux</em> string
+describes the new rhythm;  if <em>type</em> is <b>&quot;</b> (double quote
+character, indicating a note annotation), then <em>aux</em> is the content
+of the note.  Avoid long <em>aux</em> strings;  long comments can be
+continued across several annotations, incrementing <em>num</em> (below)
+to define the order.
+</dd>
+
+<dt><b>Subtype</b></dt>
+<dd>
+An integer between -128 and 127 inclusive, usually empty or 0.
+</dd>
+
+<dt><b>Chan</b></dt>
+<dd>
+An integer between 0 and 255 inclusive, usually empty or 0.
+</dd>
+
+<dt><b>Num</b></dt>
+<dd>
+An integer between -128 and 127 inclusive, usually empty or 0.
+</dd>
+</dl>
+
+<p>
+Although a <a href="http://physionet.org/physiobank/annotations.shtml">standard
+set of annotation <em>type</em>s and <em>aux</em> strings</a> is shared among
+many projects, the <em>subtype</em>, <em>chan</em>, and <em>num</em> attributes
+have no standard meanings.  Moreover, database creators may assign non-standard
+<em>type</em>s and <em>aux</em> strings, particularly if the signals are
+not electrocardiograms.  If you wish to contribute annotations to an existing
+database, please take care to familiarize yourself with its annotation
+conventions (which are usually outlined on the database's home page).
+</div>
+
+<h3>Moving the edit marker bar</h3>
+
+<p>
+Click or touch near the desired location within the signal window, then use
+<button>&#8612;</button> and <button>&#8614;</button> to make fine adjustments
+to the position of the bar.  The position increment increases gradually if you
+use either of these buttons repeatedly; switching to the other one reverses
+direction and resets the position increment to its minimum value.
+
+<p>
+If you have enabled mouse shortcuts on the <b>Settings</b> tab, simply move the
+pointer anywhere in the signal window; the edit marker will follow the pointer.
+If the marker does not move smoothly, you may have a more satisfactory
+experience using a different web browser.
+
+<h3>Marking a location (inserting an annotation)</h3>
+
+<p>
+Click or touch <button>Mark</button> once the marker bar is in the desired
+location.
+
+<p>
+If you have enabled mouse shortcuts on the <b>Settings</b> tab, simply
+click once the marker bar is in the desired location to insert an annotation
+of the type chosen from the annotation palette.  Keep the pointer
+well above or below any existing annotation label to avoid selecting and
+replacing the existing annotation rather than inserting a new one.
+
+<h3>Selecting an annotation</h3>
+
+<p>
+Use <button>&#8676;</button> and <button>&#8677;</button> to select an
+annotation.  A <em>selection rectangle</em> appears surrounding the label
+of the selected annotation.
+
+<h3>Marking an annotation</h3>
+
+<p>
+Use <button>Mark</button> to change the selected annotation to the palette
+choice (or to delete it, if the palette choice was <button style="color:
+red">&#9003;</button>).
+ 
+
+<h4>Mouse shortcut: Selecting and marking an annotation</h4>
+
+<p>
+If you have enabled mouse shortcuts on the <b>Settings</b> tab, press and hold
+the mouse button while the pointer is over an annotation label.  The selection
+rectangle will appear around the annotation.  Release the mouse button with the
+pointer <em>inside</em> the selection rectangle to change or delete the
+annotation.
+
+<h3>Moving an annotation</h3>
+
+<p>
+After selecting the annotation to be moved, use <button>&#8612;</button>
+and <button>&#8614;</button> to move the edit marker bar to the desired
+location, then touch or click <button>Mark</button> to move the annotation.
+
+<h4>Mouse shortcut: Selecting and moving an annotation</h4>
+
+<p>
+If you have enabled mouse shortcuts on the <b>Settings</b> tab, press and hold
+the mouse button while the pointer is over an annotation label.  The selection
+rectangle will appear around the annotation.  Release the mouse button with the
+pointer <em>outside</em> the selection rectangle ("click and drag").
+
+<p>
+To move the annotation by less than the distance to the edge of the selection
+rectangle, simply move the pointer above or below the rectangle.
+
+<h3>Correcting editing errors</h3>
+
+<p>
+Editing errors are probably inevitable, but they are easy to correct.
+Use <button>Undo</button> to restore the state before the most recent
+edit.  You may use <button>Undo</button> repeatedly to undo as many
+edits as you wish.  If the edit log is visible, you will see that each
+edit is recorded as one line of the log;  undone edits appear in red.
+
+<p>
+If you undo an edit that you intended to keep, use <button>Redo</button>
+to restore it.  You may use <button>Redo</button> repeatedly until there
+are no more undone edits.
+
+<h3>Uploading annotations to PhysioNet</h3>
+
+<p>
+The annotation sets you create using LightWAVE are initially stored
+locally, and they are accessible only on the computer where they were
+created.  Whenever you wish to do so, you can upload them to PhysioNetWorks
+in order to access them from another computer, or (if you wish) to share them
+with other PhysioNetWorks members.
+
+<p>
+Simplifying the process of contributing annotations to PhysioBank and to
+PhysioNetWorks projects is a major motivation for the development of LightWAVE.
 We welcome contributions of corrected and supplementary annotations for
 PhysioBank's data collections (databases).  We review all such contributions
 before posting them, with acknowledgement to their contributors.  Similarly,
@@ -23,38 +375,35 @@ many owners of PhysioNetWorks projects encourage such contributions to their
 projects.
 
 <p>
-Simplifying the process of contributing annotations to PhysioBank and to
-PhysioNetWorks projects is a major motivation for the development of LightWAVE.
-When annotation editing is implemented in LightWAVE, here's how it will work:
+To upload your annotations to PhysioNetWorks:
 
 <ol>
-<li> You will need to identify yourself by logging in to your PhysioNetWorks
-account.  (If you don't have an account, LightWAVE will guide you through the
-brief process of creating one.)
+<li> Log into your PhysioNetWorks account.  (If you don't have an account,
+you can create one in a minute or two -- it's free.)
 
-<li> Once logged in, select a record to edit, either from PhysioBank or
-from any PhysioNetWorks project of which you are a member.  You may edit an
-existing annotation file, or you may create a new one.
+<li> Start LightWAVE and open the annotation set you wish to upload.  On the
+<b>Settings</b> tab, click on <button>Sync with PhysioNetWorks</button>.  (This
+button is disabled unless you have logged in and have selected an annotation
+set that you have edited with the same computer and browser.)
+</ol>
 
-<li> As you edit, LightWAVE will upload your edits automatically into your
-personal workspace on PhysioNetWorks, where they will be accessible only
-to you.   You will be able to access them again in future editing
-sessions, and may revise or add to them if desired.  (If you edit an
-existing annotation file, your edits will be saved as a copy, and the
-original file will be unchanged, unless you are the owner of the original
-file.)
+<p>
+Your uploaded annotations are saved in a location where they are accessible
+only to you.  For example, if your PhysioNetWorks user name is
+<tt>harry@gryffindor.hogwarts.ac.uk</tt>, and you have uploaded an edited set
+of <tt>fqrs</tt> annotations for record <tt>challenge/2013/set-a/a03</tt>, they
+will be accessible to you (only) at
+<tt>https://physionet.org/users/harry@gryffindor.hogwarts.ac.uk/works/challenge/2013/set-a/a03.fqrs</tt>.
 
-<li>
-When you are finished with a set of annotations, you may mark them
-as final within LightWAVE.   At that time, LightWAVE will copy them
-to the PhysioNetWorks project associated with the record, where they will
-be visible to the members of the project.  (There will be a single project
-for annotations of data collections that are already public in PhysioBank.)
+<p>
+The uploader creates any missing directories as needed so that you will be able
+to access your uploaded annotations using LightWAVE for PhysioNetWorks, or using
+any other WFDB applications if you have authenticated yourself
+using <tt>pnwlogin</tt> (included in WFDB 10.5.14, August 2012, and later
+versions).
 
-<li> The project owner will review your annotations.  If you are the project
-owner, you will find the annotations in a "to be reviewed" group.  If the
-annotations are corrections to an existing file that you own, you may view
-and approve or reject each correction individually, or you may replace the
-entire existing file with the corrected version of it.
+<p>
+To share uploaded annotation files with others, copy them into a location
+accessible to those with whom you wish to share it.
 </ol>
 </html>

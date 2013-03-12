@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	20 February 2013  version 0.47
+//			Last revised:	  12 March 2013   version 0.48
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -52,7 +52,10 @@ var rdt_ticks;	// record length, in ticks (max of adt_ticks and sdt_ticks)
 var ann_set = ''; // annotators for the selected database, from alist()
 var ann = [];   // annotations read and cached by read_annotations()
 var nann = 0;	// number of annotators, set by read_annotations()
-var annselected = '';// name of annotator to be highlighted, if any
+var annselected = '';// name of annotator to be highlighted/searched/edited
+var selarr = null; // array of annselected annotations
+var selann = -1;// index of selected annotation in selarr, if any
+var asy0;	// baseline y for display of labels in selected annotation set
 var signals;    // signals for the selected record, from slist()
 var nsig = 0;	// number of signals, set by read_signals()
 var sigselected = '';// name of signal to be highlighted, if any
@@ -70,14 +73,41 @@ var g_visible = 1; // visibility flag for grid (1: on, 0: off)
 var m_visible = 1; // visibility flag for annotation marker bars (1: on, 0: off)
 var a_visible = []; // visibility flags for annotators
 var s_visible = []; // visibility flags for signals
-var x_cursor = 0; // SVG cursor x-coordinate (see show_time())
+var x_cursor = -1; // signal window cursor x-coordinate (see svgxyt())
+var xx_cursor = -1;// raw cursor x-coordinate (= x_cursor if in signal window)
+var y_cursor;	// unconstrained cursor y-coordinate (see svgxyt())
+var t_cursor;	// time in ticks corresponding to x_cursor (see svgxyt())
+var c_velocity = 10; // SVG cursor velocity (see nudge_left() and nudge_right())
 var mag = [];   // magnification of signals in plots
 var help_main = 'about.html'; // initial and main help topic
 var svc = '';   // SVG code to draw the cursor (see show_time())
 var svg = '';   // SVG code to draw the signal window (see show_plot())
+var svsa = '';   // SVG code to highlight the selected annotation (see jump_*)
+var m = null;  // current transformation matrix for signal window
 var requests = 0; // count of AJAX requests since last page load
 var pending = 0;  // count of pending AJAX requests
-var intervalId = null; // autoscroll timer
+var rqlog = '';	// AJAX request log (hidden by default)
+var autoscroll = null; // autoplay_fwd/rev timer
+var editing = false;   // editing controls hidden if false
+var shortcuts = false; // editing mode (true: use shortcuts, false: don't)
+
+var width;	// width of View/edit panel, in pixels
+var height;	// height of View/edit panel, in pixels
+var swl;        // width of left column, in pixels
+var sww;	// signal window width, in pixels
+var swr;	// width of right column, in pixels
+var svgw;	// grid width, in SVG coords
+var svgh;	// grid height, in SVG coords
+var svgl;	// left column width, in SVG coords
+var svgr;       // right column width, in SVG coords
+var svgtw;	// total available width in SVG coords
+var svgf;	// font-size for signal/annotation labels
+var svgtf;	// small font-size for timestamps
+var svgc;	// size for small elements (circles, etc.)
+var adx1;	// arrow half-width
+var adx2;	// arrow width / edit marker half-width
+var adx4;	// edit marker width
+var ady1;	// arrow height
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -210,8 +240,14 @@ function show_summary() {
 
     if (nann > 0) {
 	for (ia = 0; ia < nann; ia++) {
-	    itext += '<tr><td>Annotator: ' + ann[ia].name + '</td><td>'
-		+ '(' + ann[ia].annotation.length + ' annotations)</td></tr>\n';
+	    itext += '<tr><td style="vertical-align: top">Annotator: '
+		+ ann[ia].name + '</td><td>' + '(' + ann[ia].annotation.length
+		+ ' annotations)<br>\n<table style="padding: 0 0 1em 3em">';
+	    var i, s = ann[ia].summary;
+	    for (i = 0; i < s.length; i++) {
+		    itext += '<tr><td>' + s[i][0] + '</td><td align=right>' + s[i][1] + '</td</tr>\n';
+	    }
+	    itext += '</table>\n</td></tr>\n';
 	}
     }
     if (signals) {
@@ -255,8 +291,7 @@ function show_tables() {
 	    else {
 		var a = ann[ia].annotation;
 		atext += '<p><b>Annotator:</b> ' + ann[ia].name
-		    + ' (' + a.length + ' annotations)<br>\n';
-		atext += '<p><table class="dtable">\n<tr>'
+		    + '\n<p><table class="dtable">\n<tr>'
 		    + '<th>Time (elapsed)&nbsp;</th><th>Type</th>'
 		    + '<th>Sub&nbsp;</th><th>Chan</th><th>Num&nbsp;</th>'
 		    + '<th>Aux</th></tr>\n';
@@ -299,13 +334,16 @@ function show_tables() {
 		stext += '<th><i>(' + u + ')</i></th>';
 	    }
 
-	    var t = t0_ticks;
-	    for (var i = 0; t < tf_ticks; i++, t++) {
+	    for (var t = t0_ticks; t < tf_ticks; t++) {
 		stext += '</tr>\n<tr><td>' + mstimstr(t);
 		for (var j = 0; j < is; j++) {
 		    stext += '</td><td>';
 		    if (t%sig[j].tps == 0) {
-			var vi = sig[j].samp[i/sig[j].tps];
+			if (t >= sig[j].tf) {
+			    sig[j] = find_trace(db, record, sig[j].name,
+						sig[j].tf);
+			}
+			var vi = sig[j].samp[(t - sig[j].t0)/sig[j].tps];
 			if (vi == -32768) stext += '-';
 			else {
 			    v = (vi - sig[j].base)/ sig[j].gain;
@@ -323,42 +361,104 @@ function show_tables() {
 	$('#sigdata').empty();
 }
 
-var editing = false;
-var has_mouse = false;
-
 function do_edit(e) {
     var x = e.pageX;
-    show_time(x);
+    var y = e.pageY;
+    c_velocity = 10;
+    show_time(x, y);
 }
 
 function handle_edit() {
-    if (!editing)
-	$('svg').off('click', do_edit).off('mousemove', do_edit);
-    else if (has_mouse)
-	$('svg').off('click', do_edit).on('mousemove', do_edit);
-    else
-	$('svg').off('mousemove', do_edit).on('click', do_edit);
+    if (editing) {
+	$('.editgroup').show();
+	if (shortcuts) {
+	    $('svg').on('mousedown', select_ann)
+		.on('mouseup', move_selection)
+		.on('mousemove', do_edit)
+	        .off('touchstart touchend');
+	}
+	else {
+	    $('svg').on("touchstart", function(e) { select_ann(e);})
+		.on("touchend", function(e) { move_selection(e);})
+		.off('mousemove', do_edit)
+	        .off('mouseup', move_selection)
+	        .off('mousedown', select_ann);
+	}
+    }
+    else {
+	$('svg').off('mousedown mouseup touchstart touchend');
+	$('.editgroup').hide();
+    }
 }
 
-function toggle_mouse_edit() {
-    $('#touch_edit').attr('checked', false);
-    if (!has_mouse) editing = has_mouse = true;
-    else editing = !editing;
-    $('#mouse_edit').attr('checked', editing);
-    handle_edit();
+var seltype;
+
+function select_type(e) {
+    var ann = { a : null, s: null, c: null, n: null, x: null };
+
+    $(seltype).css("color", "blue").css("background-color", "white");
+    seltype = e.target;
+    $(seltype).css("color", "white").css("background-color", "blue");
+    var s = $(seltype).text();
+    var f = s.split(":");
+
+    switch (f.length) {
+    case 1:
+	if (f[0][0] == '(' && f[0].length > 1) {
+	    ann.a = '+';
+	    ann.x = f[0];
+	}
+	else
+	    ann.a = f[0];
+	break;
+    case 2:
+	ann.a = f[0];
+	ann.x = f[1];
+	break;
+    }
+    copy_to_template(ann);
 }
 
-function toggle_touch_edit() {
-    $('#mouse_edit').attr('checked', false);
-    if (has_mouse) { editing = true; has_mouse = false; }
-    else editing = !editing;
-    $('#touch_edit').attr('checked', editing);
-    handle_edit();
+// initialize the palette with the most common annotation types in summary
+function load_palette(summary) {
+    var i, imax, ptext = '';
+
+    imax = summary.length;
+    if (imax > 20) imax = 20;
+    for (i = 0; i < imax; i++) {
+	ptext += '<button class="palette_ann"';
+	if (i == 0) {
+	    ptext += ' style="color: white; background-color: blue"';
+	    seltype = '#palette_0';
+	}
+	else
+	    ptext += ' style="color: blue; background-color: white"';
+	ptext += ' id="palette_' + i + '">' + summary[i][0] + '</button>';
+    }
+    var f = summary[0][0].split(":");
+
+    switch (f.length) {
+    case 1:
+	if (f[0][0] == '(' && f[0].length > 1) {
+	    ann.a = '+';
+	    ann.x = f[0];
+	}
+	else
+	    ann.a = f[0];
+	break;
+    case 2:
+	ann.a = f[0];
+	ann.x = f[1];
+	break;
+    }
+    copy_to_template(ann);
+    $('#palette').html(ptext);
+    $('.palette_ann').on('click', select_type);
 }
+
 
 function handle_svg_events() {
-    handle_edit();
-
+    $('svg').click(function(event){ mark(event); });
     $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
 
@@ -367,9 +467,17 @@ function handle_svg_events() {
 	if (a_visible[aname] == 0) {
 	    a_visible[aname] = 1;
 	    annselected = aname;
+	    for (var i = 0; i < nann; i++) {
+		if (ann[i].name == aname) {
+		    selarr = ann[i].annotations;
+		    load_palette(ann[i].summary);
+		    break;
+		}
+	    }
 	}
 	else if (annselected == aname) {
 	    annselected = '';
+	    if (nann > 1) selarr = null;
 	}
 	else {
 	    a_visible[aname] = 0;
@@ -400,21 +508,6 @@ function handle_svg_events() {
     });
 }
 
-var width, height, swl, sww, swr;  // View/edit graphics dimensions, in pixels
-var svgw = 1000*dt_sec, svgh = svgw/2; // Grid dimensions, in SVG coords
-var svgl = svgw/8;	  	   // Left column width, in SVG coords
-var svgr = svgw/24;		   // Right column width, in SVG coords
-var svgt = 12*dt_sec;		   // Top margin in SVG coords (y-translation)
-var svgtw = svgl + svgw + svgr;    // Total available width in SVG coords
-var svgf = 12*dt_sec;		   // font-size for signal/annotation labels
-var svgtf = 10*dt_sec;		   // Small font-size for timestamps
-var svgc = 5*dt_sec;		   // Size for small elements (circles, etc.)
-var adx1 = 2*dt_sec;
-var adx2 = 4*dt_sec;
-var adx4 = 8*dt_sec;
-var ady1 = 10*dt_sec;
-var ady2 = 20*dt_sec;
-
 function set_sw_width(seconds) {
     dt_sec = seconds;
     svgw = 1000*dt_sec;
@@ -429,7 +522,6 @@ function set_sw_width(seconds) {
     adx2 = 4*dt_sec;
     adx4 = 8*dt_sec;
     ady1 = 10*dt_sec;
-    ady2 = 20*dt_sec;
 }
 
 function show_plot() {
@@ -449,17 +541,15 @@ function show_plot() {
 	if (is < nsig) { y0s[is] = y; y += dy; is++; }
 	if (ia < nann) { y0a[ia] = y; y += dy; ia++; }
     }
+    if (nann > 0) asy0 = y0a[0];
 
     svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
 	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
 	+ ' width="' + width + '" height="' + height
 	+ '" preserveAspectRatio="xMidYMid meet">\n';
     svg += '<g id="viewport" transform="scale(' + width/svgtw
-	+ '),translate(' + svgl + ',' + svgt + ')">\n';
+	+ '),translate(' + svgl + ',' + svgf + ')">\n';
     
-    // cursor
-    svg += '<g id="cursor"></g>';
-
     // background grid
     var grd = '<g id="grid">\n';
     grd += '<circle cx="-' + svgf + '" cy="' + svgh
@@ -502,26 +592,6 @@ function show_plot() {
 	    + timstr(ttick) + '</text>\n';
 	ttick += tickint;
     }
-/*
-    var tsm = (t0_ticks + +tf_ticks + x0s*tickfreq/500)/2;
-
-    tst = '<g id="times">\n<text x="' + x0s + '" y="' + svgts
-	+ '" font-size="' + svgtf + '" fill="red" style="text-anchor: middle;">'
-	+ timstr(t0_ticks + x0s*tickfreq/1000) + '</text>\n';
-
-    if (dt_sec%2 == 0) {
-	tst += 	'\n<text x="' + (x0s + +svgw/2) + '" y="' + svgts
-	    + '" font-size="' + svgtf
-	    + '" fill="red" style="text-anchor: middle;">'
-	    + timstr(tsm) + '</text>\n';
-    }
-
-    if (x0s == 0) {
-	tst += '<text x="' + svgw + '" y="' + svgts + '" font-size="' + svgtf
-	    + '" fill="red" style="text-anchor: middle;">' + timstr(tf_ticks)
-	    + '</text></g>\n';
-    }
-*/
     tst += '</g>\n';
 
 
@@ -538,18 +608,22 @@ function show_plot() {
 	+ ',' + ady1 + ' V';
     for (ia = 0; ia < nann; ia++) {
 	var y0 = y0a[ia];
+	var ytop = y0 - svgf;
 	var aname = ann[ia].name;
 	sva += '<g id="ann;;' + aname + '">\n';
 	if (a_visible[aname] == 1) {
 	    sva += '<title>' + ann[ia].desc;
 	    if (aname == annselected) {
-		sva += ' (click for normal view)</title>'
-		    + '<text font-weight="bold"';
+		asy0 = y0;
+		sva += ' (click for normal view)</title>';
 	    }
 	    else {
-		sva += ' (click to hide)</title><text'
+		sva += ' (click to hide)</title>';
 	    }
-	    sva += ' x="-50" y="' + y0
+	    sva += '<rect x="-' + svgl + '" y="' + ytop
+		+ '" width="' + svgl + '" height="' + 2*svgf
+		+ '" fill="white" />'
+		+ '<text x="-50" y="' + y0
 		+ '" font-size="' + svgf + '" fill="blue" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
 	    if (aname == annselected)
@@ -590,6 +664,9 @@ function show_plot() {
 	else {
 	    sva += '<title>' + ann[ia].desc
 	    	+ ' (click for highlighted view)</title>'
+		+ '<rect x="-' + svgl + '" y="' + ytop
+		+ '" width="' + svgl + '" height="' + 2*svgf
+		+ '" fill="white" />'
 		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
 		+ '" fill="rgb(150,150,200)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
@@ -598,26 +675,30 @@ function show_plot() {
     }
 
     // signal names and traces
-    svs = '';
+    var svs = '';
     for (is = 0; is < nsig; is++) {
 	var y0 = y0s[is];
+	var ytop = y0 - svgf;
 	var sname = signals[is].name;
 	var trace = find_trace(db, record, sname, t0_ticks);
 	
 	svs += '<g id="sig;;' + sname + '">\n';
 	if (trace && s_visible[sname] == 1) {
 	    svs += '<title>' + sname;
-	    if (sname == sigselected) {
-		svs += ' (click for normal view)</title>'
-		    + '<text font-weight="bold"';
-	    }
+	    if (sname == sigselected)
+		svs += ' (click for normal view)</title>';
 	    else {
-		svs += ' (click to hide)</title><text'
+		svs += ' (click to hide)</title>'
 	    }
-	    svs += ' x="-50" y="' + y0
+	    svs += '<rect x="-' + svgl + '" y="' + ytop
+		+ '" width="' + svgl + '" height="' + 2*svgf
+		+ '" fill="white" />'
+		+ '<text x="-50" y="' + y0
 		+ '" font-size="' + svgf + '" fill="black" font-style="italic"'
-		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ sname + '</text></g>\n';
+		+ ' style="text-anchor: end; dominant-baseline: middle"';
+	    if (sname == sigselected)
+		svs += ' font-weight="bold"';
+	    svs += '>' + sname + '</text></g>\n';
 
 	    var s = trace.samp;
 	    var tps = trace.tps;
@@ -671,7 +752,7 @@ function show_plot() {
 			    svs += ' '  + x + ',' + v;
 			else
 			    svs += ' M' + x + ',' + v
-			        +  ' L' + x + ',' + v;
+			    +  ' L' + x + ',' + v;
 			pv = true;
 		    }
 		    else
@@ -685,6 +766,9 @@ function show_plot() {
 	}
 	else {	// signal is hidden, show label only
 	    svs += '<title>' + sname + ' (click for highlighted view)</title>'
+		+ '<rect x="-' + svgl + '" y="' + ytop
+		+ '" width="' + svgl + '" height="' + 2*svgf
+		+ '" fill="white" />'
 		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
 		+ '" fill="rgb(128,128,128)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
@@ -694,7 +778,9 @@ function show_plot() {
 
     svg += grd + tst + sva + svs;
     $('#plotdata').html(svg + '</svg>\n');
-    $('.pointer').html('&nbsp;');
+    if (selann >= 0 &&
+	t0_ticks <= selarr[selann].t && selarr[selann].t <= t0_ticks + dt_ticks)
+	show_time(selarr[selann].t);
     handle_svg_events();    // Handle user input in the signal window
 }
 
@@ -703,33 +789,25 @@ function update_output() {
     else if (current_tab == 'Tables') show_tables();
 }
 
-function toggle_show_status() {
-    $('#status').toggle();
-}
-
-function toggle_show_log() {
-    $('#log').toggle();
-}
-
-function clear_log() {
-    requests = 0; pending = 0;
-    $('#log').empty();
-}
-
 function show_status(requestp) {
-    var status;
+    var i, status;
 
     if (requestp) {
 	requests++; pending++;
-	if ((requests % 100) == 0)
-	    $('#log').empty();   // don't allow log to grow without bounds
+	if (requests > 10) {
+	    for (i = rqlog.length - 5; i > 0 && rqlog[i] != '\n'; i--)
+		;
+	    rqlog = requests + ': ' + url + '<br>\n' + rqlog.substring(0, i);
+	}
+	else
+	    rqlog = requests + ': ' + url + '<br>\n' + rqlog;
+	$('#requests').html(rqlog);
     }
     else {
 	pending--;
     }
     status = 'Requests: ' + requests + '&nbsp;&nbsp;Pending: ' + pending;
     $('#status').html(status);
-    if (requestp) $('#log').prepend(url + '<br>\n');
 }
 
 // Retrieve one or more complete annotation files for the selected record.
@@ -745,13 +823,14 @@ function read_annotations(t0_string) {
 	    + '&dt=0&callback=?';
 	show_status(true);
 	$.getJSON(url, function(data) {
+	    slist(t0_string);
 	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
 		ann[nann] = data.fetch.annotator[i];
 		a_visible[ann[nann].name] = 1;
-		ann[nann].opacity = 1;
-		for (var j = 0; j < ann_set.length; j++)
+		for (var j = 0; j < ann_set.length; j++) {
 		    if (ann[nann].name == ann_set[j].name)
 			ann[nann].desc = ann_set[j].desc;
+		}
 	    }
 	    for (i = 0; i < ann.length; i++) {
 		var len, t;
@@ -760,20 +839,51 @@ function read_annotations(t0_string) {
 		if (len > 0) var t = ann[i].annotation[len-1].t;
 		if (t > adt_ticks) adt_ticks = t;
 	    }
-	    if (atarget != '') {
+
+	    // compile summaries of the annotation types in each set
+	    for (i = 0; i < nann; i++) {
+		var a = ann[i].annotation, j, key, s = {}, ss = [];
+
+		for (j = 0; j < a.length; j++) {
+		    if (a[j].x != null) {
+			if (a[j].a == '+' && a[j].x[0] == '(') key = a[j].x;
+			else key = a[j].a + ':' + a[j].x;
+		    }
+		    else
+			key = a[j].a;
+		    if (s.hasOwnProperty(key))
+			s[key]++;
+		    else
+			s[key] = 1;
+		}
+		for (key in s)
+		    ss.push([key, s[key]]);
+		// sort the types by prevalence (most to least frequent)
+		ann[i].summary = ss.sort(function(a, b) {return b[1] - a[1]});
+	    }
+
+	    if (annselected != '') {
 		for (i = 0; i < nann; i++) {
-		    if (atarget === ann[i].name)
+		    if (annselected === ann[i].name) {
+			selarr = ann[i].annotation;
+			load_palette(ann[i].summary);
 			break;
+		    }
 		}
 		if (i >= nann)
-		    atarget = '';
+		    annselected = '';
 	    }
-	    if (atarget == '') atarget = ann[0].name;
-	    slist(t0_string);
+	    if (annselected == '') {
+		annselected = ann[0].name;
+		selarr = ann[0].annotation;
+		load_palette(ann[0].summary);
+	    }
 	    show_status(false);
 	});
     }
     else {
+	annselected = '';
+	selarr = null;
 	slist(t0_string);
     }
 }
@@ -844,7 +954,7 @@ function go_here(t_ticks) {
     else {
 	$('.fwd').removeAttr('disabled');
 	$('.eor').removeAttr('disabled');
-	if (target && atarget) $('.sfwd').removeAttr('disabled');
+	if (target && annselected) $('.sfwd').removeAttr('disabled');
     }
     if (t_ticks <= 0) {
 	t_ticks = 0;
@@ -855,7 +965,7 @@ function go_here(t_ticks) {
     else {
 	$('.rev').removeAttr('disabled');
 	$('.sor').removeAttr('disabled');
-	if (target && atarget) $('.srev').removeAttr('disabled');
+	if (target && annselected) $('.srev').removeAttr('disabled');
     }
 
     var title = 'LW: ' + sdb + '/' + record;
@@ -874,6 +984,11 @@ function go_here(t_ticks) {
 	$('.fwd').attr('disabled', 'disabled');
 	$('.eor').attr('disabled', 'disabled');
 	$('.sfwd').attr('disabled', 'disabled');
+    }
+    if (m) {
+	var x = Math.round(x_cursor * m.a + m.e);
+	var y = Math.round(asy0 * m.d + m.f);
+	show_time(x, y);
     }
 }
 
@@ -898,27 +1013,36 @@ function scrollfwd() {
 }
 
 function resize_lightwave() {
+    m = document.getElementById("viewport").getScreenCTM();
+    set_sw_width(dt_sec);
     $('#helpframe').attr('height', $(window).height() - 180 + 'px');
     show_plot(); // redraw signal window if resized
 }
 
 function autoplay_off() {
-    if (intervalId) { clearInterval(intervalId); intervalId= null; }
+    if (autoscroll) {
+	clearInterval(autoscroll);
+	autoscroll= null;
+	$('.scrollfwd').html('&#9654;');
+	$('.scrollrev').html('&#9664;');
+    }
 }
 
 function autoplay_fwd() {
-    if (intervalId) autoplay_off();
+    if (autoscroll) autoplay_off();
     else {
 	var dti = 50+dt_ticks*nsig/1000;
-	intervalId = setInterval(scrollfwd, dti);
+	autoscroll = setInterval(scrollfwd, dti);
+	$('.scrollfwd').html('<div style="color: red">&#9632;</div>');
     }
 }
 
 function autoplay_rev() {
-    if (intervalId) autoplay_off();
+    if (autoscroll) autoplay_off();
     else {
 	var dti = 50+dt_ticks*nsig/1000;
-	intervalId = setInterval(scrollrev, dti);
+	autoscroll = setInterval(scrollrev, dti);
+	$('.scrollrev').html('<div style="color: red">&#9632;</div>');
     }
 }
 
@@ -932,7 +1056,7 @@ function gorev() {
     go_here(t_ticks);
     prefetch(t_ticks - dt_ticks);
 }
-	 
+
 function go_to() {
     var t0_string;
     if (current_tab == 'View/edit') t0_string = $('#view .t0_str').val();
@@ -1000,7 +1124,7 @@ function match(sa, i) {
 	break;
     default:
 	if (sa[i].a == target || sa[i].x == target)
-	    m= true;
+	    m = true;
     }
     return m;
 }
@@ -1010,7 +1134,7 @@ function srev() {
 
     // find the annotation set
     for (i = 0; i < nann; i++) {
-	if (ann[i].name == atarget) {
+	if (ann[i].name == annselected) {
 	    sa = ann[i].annotation;
 	    na = sa.length;
 	    break;
@@ -1053,7 +1177,7 @@ function srev() {
     }
     else {  // no match found, disable further reverse searches
 	$('.srev').attr('disabled', 'disabled');
-	alert(target + ' not found in ' + atarget
+	alert(target + ' not found in ' + annselected
 	      + ' before ' + timstr(t0_ticks));
     }
 }
@@ -1063,7 +1187,7 @@ function sfwd() {
 
     // find the annotation set
     for (i = 0; i < nann; i++) {
-	if (ann[i].name == atarget) {
+	if (ann[i].name == annselected) {
 	    sa = ann[i].annotation;
 	    na = sa.length;
 	    break;
@@ -1072,6 +1196,8 @@ function sfwd() {
     if (i >= nann) return;  // annotation set not found
 
     // find the first annotation in the set after the signal window
+//    i = ann_after(anns
+
     for (i = 0; i < na && sa[i].t < tf_ticks; i++)
 	;
 
@@ -1106,7 +1232,7 @@ function sfwd() {
     }
     else {  // no match found, disable further forward searches
 	$('.sfwd').attr('disabled', 'disabled');
-	alert(target + ' not found in ' + atarget
+	alert(target + ' not found in ' + annselected
 	      + ' after ' + timstr(tf_ticks));
     }
 }
@@ -1123,21 +1249,21 @@ function find() {
 	return;
     }
     else if (nann == 1) {
-	atarget = ann[0].name;
+	annselected = ann[0].name;
 	content = '<div title= \"' + ann[0].desc + '">In: '
 	    + ann[0].name + '</div>';
     }
     else {
 	content = '<div title="Select a set of annotations to search">'
-	    + 'In:&nbsp;<select name=\"atarget\" id=\"atarget\">\n';
+	    + 'In:&nbsp;<select name=\"annselected\" id=\"annselected\">\n';
 	for (i = 0; i < nann; i++) {
-	    if (atarget === ann[i].name) break;
+	    if (annselected === ann[i].name) break;
 	}
-	if (i > nann) atarget = ann[0].name;
+	if (i > nann) annselected = ann[0].name;
 	for (i = 0; i < nann; i++) {
 	    content += '<option value=\"' + ann[i].name + '\" title =\"'
 		+ ann[i].desc + '\" ';
-	    if (atarget === ann[i].name) {
+	    if (annselected === ann[i].name) {
 		content += ' selected';
 	    }
 	    content += '>' + ann[i].name + '</option>\n';
@@ -1146,13 +1272,13 @@ function find() {
     }
     $('#annsets').html(content);
     $('#target').val(target);
-    $('#target, #atarget').on("change", function() {
+    $('#target, #annselected').on("change", function() {
 	target = $('#target').val();
 	if (nann > 1) {
-	    atarget = $('#atarget').val();
+	    annselected = $('#annselected').val();
 	}
-	else atarget = ann[0].name;
-	if (target != '' && atarget != '') {
+	else annselected = ann[0].name;
+	if (target != '' && annselected != '') {
 	    if (t0_ticks > 0)
 		$('.srev').removeAttr('disabled');
 	    if (tf_ticks <= rdt_ticks)
@@ -1165,11 +1291,11 @@ function find() {
         height: 'auto',
 	beforeClose: function(event, ui) {
 	    target = $('#target').val();
-	    if (nann > 1) atarget = $('#atarget').val();
-	    else atarget = ann[0].name;
+	    if (nann > 1) annselected = $('#annselected').val();
+	    else annselected = ann[0].name;
 	},
 	close: function(event, ui) {
-	    if (target != '' && atarget != '') {
+	    if (target != '' && annselected != '') {
 		if (t0_ticks > 0)
 		    $('.srev').removeAttr('disabled');
 		if (tf_ticks <= rdt_ticks)
@@ -1186,13 +1312,6 @@ function stretch_signal() {
     }
 }
 
-function shrink_signal() {
-    if (sigselected != '' && mag[sigselected] > 0.001) {
-	mag[sigselected] /= 1.1;
-	show_plot();
-    }
-}
-
 function reset_signal() {
     if (sigselected != '' && mag[sigselected] != 1) {
 	mag[sigselected] = 1.1;
@@ -1200,9 +1319,382 @@ function reset_signal() {
     }
 }
 
+function shrink_signal() {
+    if (sigselected != '' && mag[sigselected] > 0.001) {
+	mag[sigselected] /= 1.1;
+	show_plot();
+    }
+}
+
+// hide or show add type to palette dialog
+function toggle_add_typebox() {
+    if (!editing) {
+	$('.editgroup').hide();
+	return;
+    }
+    if (nann < 1) {
+	alert('No annotations to edit!');
+	return;
+    }
+    else if ($('#add_typebox').dialog("isOpen")) {
+	$('#add_typebox').dialog("close");
+	return;
+    }
+    else {
+	$('#add_typebox').dialog("open");
+	$('#add_typebox').dialog({
+	    width: '500px',
+	    height: 'auto'
+	});
+    }
+}
+
+function ann_after(a, t) {
+    if (!a) return (-1);
+    var i, imin = 0, imax = a.length - 1;
+
+    while (imax - imin > 1) {
+	i = Math.floor((imin + imax)/2);
+	if (a[i].t <= t)
+	    imin = i;
+	else
+	    imax = i;
+    }
+    return (imax);
+}	    
+
+
+function ann_before(a, t) {
+    if (!a) return (-1);
+    var i, imin = 0, imax = a.length - 1;
+
+    while (imax - imin > 1) {
+	i = Math.floor((imin + imax)/2);
+	if (a[i].t > t)
+	    imax = i;
+	else
+	    imin = i;
+    }
+    return (imin);
+}	    
+
+function highlight_selection() {
+    var x0 = Math.floor((selarr[selann].t - t0_ticks)*1000/tickfreq) - svgf;
+    var y0 = asy0 - 2*svgf;
+    svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+	+ '" fill="yellow" fill-opacity="0.2" d="M'
+	+ x0 + ',' + y0 + ' l' + 2*svgf + ',0 l0,' + 3*svgf
+	+ ' l-' + 2*svgf + ',0 l0,-' + 3*svgf + '" />';
+}
+
+function jump_left() {
+    var i, x, y;
+    var t = t0_ticks + x_cursor*tickfreq/1000;
+
+    i = ann_before(selarr, t);
+    t = selarr[i].t;
+
+    if (t < t0_ticks) {
+	do {
+	    t0_ticks -= dt_ticks;
+	} while (t < t0_ticks);
+	go_here(t - dt_ticks/2);
+    }
+    if (selann == i) {
+	selann = -1;
+	svsa = '';
+    }
+    else {
+	selann = i;
+	highlight_selection();
+    }
+    x = Math.floor((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+    y = Math.round(asy0 * m.d + m.f);
+    c_velocity = 10;
+    show_time(x, y);
+}
+
+function nudge_left() {
+    if (c_velocity > 0) c_velocity = -10;
+    else if (c_velocity > -100) c_velocity *= 1.1;
+    if (x_cursor > 0) x_cursor += c_velocity;
+    var x = Math.round(x_cursor * m.a + m.e);
+    var y = Math.round(asy0 * m.d + m.f);
+    show_time(x, y);
+}
+
+function nudge_right() {
+    if (c_velocity < 0) c_velocity = 10;
+    else if (c_velocity < 100) c_velocity *= 1.1;
+    if (x_cursor < svgw) x_cursor += c_velocity;
+    var x = Math.round(x_cursor * m.a + m.e);
+    var y = Math.round(asy0 * m.d + m.f);
+    show_time(x, y);
+}
+
+function jump_right() {
+    var i, x, y;
+    var t = t0_ticks + x_cursor*tickfreq/1000;
+
+    i = ann_after(selarr, t);
+    t = selarr[i].t;
+
+    if (t > t0_ticks + dt_ticks)
+	go_here(t - dt_ticks/2);
+
+    if (selann == i) {
+	selann = -1;
+	svsa = '';
+    }
+    else {
+	selann = i;
+	highlight_selection();
+    }
+    x = Math.ceil((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+    y = Math.round(asy0 * m.d + m.f);
+    c_velocity = 10;
+    show_time(x, y);
+}
+
+function undo() {
+    ;
+}
+
+function select_ann(e) {
+    svgxyt(e.pageX, e.pageY);
+    if (asy0 - 2*svgf < y_cursor && y_cursor < asy0 + 3*svgf) {
+	i = ann_before(selarr, t_cursor);
+	if (i >= 0) {
+	    dt = t_cursor - selarr[i].t;
+	    if (dt < 150) {
+		if (i+1 < selarr.length) {
+		    if (dt > selarr[i+1].t - t_cursor)
+			selann = i+1;
+		    else
+			selann = i;
+		}
+	    }
+	    else if (i+1 < selarr.length) {
+		if (selarr[i+1].t - t_cursor < 150)
+		    selann = i+1;
+	    }
+	    else
+		selann = -1;
+	}
+	if (selann >= 0) highlight_selection();
+    }
+}
+
+function copy_from_template(ann)
+{
+    ann.a = $('#edita').val();
+    ann.s = $('#edits').val();
+    ann.c = $('#editc').val();
+    ann.n = $('#editn').val();
+    ann.x = $('#editx').val();
+}
+
+function copy_to_template(ann)
+{
+    $('#edita').val(ann.a);
+    $('#edits').val(ann.s);
+    $('#editc').val(ann.c);
+    $('#editn').val(ann.n);
+    $('#editx').val(ann.x);
+}
+
+function move_selection(e) {
+    if (selann >= 0) {
+	svgxyt(e.pageX, e.pageY);
+	var sel = selarr[selann];
+	// if the cursor is in the selection rectangle, apply the template
+	if (anew.a && asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf &&
+	    sel.t - tickfreq/8 < t_cursor && t_cursor < sel.t + tickfreq/8) {
+	    copy_from_template(sel);
+	}
+	// otherwise move the selected annotation without other modification
+	else {
+	    sel.t = t_cursor;
+	    // if the order of annotations has changed, remove and reinsert sel
+	    if ((selann > 0 && selarr[selann-1].t > sel.t) ||
+		(selann < selarr.length && selarr[selann+1].t < sel.t)) {
+ 		selarr.splice(selann, 1);      // remove sel
+		selann = ann_after(selarr, t); // find successor, update selann
+		selarr.splice(i, 0, sel);      // reinsert sel before successor
+	    }
+	}
+    }
+}
+
+function delete_ann() {
+    selarr.splice(selann, 1);
+}
+
+var insert_mode = true;
+
+function toggle_insert_mode() {
+    if (insert_mode) {
+	insert_mode = false;
+	$('#insert_mode').css("color", "white").css("background-color", "red")
+	    .attr("title", "click to return to insert mode");
+    }
+    else {
+	insert_mode = true;
+	$('#insert_mode').css("color", "red").css("background-color", "white")
+	    .attr("title", "click to enter delete mode");
+    }
+}
+
+function mark(event) {
+    var a, anew, c, i;
+    
+    function anncomp(a, b) {
+	if (a.t < b.t) return 1;
+	else if (a.t > b.t) return -1;
+	else if (a.c < b.c) return 1;
+	else if (a.c > b.c) return -1;
+	else if (a.n < b.n) return 1;
+	else if (a.n > b.n) return -1;
+	else return 0;
+    }
+
+    if (!editing
+	|| (!annselected && nann != 1)
+	|| x_cursor < 0
+	|| x_cursor > svgw)
+	return;
+
+    if (nann != 1) {
+	for (i = 0; i < nann; i++)
+	    if (ann[i].name == annselected) break;
+	if (i >= nann) return;
+    }
+    else
+	i = 0;
+    a = ann[i].annotation;
+
+    anew = { t: null, a: null, s: null, c: null, n: null, x: null };
+
+    anew.t = Math.round(t0_ticks + x_cursor*tickfreq/1000);
+    anew.a = $('#edita').val();
+    if (!anew.a) {
+	alert('No edit performed!  Set the\n'
+	    + 'Annotation type in the Insert...\n'
+	    + 'box to enable editing.');
+	if (!$('#editbox').dialog("isOpen"))
+	    $('#editbox').dialog("open");
+	return;
+    }
+    anew.s = $('#edits').val();
+    anew.c = $('#editc').val();
+    anew.n = $('#editn').val();
+    anew.x = $('#editx').val();
+
+    // commit the edit
+    if (selann >= 0) {		// anew will replace selann
+	a.splice(selann, 1);	// delete selann
+    }
+
+    // insert anew in time/chan/num order
+    for (i = 0; i < a.length; i++) {
+	c = anncomp(a[i], anew);
+	if (c <= 0) break;
+    }
+    if (i >= a.length)
+	a[i] = anew;	// add anew to the end of the annotation array
+    else if (i == 0)
+	a.unshift(anew);    // add anew at the beginning
+    else
+	a.splice(i, 0, anew); // insert anew between a[i-1] and a[i]
+    update_output();
+}
+
+function redo() {
+    ;
+}
+
 function set_server() {
     server = $('[name=server]').val();
     dblist();
+}
+
+
+function toggle_show_status() {
+    $('#status').toggle();
+    if ($('#status').is(":hidden")) {
+	$('#show_status').html("Show status");
+    }
+    else {
+	$('#show_status').html("Hide status");
+    }
+}
+
+function toggle_show_requests() {
+    $('#requests').toggle();
+    if ($('#requests').is(":hidden")) {
+	$('#show_requests').html("Show request log");
+    }
+    else {
+	$('#show_requests').html("Hide request log");
+    }
+}
+
+function clear_requests() {
+    requests = 0; pending = 1;
+    rqlog = '';
+    show_status(false);
+    $('#requests').empty();
+}
+
+function alert_editing() {
+    alert("WARNING: Annotation editing is not yet implemented!\n\n"
+	  + "Active editing controls affect the display only.\n"
+	  + "Any edits you make will not be saved.\n\n"
+	  + "See help topic 'Editing annotations with LightWAVE'\n"
+	  + "for information about planned features, some of which\n"
+	  + "have been implemented in this version.  More of these\n"
+	  + "features will appear in the next few releases.");
+}
+
+function toggle_editing() {
+    if (editing) {
+	editing = false;
+	$('#editing').html("Enable editing");
+    }
+    else {
+	editing = true;
+	$('#editing').html("Disable editing");
+	alert_editing();
+    }
+    handle_edit();
+}
+
+function toggle_shortcuts() {
+    if (shortcuts) {
+	shortcuts = false;
+	$('#shortcuts').html("Enable mouse shortcuts");
+    }
+    else {
+	shortcuts = editing = true;
+	$('#shortcuts').html("Disable mouse shortcuts");
+	$('#editing').html("Disable editing");
+	alert_editing();
+    }
+    handle_edit();
+}
+
+function new_annset() {
+    alert("not yet implemented!");
+}
+
+function toggle_show_edits() {
+    $('#edits').toggle();
+    if ($('#edits').is(":hidden")) {
+	$('#show_edits').html("Show edit log");
+    }
+    else {
+	$('#show_edits').html("Hide edit log");
+    }
 }
 
 function help() {
@@ -1217,23 +1709,34 @@ function help_contacts() {
     $('#helpframe').attr('src', 'doc/contacts.html');
 }
 
-function show_time(x) {
-    var m = viewport.getScreenCTM();
-    x_cursor = (x - m.e)/m.a;
-    if (x_cursor < 0) x_cursor = 0;
-    else if (x_cursor > svgw) x_cursor = svgw;
-    var t = t0_ticks + x_cursor*tickfreq/1000;
-    var ts = mstimstr(t);
+// convert (x,y) in pixels to SVG coords and time in ticks
+function svgxyt(x, y) {
+	m = document.getElementById("viewport").getScreenCTM();
+	x_cursor = xx_cursor = (x - m.e)/m.a;
+	if (x_cursor < 0) x_cursor = 0;
+	else if (x_cursor > svgw) x_cursor = svgw;
+	y_cursor = (y - m.f)/m.d;
+	t_cursor = t0_ticks + x_cursor*tickfreq/1000;
+}
+
+function show_time(x, y) {
+    svgxyt(x, y);
+    var ts = mstimstr(t_cursor);
     $('.pointer').html(ts);
 
-    svc = '<path stroke="rgb(0,100,0)" stroke-width="' + dt_sec
-	+ '" fill="none"' + ' d="M' + x_cursor
-	+ ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
-	+ ',' + ady1 + ' V' + svgh
-	+ ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
-	+ ',-' + ady1 + '" />';
-    $('#plotdata').html(svg + svc + '</svg>\n');
-
+    if (editing) {
+	var xc = x_cursor - 2*adx4;
+	svc = '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
+	    + '" fill="none" d="M' + x_cursor
+	    + ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	    + ',' + ady1 + ' V' + svgh
+	    + ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	    + ',-' + ady1 + '" />';
+	svc += '<path stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+	    + '" fill="none" d="M' + xc + ',' + y_cursor
+	    + ' l' + 4*adx4 + ',0" />';
+	$('#plotdata').html(svg + svc + svsa + '</svg>\n');
+    }
     handle_svg_events();
 }
 
@@ -1261,7 +1764,7 @@ function slist(t0_string) {
 		nsig = signals.length;
 		for (var i = 0; i < nsig; i++)
 		    s_visible[signals[i].name] = mag[signals[i].name] = 1;
-		init_tpool(nsig * 4);
+		init_tpool(nsig * 8);
 	    }
 	    else {
 		signals = null;
@@ -1284,11 +1787,13 @@ function slist(t0_string) {
 function newrec() {
     record = $('[name=record]').val();
     $('#findbox').dialog("close");
+    $('#add_typebox').dialog("close");
     var prompt = 'Reading annotations for ' + sdb + '/' + record;
     $('#prompt').html(prompt);
     read_annotations("0");
     prompt = 'Click on the <b>View/edit</b> tab to view ' + sdb + '/' + record;
     $('#prompt').html(prompt);
+    set_sw_width(dt_sec);    
 }
 
 // Load the list of annotators in the selected database.
@@ -1406,38 +1911,48 @@ function set_handlers() {
     // Handlers for buttons and other controls:
     //  on View/edit and Tables tabs:
     $('.go_to').on("click", go_to);      // go to selected location
-    $('.eor').on("click", goend);	 // go to end of record
+
+    $('.sor').on("click", gostart);	 // go to start of record
     $('.rev').on("click", gorev);	 // go back by dt_sec and plot or print
     $('.scrollrev').on("click", autoplay_rev); // toggle reverse autoscrolling
     $('.scrollfwd').on("click", autoplay_fwd); // toggle forward autoscrolling
     $('.fwd').on("click", gofwd);	 // advance by dt_sec and plot or print
-    $('.sor').on("click", gostart);	 // go to start of record
+    $('.eor').on("click", goend);	 // go to end of record
 
     $('.srev').on("click", srev);	 // search for previous 'Find' target
-    $('.find').on("click", find);	 // open 'Find' dialog
+    $('.find').on("click", find);	 // open/close 'Find' dialog
     $('.sfwd').on("click", sfwd);	 // search for next 'Find' target
-    // disable search buttons until a target has been defined
-    $('.sfwd').attr('disabled', 'disabled');
-    $('.srev').attr('disabled', 'disabled');
+
+    // signal window
+    $('#plotdata').on("mousemove", function(e){ show_time(e.pageX, e.pageY); });
 
     $('.stretch').on("click", stretch_signal); // enlarge selected signal
     $('.reset').on("click", reset_signal);     // reset scale of selected signal
     $('.shrink').on("click", shrink_signal);   // reduce selected signal
-    // disable signal resize buttons until a signal has been selected
-    $('.stretch').attr('disabled', 'disabled');
-    $('.reset').attr('disabled', 'disabled');
-    $('.shrink').attr('disabled', 'disabled');
+
+    // editgroup buttons
+    $('#add_type').on("click", toggle_add_typebox);
+    $('#insert_mode').on("click", toggle_insert_mode);
+    $('#jumpleft').on("click", jump_left);      // select annotation to left
+    $('#nudgeleft').on("click", nudge_left);    // move left one increment
+    $('#nudgeright').on("click", nudge_right);  // move left one increment
+    $('#jumpright').on("click", jump_right);    // select annotation to left
+    $('#undo').on("click", undo);    // restore state before most recent edit
+    $('#mark').on("click", mark);    // complete the pending edit
+    $('#redo').on("click", redo);    // reapply most recent edit
 
     // Signal window duration slider on View/edit tab
     $(function() {
-	$('#dtslider').slider({ value: dt_sec, min: 5, max: 60, step: 5,
+	$('#dtslider').slider({ value: dt_sec, min: 0, max: 60, step: 5,
 	    slide: function(event, ui) {
+		if (ui.value < 5) ui.value = 1;
 		$('#swidth').val(ui.value);
 		dt_sec = ui.value;
 		dt_ticks = dt_sec * tickfreq;
 		if (dt_sec < 10) tickint = tickfreq;
 		else if (dt_sec < 35) tickint = 5 * tickfreq;
 		else tickint = 10 * tickfreq;
+		m = document.getElementById("viewport").getScreenCTM();
 		set_sw_width(dt_sec);
 		go_here(t0_ticks);
 	    }
@@ -1445,16 +1960,33 @@ function set_handlers() {
 	$('#swidth').val(dt_sec);
     });
 
+    // disable search buttons until a target has been defined
+    $('.sfwd').attr('disabled', 'disabled');
+    $('.srev').attr('disabled', 'disabled');
+
+    // disable signal resize buttons until a signal has been selected
+    $('.stretch').attr('disabled', 'disabled');
+    $('.reset').attr('disabled', 'disabled');
+    $('.shrink').attr('disabled', 'disabled');
+
+    // hide edit controls unless editing
+    $('.editgroup').hide();
+
     // Find... dialog box
     $('#findbox').dialog({autoOpen: false});
 
+    // Add type to palette dialog box
+    $('#add_typebox').dialog({autoOpen: false});
+
     // on Settings tab:
     $('[name=server]').on("change", set_server); // use another lightwave server
-    $('#show_status').on("change", toggle_show_status);
-    $('#show_log').on("change", toggle_show_log);
-    $('#clear_log').on("click", clear_log);
-    $('#mouse_edit').on("change", toggle_mouse_edit);
-    $('#touch_edit').on("change", toggle_touch_edit);
+    $('#show_status').on("click", toggle_show_status);
+    $('#show_requests').on("click", toggle_show_requests);
+    $('#clear_requests').on("click", clear_requests);
+    $('#editing').on("click", toggle_editing);
+    $('#shortcuts').on("click", toggle_shortcuts);
+    $('#new_annset').on("click", new_annset);
+    $('#show_edits').on("click", toggle_show_edits);
 
     // on Help tab:
     $('#helpframe').attr('height', $(window).height() - 180 + 'px');
@@ -1520,6 +2052,7 @@ function parse_url() {
 		if (data.success) ann_set = data.annotator;
 		else ann_set = '';
 		read_annotations(t0_string);
+		set_sw_width(dt_sec);
 		show_status(false);
 	    });
 	}
