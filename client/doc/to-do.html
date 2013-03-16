@@ -10,7 +10,7 @@
 <h2>LightWAVE to-do list</h2>
 
 <p>George Moody<br>
-<em>Last revised: 18 February 2013 (0.45)</em>
+<em>Last revised: 16 March 2013 (0.49)</em>
 
 <p>
 This is a list of planned features and enhancements, many of which will appear
@@ -60,13 +60,13 @@ significantly reorganized during the next several alpha releases.</s>
  <ul>
  <li> should be usable on touchscreens (iPad) as well as with mouse
    or trackball and normal screen
- <li> pull-out or pop-up annotation palette
+ <li> <s>pull-out or pop-up annotation palette</s>
    <ul>
-   <li> most recently-used/favorite annotations near top
-   <li> selecting type from palette modifies cursor
-   <li> palette should include deletion tool (restore if applied
-   again)
+   <li> <s>most recently-used/favorite annotations near top</s>
+   <li> <s>selecting type from palette modifies cursor</s>
+   <li> <s>palette should include deletion tool</s>
    </ul>
+ <li> <s>unlimited undo/redo</s>
  <li> "snap" mode to move new annotations to local extremum automatically
    <ul>
    <li> use gestures to move to nearest following/preceding local max/min
@@ -81,8 +81,6 @@ significantly reorganized during the next several alpha releases.</s>
      annotation types
    <li> users should be able to save their NOTE sub-palettes (by default)
      for use with future records (even with other projects)
-   <li> saved sub-palettes should not be readily sharable (to encourage
-     promotion of useful texts to first-class annotations instead)
    </ul>
  <li> entry of persistent annotations marks onset, subtype (with predefined
      but extensible choices)
@@ -92,7 +90,6 @@ significantly reorganized during the next several alpha releases.</s>
      display, but the user should be prompted to enter new subtype
    <li> need "unknown"/"unclassified" subtype
    </ul>
- <li> client-side event detector?
  </ul>
 <li> <s>bookmarking to save state</s>
 <li> <s>switch servers at run-time</s>
@@ -103,9 +100,6 @@ significantly reorganized during the next several alpha releases.</s>
 <li> data exporter (text, CSV, EDF, MATLAB, WFDB, others?)
 <li> calipers/dividers (set of draggable markers that are kept equidistant,
   for measuring time intervals and observing periodicity/prematurity)
-<li> nonlinear display?  scrollable "perspective" display with time-compressed
-  data at left and right edges of the signal window, perhaps via SVG
-  transform?
 <li> make custom jquery-ui.min.js and jquery-ui.min.css omitting unused
   components
 </ul>
@@ -121,8 +115,7 @@ with (*) will require coordinated client-side changes.
 <ul>
 <li> * handler for receiving and storing annotations from clients
   <ul>
-  <li> save in user's personal PNW workspace, with mechanism for submitting
-    to curator/project owner when ready
+  <li> save in user's personal PNW workspace
   </ul>
 <li> <s>disambiguate identically-named signals</s>
 <li> <s>short-form signal names</s>
@@ -130,8 +123,6 @@ with (*) will require coordinated client-side changes.
 <li> <s>return success flag in response</s>
 <li> <s>return version number with dblist</s>
 <li> <s>authenticated access to PhysioNetWorks data</s>
-<li> investigate repackaging as an Apache module or as a FastCGI app
-<li> investigate server-side caching of JSON-formatted data
 <li> * task dispatcher (e.g., accept requests to reformat uploaded
  data, run a QRS detector, etc.)
 </ul>
@@ -144,8 +135,8 @@ with (*) will require coordinated client-side changes.
 These topics need tutorials:
 
 <ul>
-<li><s><a href="about.html">Viewing</a> and</s>
- <a href="annotation-editing.html">editing</a> with LightWAVE
+<li><s><a href="about.html">Viewing</a> and
+ <a href="annotation-editing.html">editing</a> with LightWAVE</s>
 <li><s>Simple installation for off-line use</s>
 <li>Client customization guide
 </ul>
@@ -185,4 +176,8 @@ needed.
 <li> Integrate LightWAVE with PhysioBank ATM, PhysioBank Record Search,
   and PhysioNetWorks
 </ul>
+
+<p>
+Also see <a href="projects.html">LightWAVE projects</a>.
+
 </html>

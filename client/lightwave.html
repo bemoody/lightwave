@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  12 March 2013   version 0.48
+			Last revised:	  14 March 2013   version 0.49
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -197,8 +197,15 @@ annotations.'>
  </tr>
 </table>
 
+<!--
 <p>See <a href="http://physionet.org/physiobank/annotations.shtml"
 target="_blank">PhysioBank Annotations</a> for standard annotation types.
+-->
+
+<p>See
+<a href="javascript:popup('http://physionet.org/physiobank/annotations.shtml')">
+<b>PhysioBank Annotations</b></a> for standard annotation types.
+
 </div>
 
  <div style="position: relative; margin-top: -1.2em"></div>
@@ -208,8 +215,7 @@ target="_blank">PhysioBank Annotations</a> for standard annotation types.
   MSIE 6, 7, and 8 can be used to run modern web apps such as LightWAVE if you
   install <a href="http://www.google.com/chromeframe">Google Chrome Frame</a>
   (a free plugin).  Browsers such as Chrome, Firefox, Opera, Safari,
-  and MSIE 9+ have built-in support for SVG and work well with
-  LightWAVE.
+  and MSIE 9+ have built-in support for SVG and work well with LightWAVE.
  <![endif]-->
 
  <table width="100%">
@@ -221,7 +227,6 @@ target="_blank">PhysioBank Annotations</a> for standard annotation types.
 		title="reset the highlighted signal">=</button>
 	<button class="shrink"
 		title="reduce the highlighted signal">&#9660;</button>
-      </div>
     </td>
 
    <td align=right width="25%" class="editgroup" style="font-size: 14px">
@@ -241,14 +246,7 @@ target="_blank">PhysioBank Annotations</a> for standard annotation types.
 button in this group for insert mode)">&#9003;</button>
 	  </td>
 	  <td style="text-align: right; vertical-align: middle" id="palette">
-	    <button title="normal beat">&bull;</button>
-	    <button style="background: blue; color: white"
-		    title="premature ventricular contraction">V</button>
-	    <button title="fusion of V and N">F</button>
-	    <button title="normal sinus rhythm">(N</button>
-	    <button title="ventricular bigeminy">(B</button>
-	    <button title="atrial premature beat">A</button>
-	    <button title="ventricular tachycardia">(VT</button>
+	    Loading annotation palette...
 	</td></tr>
       </table>
     </td>
@@ -405,7 +403,7 @@ and links to more information">Main help</button>
 <p>
 <div id="requests" style="display: none"></div>
 <p>
-<div id="edits" style="display: none"></div>
+<div id="editlog" style="display: none"></div>
 
 </div>  <!-- end of "js" div -->
 </div>  <!-- end of "top" div -->
