@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  16 March 2013   version 0.49
+//			Last revised:	  18 March 2013   version 0.50
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -36,104 +36,128 @@
 // '/cgi-bin/lightwave', the LightWAVE CGI application.
 // ____________________________________________________________________________
 
+/*global $ */
+/*jslint plusplus: true, white: true, passfail: false, browser: true,
+   maxerr: 1000, devel: true */
+
+(function(){
 "use strict";
 
 // 'server' is the first part of every AJAX request.  Change it if you are
 // not using the public LightWAVE server.
-var server = 'http://physionet.org/cgi-bin/lightwave';
+var server = 'http://physionet.org/cgi-bin/lightwave',
 
-var url;	// request sent to server (server + request-specific string)
-var db = '';	// name of the selected database
-var sdb = '';	// shortened name of the selected database
-var record = '';// name of the selected record
-var recinfo;    // metadata for the selected record, initialized by slist()
-var tickfreq;   // ticks per second (LCM of sampling frequencies of signals)
-var adt_ticks;  // length of longest annotation set, in ticks
-var sdt_ticks;  // length of signals, in ticks
-var rdt_ticks;	// record length, in ticks (max of adt_ticks and sdt_ticks)
-var ann_set = ''; // annotators for the selected database, from alist()
-var ann = [];   // annotations read and cached by read_annotations()
-var nann = 0;	// number of annotators, set by read_annotations()
-var annselected = '';// name of annotator to be highlighted/searched/edited
-var selarr = null; // array of annselected annotations
-var selann = -1;// index of selected annotation in selarr, if any
-var asy0;	// baseline y for display of labels in selected annotation set
-var signals;    // signals for the selected record, from slist()
-var nsig = 0;	// number of signals, set by read_signals()
-var sigselected = '';// name of signal to be highlighted, if any
-var current_tab;// name of the currently selected tab
-var dt_sec = 10;// window width in seconds
-var dt_ticks;   // window width in ticks
-var dt_tol;	// selection window half-width in ticks (0.012*dt_ticks)
-var t0_ticks = -1; // time of the first sample in the signal window, in ticks
-var tf_ticks;	// time of the first sample after the signal window, in ticks
-var tickint;    // interval between timestamps on plot
-var tpool = []; // cache of 'trace' objects (10-second signal segments)
-var tid = 0;	// next trace id (all traces have id < tid)
-var target = '*';// search target, set in Find... dialog
-var atarget = '';// annotator to be searched, set in Find... dialog
-var g_visible = 1; // visibility flag for grid (1: on, 0: off)
-var m_visible = 1; // visibility flag for annotation marker bars (1: on, 0: off)
-var a_visible = []; // visibility flags for annotators
-var s_visible = []; // visibility flags for signals
-var x_cursor = -1; // signal window cursor x-coordinate (see svgxyt())
-var xx_cursor = -1;// raw cursor x-coordinate (= x_cursor if in signal window)
-var y_cursor;	// unconstrained cursor y-coordinate (see svgxyt())
-var t_cursor;	// time in ticks corresponding to x_cursor (see svgxyt())
-var c_velocity = 10; // SVG cursor velocity (see nudge_left() and nudge_right())
-var mag = [];   // magnification of signals in plots
-var help_main = 'about.html'; // initial and main help topic
-var svc = '';   // SVG code to draw the cursor (see show_time())
-var svg = '';   // SVG code to draw the signal window (see show_plot())
-var svsa = '';   // SVG code to highlight the selected annotation (see jump_*)
-var m = null;  // current transformation matrix for signal window
-var requests = 0; // count of AJAX requests since last page load
-var pending = 0;  // count of pending AJAX requests
-var rqlog = '';	// AJAX request log (hidden by default)
-var autoscroll = null; // autoplay_fwd/rev timer
-var editing = false;   // editing controls hidden if false
-var shortcuts = false; // editing mode (true: use shortcuts, false: don't)
-var palette = null;    // annotation palette (see load_palette())
-var seltype; // id of the current selection in the palette ('#palette_N')
-var selkey;  // button text for the current palette selection
+    url,	// request sent to server (server + request-specific string)
+    db = '',	// name of the selected database
+    sdb = '',	// shortened name of the selected database
+    record = '',// name of the selected record
+    recinfo,    // metadata for the selected record, initialized by slist()
+    tickfreq,   // ticks per second (LCM of sampling frequencies of signals)
+    adt_ticks,  // length of longest annotation set, in ticks
+    sdt_ticks,  // length of signals, in ticks
+    rdt_ticks,	// record length, in ticks (max of adt_ticks and sdt_ticks)
+    ann_set = '', // annotators for the selected database, from alist()
+    ann = [],   // annotations read and cached by read_annotations()
+    nann = 0,	// number of annotators, set by read_annotations()
+    annselected = '',// name of annotator to be highlighted/searched/edited
+    selarr = null, // array of annselected annotations
+    selann = -1,// index of selected annotation in selarr, if any
+    asy0,	// baseline y for display of labels in selected annotation set
+    signals,    // signals for the selected record, from slist()
+    nsig = 0,	// number of signals, set by read_signals()
+    sigselected = '',// name of signal to be highlighted, if any
+    current_tab,// name of the currently selected tab
+    dt_sec = 10,// window width in seconds
+    dt_ticks,   // window width in ticks
+    dt_tol,	// selection window half-width in ticks (0.012*dt_ticks)
+    t0_ticks = -1, // time of the first sample in the signal window, in ticks
+    tf_ticks,	// time of the first sample after the signal window, in ticks
+    tickint,    // interval between timestamps on plot
+    tpool = [], // cache of 'trace' objects (10-second signal segments)
+    tid = 0,	// next trace id (all traces have id < tid)
+    target = '*',// search target, set in Find... dialog
+    g_visible = 1, // visibility flag for grid (1: on, 0: off)
+    m_visible = 1, // visibility flag for annotation marker bars (1: on, 0: off)
+    a_visible = [], // visibility flags for annotators
+    s_visible = [], // visibility flags for signals
+    x_cursor = -1, // signal window cursor x-coordinate (see svgxyt())
+    xx_cursor = -1,// raw cursor x-coordinate (= x_cursor if in signal window)
+    y_cursor,	// unconstrained cursor y-coordinate (see svgxyt())
+    t_cursor,	// time in ticks corresponding to x_cursor (see svgxyt())
+    c_velocity = 10, // SVG cursor velocity (see nudge_left() and nudge_right())
+    mag = [],   // magnification of signals in plots
+    help_main = 'about.html', // initial and main help topic
+    svc = '',   // SVG code to draw the cursor (see show_time())
+    svg = '',   // SVG code to draw the signal window (see show_plot())
+    svsa = '',   // SVG code to highlight the selected annotation (see jump_*)
+    m = null,  // current transformation matrix for signal window
+    requests = 0, // count of AJAX requests since last page load
+    pending = 0,  // count of pending AJAX requests
+    rqlog = '',	// AJAX request log (hidden by default)
+    autoscroll = null, // autoplay_fwd/rev timer
+    editing = false,   // editing controls hidden if false
+    shortcuts = false, // editing mode (true: use shortcuts, false: don't)
+    palette = null,    // annotation palette (see load_palette())
+    seltype, // id of the current selection in the palette ('#palette_N')
+    selkey,  // button text for the current palette selection
+    insert_mode = true, // editing mode (true: insert, false: delete)
+    changes = [],	// edit log
+    undo_count = 0,	// number of undos that are possible from current state
+    ilast = -1,		// index in selarr of annot most recently found
 
 // View/edit panel geometry
-var width;	// width of View/edit panel, in pixels
-var height;	// height of View/edit panel, in pixels
-var swl;        // width of left column, in pixels
-var sww;	// signal window width, in pixels
-var swr;	// width of right column, in pixels
-var svgw;	// grid width, in SVG coords
-var svgh;	// grid height, in SVG coords
-var svgl;	// left column width, in SVG coords
-var svgr;       // right column width, in SVG coords
-var svgtw;	// total available width in SVG coords
-var svgf;	// font-size for signal/annotation labels
-var svgtf;	// small font-size for timestamps
-var svgc;	// size for small elements (circles, etc.)
-var adx1;	// arrow half-width
-var adx2;	// arrow width / edit marker half-width
-var adx4;	// edit marker width
-var ady1;	// arrow height
+    width,	// width of View/edit panel, in pixels
+    height,	// height of View/edit panel, in pixels
+    swl,        // width of left column, in pixels
+    sww,	// signal window width, in pixels
+    swr,	// width of right column, in pixels
+    svgw,	// grid width, in SVG coords
+    svgh,	// grid height, in SVG coords
+    svgl,	// left column width, in SVG coords
+    svgr,       // right column width, in SVG coords
+    svgtw,	// total available width in SVG coords
+    svgf,	// font-size for signal/annotation labels
+    svgtf,	// small font-size for timestamps
+    svgc,	// size for small elements (circles, etc.)
+    adx1,	// arrow half-width
+    adx2,	// arrow width / edit marker half-width
+    adx4,	// edit marker width
+    ady1;	// arrow height
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
-    for (var i = tpool.length; i < ntrace; i++) {
+    var i;
+
+    for (i = tpool.length; i < ntrace; i++) {
 	tpool[i] = {};
 	tpool[i].id = tid++;
     }
 }
 
+// Find a trace in the cache
+function find_trace(db, record, signame, t) {
+    var i;
+
+    for (i = 0; i < tpool.length; i++) {
+	if (tpool[i].name === signame &&
+	    tpool[i].t0 <= t && t < tpool[i].tf &&
+	    tpool[i].record === record && tpool[i].db === db) {
+	    return tpool[i];
+	}
+    }
+    return null;
+}
+
 // Replace the least-recently-used trace with the contents of s
 function set_trace(db, record, s) {
-    var idmin = tid, imin, j, len, ni, p, trace, v, vmean, vmid, vmax, vmin, w;
+    var i, idmin, imin, j, len, ni, p, trace, v, vmean, vmid, vmax, vmin, w;
 
+    idmin = tid;
     len = s.samp.length;
 
     // do nothing if the trace is already in the pool
-    if ((trace = find_trace(db, record, s.name, s.t0)) &&
-	 trace.tf >= s.t0 + len*s.tps)
-	return;
+    trace = find_trace(db, record, s.name, s.t0);
+    if (trace && trace.tf >= s.t0 + len*s.tps) { return; }
 
     // set additional properties of s that were not supplied by the server
     s.id = tid++;
@@ -146,10 +170,11 @@ function set_trace(db, record, s) {
     vmean = vmax = vmin = v[0];
     for (j = ni = p = 0; j < len; j++) {
 	p = v[j] += p;
-	if (p == -32768) ni++; // ignore invalid samples in baseline calculation
+	// ignore invalid samples in baseline calculation
+	if (p === -32768) { ni++; }
 	else {
-	    if (p > vmax) vmax = p;
-	    else if (p < vmin) vmin = p;
+	    if (p > vmax) { vmax = p; }
+	    else if (p < vmin) { vmin = p; }
 	    vmean += +p;
 	}
     }
@@ -157,13 +182,13 @@ function set_trace(db, record, s) {
     // calculate the local baseline (a weighted sum of mid-range and mean)
     vmean /= len - ni;
     vmid = (vmax + vmin)/2;
-    if (vmid > vmean) w = (vmid - vmean)/(vmax - vmean);
-    else if (vmid < vmean) w = (vmean - vmid)/(vmean - vmin);
-    else w = 1;
+    if (vmid > vmean) { w = (vmid - vmean)/(vmax - vmean); }
+    else if (vmid < vmean) { w = (vmean - vmid)/(vmean - vmin); }
+    else { w = 1; }
     s.zbase = vmid + w*(vmean - vmin);
 
     // find the least-recently-used trace
-    for (var i = 0; i < tpool.length; i++) {
+    for (i = 0; i < tpool.length; i++) {
 	if (tpool[i].id < idmin) {
 	    imin = i;
 	    idmin = tpool[i].id;
@@ -172,51 +197,50 @@ function set_trace(db, record, s) {
     tpool[imin] = s; // replace it
 }
 
-// Find a trace in the cache
-function find_trace(db, record, signame, t) {
-    for (var i = 0; i < tpool.length; i++) {
-	if (tpool[i].name == signame &&
-	    tpool[i].t0 <= t && t < tpool[i].tf &&
-	    tpool[i].record == record && tpool[i].db == db) {
-	    return tpool[i];
-	}
-    }
-    return null;
-}
-
 // Convert argument (in samples) to a string in HH:MM:SS format.
 function timstr(t) {
-    var ss = Math.floor(t/tickfreq);
-    var mm  = Math.floor(ss/60);    ss %= 60;
-    var hh  = Math.floor(mm/60);    mm %= 60;
-    if (ss < 10) ss = '0' + ss;
-    if (mm < 10) mm = '0' + mm;
-    if (hh < 10) hh = '0' + hh;
-    var tstring = hh + ':' +  mm + ':' + ss;
+    var ss, mm, hh, tstring;
+
+    ss = Math.floor(t/tickfreq);
+    mm  = Math.floor(ss/60);    ss %= 60;
+    hh  = Math.floor(mm/60);    mm %= 60;
+    if (ss < 10) { ss = '0' + ss; }
+    if (mm < 10) { mm = '0' + mm; }
+    if (hh < 10) { hh = '0' + hh; }
+    tstring = hh + ':' +  mm + ':' + ss;
     return tstring;
 }
 
 // Convert argument (in samples) to a string in HH:MM:SS.mmm format.
 function mstimstr(t) {
-    var mmm = Math.floor(1000*t/tickfreq) % 1000;
+    var mmm, tstring;
+
+    mmm = Math.floor(1000*t/tickfreq) % 1000;
     if (mmm < 100) {
-	if (mmm < 10) mmm = '.00' + mmm;
-	else mmm = '.0' + mmm;
+	if (mmm < 10) { mmm = '.00' + mmm; }
+	else { mmm = '.0' + mmm; }
     }
-    else mmm = '.' + mmm;
-    var tstring = timstr(t) + mmm;
+    else { mmm = '.' + mmm; }
+    tstring = timstr(t) + mmm;
     return tstring;
 }
 
 // Convert string argument to time in samples.
 function strtim(s) {
-    var c = s.split(":");
-    var t;
+    var c, t;
+
+    c = s.split(":");
     switch (c.length) {
-      case 1: if (c[0] == "") t = 0;
-	else t = +c[0]; break;
-      case 2: t = 60*c[0] + +c[1]; break;
-      case 3: t = 3600*c[0] + 60*c[1] + +c[2]; break;
+      case 1:
+	if (c[0] === "") { t = 0; }
+	else { t = +c[0]; }
+	break;
+      case 2:
+	t = 60*c[0] + Number(c[1]);
+	break;
+      case 3:
+	t = 3600*c[0] + 60*c[1] + Number(c[2]);
+	break;
       default: t = 0;
     }
     return Math.round(t*tickfreq);
@@ -232,16 +256,17 @@ function html_escape(s) {
 }
 
 function show_summary() {
-    var itext = '', ia, ii, is, rdurstr;
+    var i, ia, ii, is, itext = '', rdurstr, s;
 
-    if (recinfo.duration) sdt_ticks = strtim(recinfo.duration);
-    else sdt_ticks = 0;
+    if (recinfo.duration) { sdt_ticks = strtim(recinfo.duration); }
+    else { sdt_ticks = 0; }
     rdt_ticks = (adt_ticks > sdt_ticks) ? adt_ticks : sdt_ticks;
     rdurstr = timstr(rdt_ticks);
     itext += '<h3>Summary</h3>\n<table>\n'
         + ' <tr><td>Record length</td><td>' + rdurstr + '</td></tr>\n';
-    if (recinfo.start)
+    if (recinfo.start) {
 	itext += ' <tr><td>Start</td><td>' + recinfo.start + '</td></tr>\n';
+    }
     itext += ' <tr><td>Clock frequency&nbsp;</td><td>' + tickfreq
 	+ ' ticks per second</td></tr>\n';
 
@@ -250,7 +275,7 @@ function show_summary() {
 	    itext += '<tr><td style="vertical-align: top">Annotator: '
 		+ ann[ia].name + '</td><td>' + '(' + ann[ia].annotation.length
 		+ ' annotations)<br>\n<table style="padding: 0 0 1em 3em">';
-	    var i, s = ann[ia].summary;
+	    s = ann[ia].summary;
 	    for (i = 0; i < s.length; i++) {
 		itext += '<tr><td>' + s[i][0] + '</td><td align=right>'
 		    + s[i][1] + '</td</tr>\n';
@@ -261,15 +286,19 @@ function show_summary() {
     if (signals) {
 	for (is = 0; is < nsig; is++) {
 	    itext += '<tr><td>Signal: ' + signals[is].name + '</td><td>';
-	    if (signals[is].tps == 1)
+	    if (signals[is].tps === 1) {
 		itext += signals[is].tps + ' tick per sample; ';
-	    else
+	    }
+	    else {
 		itext += signals[is].tps + ' ticks per sample; ';
+	    }
 	    itext += signals[is].gain + ' adu/';
-	    if (signals[is].units)
+	    if (signals[is].units) {
 		itext += signals[is].units + '; ';
-	    else
+	    }
+	    else {
 		itext += 'mV; ';
+	    }
 	    itext +=  signals[is].adcres + '-bit ADC, zero at '
 		+ signals[is].adczero + ';  baseline is '
 		+ signals[is].baseline + '</td></tr>\n';
@@ -286,31 +315,58 @@ function show_summary() {
     $('#info').html(itext);
 }
 
+function ann_after(a, t) {
+    var i, imin = 0, imax;
+    
+    if (!a) { return -1; }
+    imax = a.length - 1;
+    if (a[imax].t <= t) { return -1; }
+    if (a[0].t > t) { return 0; }
+    while (imax - imin > 1) {
+	i = Math.floor((imin + imax)/2);
+	if (a[i].t <= t) { imin = i; }
+	else { imax = i; }
+    }
+    return imax;
+}	    
+
+function ann_before(a, t) {
+    var i, imin = 0, imax;
+
+    if (!a) { return (-1); }
+    imax = a.length - 1;
+    while (imax - imin > 1) {
+	i = Math.floor((imin + imax)/2);
+	if (a[i].t > t) { imax = i; }
+	else { imin = i; }
+    }
+    return imin;
+}	    
+
 function show_tables() {
-    var atext = '', stext = '', ia, is;
+    var a, atext = '', i, ia, is, j, sig = [], sname, stext = '', t, u, v, vi;
 
     if ($('#viewann').prop('checked')) {
-        if (ann.length > 0) 
-		atext += '<h3>Annotations</h3>\n';
+        if (ann.length > 0) { atext += '<h3>Annotations</h3>\n'; }
 	for (ia = 0; ia < nann; ia++) {
-	    if (a_visible[ann[ia].name] == 0) {
+	    if (a_visible[ann[ia].name] === 0) {
 		atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
 	    }
 	    else {
-		var a = ann[ia].annotation;
 		atext += '<p><b>Annotator:</b> ' + ann[ia].name
 		    + '\n<p><table class="dtable">\n<tr>'
 		    + '<th>Time (elapsed)&nbsp;</th><th>Type</th>'
 		    + '<th>Sub&nbsp;</th><th>Chan</th><th>Num&nbsp;</th>'
 		    + '<th>Aux</th></tr>\n';
-		for (var i = 0; i < a.length; i++) {
-		    if (a[i].t < t0_ticks) continue;
-		    else if (a[i].t > tf_ticks) break;
+		a = ann[ia].annotation;
+		for (i = ann_after(a, t0_ticks);
+		     0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
 		    atext += '<tr><td>' + mstimstr(a[i].t) + '</td><td>'
 			+ a[i].a + '</td><td>' + a[i].s + '</td><td>'
 			+ a[i].c + '</td><td>' + a[i].n + '</td><td>';
 		    if (a[i].x) { atext += a[i].x; }
 		    atext +=  '</td></tr>\n';
+		    i++;
 		}
 		atext += '</table>\n</div></div>\n';
 		atext += '</table>\n<p>\n';
@@ -319,40 +375,41 @@ function show_tables() {
 	atext += '<hr>\n';
 	$('#anndata').html(atext);
     }
-    else
-	$('#anndata').empty();
+    else { $('#anndata').empty(); }
 
     if ($('#viewsig').attr('checked')) {
 	if (signals) {
-	    var sig = [];
+	    sig = [];
 	    for (i = is = 0; i < signals.length; i++) {
-		var sname = signals[i].name;
-		if (s_visible[sname])
+		sname = signals[i].name;
+		if (s_visible[sname]) {
 		    sig[is++] = find_trace(db, record, sname, t0_ticks);
+		}
 	    }
 	    
 	    stext = '<h3>Signals</h3>\n<p><table class="dtable">\n'
 		+ '<tr><th>Time (elapsed)&nbsp;</th>';
-	    for (i = 0; i < is; i++)
+	    for (i = 0; i < is; i++) {
 		stext += '<th>' + sig[i].name + '&nbsp;</th>';
+	    }
 	    stext += '\n<tr><th></th>';
 	    for (i = 0; i < is; i++) {
 		u = sig[i].units;
-		if (!u) u = '[mV]';
+		if (!u) { u = '[mV]'; }
 		stext += '<th><i>(' + u + ')</i></th>';
 	    }
 
-	    for (var t = t0_ticks; t < tf_ticks; t++) {
+	    for (t = t0_ticks; t < tf_ticks; t++) {
 		stext += '</tr>\n<tr><td>' + mstimstr(t);
-		for (var j = 0; j < is; j++) {
+		for (j = 0; j < is; j++) {
 		    stext += '</td><td>';
-		    if (t%sig[j].tps == 0) {
+		    if (t%sig[j].tps === 0) {
 			if (t >= sig[j].tf) {
 			    sig[j] = find_trace(db, record, sig[j].name,
 						sig[j].tf);
 			}
-			var vi = sig[j].samp[(t - sig[j].t0)/sig[j].tps];
-			if (vi == -32768) stext += '-';
+			vi = sig[j].samp[(t - sig[j].t0)/sig[j].tps];
+			if (vi === -32768) { stext += '-'; }
 			else {
 			    v = (vi - sig[j].base)/ sig[j].gain;
 			    stext += v.toFixed(3);
@@ -365,174 +422,100 @@ function show_tables() {
 	}
 	$('#sigdata').html(stext);
     }
-    else
-	$('#sigdata').empty();
+    else { $('#sigdata').empty(); }
 }
 
-function do_edit(e) {
-    var x = e.pageX;
-    var y = e.pageY;
-    c_velocity = 10;
-    show_time(x, y);
+// convert (x,y) in pixels to SVG coords and time in ticks
+function svgxyt(x, y) {
+    m = document.getElementById("viewport").getScreenCTM();
+    x_cursor = xx_cursor = (x - m.e)/m.a;
+    if (x_cursor < 0) { x_cursor = 0; }
+    else if (x_cursor > svgw) { x_cursor = svgw; }
+    y_cursor = (y - m.f)/m.d;
+    t_cursor = t0_ticks + x_cursor*tickfreq/1000;
 }
 
-function handle_edit() {
-    if (editing) {
-	$('.editgroup').show();
-	if (shortcuts) {
-	    $('svg').on('click', select_ann);
-	    $('svg').on('mouseup', mark);
-	    $('svg').on('mousemove', do_edit);
-	    $('svg').off('touchstart touchend');
+function update_output() {
+    if (current_tab === 'View/edit') { show_plot(); }
+    else if (current_tab === 'Tables') { show_tables(); }
+}
+
+function show_status(requestp) {
+    var i, status;
+
+    if (requestp) {
+	requests++; pending++;
+	if (requests > 10) {
+	    for (i = rqlog.length - 5; i > 0; i--) {
+		if (rqlog[i] !== '\n') { break; }
+	    }
+	    rqlog = requests + ': ' + url + '<br>\n' + rqlog.substring(0, i);
 	}
-	else {
-	    $('svg').on("touchstart", function(e) { select_ann(e);})
-		.off('mousemove', do_edit)
-	        .off('mouseup', mark)
-	        .off('mousedown', select_ann);
-	}
+	else { rqlog = requests + ': ' + url + '<br>\n' + rqlog; }
+	$('#requests').html(rqlog);
     }
     else {
-//	$('svg').off('mousedown mouseup touchstart touchend');
-	$('.editgroup').hide();
+	pending--;
     }
+    status = 'Requests: ' + requests + '&nbsp;&nbsp;Pending: ' + pending;
+    $('#status').html(status);
 }
 
-function select_type(e) {
-    var ann = { a : null, s: null, c: null, n: null, x: null };
+// Retrieve one or more signal segments starting at t for the selected record.
+function read_signals(t0, update) {
+    var i, fetch, s, sigreq = '', t, tf, tr = t0 + dt_ticks, trace = '';
 
-    $(seltype).css("color", "blue").css("background-color", "white");
-    seltype = '#' + e.target.id;
-    $(seltype).css("color", "white").css("background-color", "blue");
-    var s = $(seltype).text();
-    var f = s.split(":");
-
-    switch (f.length) {
-    case 1:
-	if (f[0][0] == '(' && f[0].length > 1) {
-	    ann.a = '+';
-	    ann.x = f[0];
-	}
-	else
-	    ann.a = f[0];
-	break;
-    case 2:
-	ann.a = f[0];
-	ann.x = f[1];
-	break;
-    }
-    copy_to_template(ann);
-    selkey = s;
-}
-
-// initialize the palette with the most common annotation types in summary
-function load_palette(summary) {
-    var i, imax, ptext = '';
-
-    palette = summary;
-    imax = summary.length;
-    if (imax > 20) imax = 20;
-    for (i = 0; i < imax; i++) {
-	ptext += '<button class="palette_ann"';
-	if (i == 0) {
-	    ptext += ' style="color: white; background-color: blue"';
-	    seltype = '#palette_0';
-	}
-	else
-	    ptext += ' style="color: blue; background-color: white"';
-	ptext += ' id="palette_' + i + '">' + summary[i][0] + '</button>';
-    }
-    var f = summary[0][0].split(":");
-
-    switch (f.length) {
-    case 1:
-	if (f[0][0] == '(' && f[0].length > 1) {
-	    ann.a = '+';
-	    ann.x = f[0];
-	}
-	else
-	    ann.a = f[0];
-	break;
-    case 2:
-	ann.a = f[0];
-	ann.x = f[1];
-	break;
-    }
-    copy_to_template(ann);
-    selkey = summary[0][0];
-    $('#palette').html(ptext);
-    $('.palette_ann').on('click', select_type);
-}
-
-function handle_svg_events() {
-    $('svg').mousedown(function(event){ select_ann(event); });
-    $('svg').mouseup(function(event){ mark(event); });
-    $('#grid').click(function(event){ g_visible = 1 - g_visible; show_plot();});
-    $('#mrkr').click(function(event){ m_visible = 1 - m_visible; show_plot();});
-
-    $("[id^='ann;;']").click(function(event){
-	var aname = $(this).attr('id').split(";")[2];
-	if (a_visible[aname] == 0) {
-	    a_visible[aname] = 1;
-	    annselected = aname;
-	    for (var i = 0; i < nann; i++) {
-		if (ann[i].name == aname) {
-		    selarr = ann[i].annotations;
-		    load_palette(ann[i].summary);
-		    break;
+    if (signals) {
+	for (i = 0; i < signals.length; i++) {
+	    if (s_visible[signals[i].name] === 1) {
+		t = t0;
+		tf = t + dt_ticks;
+		while (t < tf) {
+		    trace = find_trace(db, record, signals[i].name, t);
+		    if (trace) {
+			trace.id = tid++;	// found, mark as recently used
+			t = trace.tf;
+		    }
+		    else {		
+			if (t < tr) { tr = t; } // must read from t to tf
+			sigreq += '&signal='
+			    + encodeURIComponent(signals[i].name);
+			break;
+		    }
 		}
 	    }
 	}
-	else if (annselected == aname) {
-	    annselected = '';
-	    if (nann > 1) selarr = null;
-	}
-	else {
-	    a_visible[aname] = 0;
-	}
-	show_plot();
-    });
-
-    $("[id^='sig;;']").click(function(event){
-	var sname = $(this).attr('id').split(";")[2];
-	if (s_visible[sname] == 0) {
-	    s_visible[sname] = 1;
-	    sigselected = sname;
-	    $('.stretch').removeAttr('disabled');
-	    $('.reset').removeAttr('disabled');
-	    $('.shrink').removeAttr('disabled');
-	}
-	else if (sigselected == sname) {
-	    sigselected = '';
-	    $('.stretch').attr('disabled', 'disabled');
-	    $('.reset').attr('disabled', 'disabled');
-	    $('.shrink').attr('disabled', 'disabled');
-	}
-	else {
-	    s_visible[sname] = 0;
-	}
-	read_signals(t0_ticks, true);
-	show_plot();
-    });
-}
-
-function set_sw_width(seconds) {
-    dt_sec = seconds;
-    svgw = 1000*dt_sec;
-    svgh = svgw/2;
-    svgl = svgw/8;
-    svgr = svgw/24;
-    svgtw = svgl + svgw + svgr;
-    svgf = 12*dt_sec;
-    svgtf = 10*dt_sec;
-    svgc = 8*dt_sec;
-    adx1 = 2*dt_sec;
-    adx2 = 4*dt_sec;
-    adx4 = 8*dt_sec;
-    ady1 = 10*dt_sec;
+    }
+    if (sigreq) {
+	url = server
+	    + '?action=fetch'
+	    + '&db=' + db
+	    + '&record=' + record
+	    + sigreq
+	    + '&t0=' + tr/tickfreq
+	    + '&dt=' + dt_sec
+	    + '&callback=?';
+	show_status(true);
+	$.getJSON(url, function(data) {
+	    fetch = data.fetch;
+	    if (fetch && fetch.hasOwnProperty('signal')) {
+		s = data.fetch.signal;
+		for (i = 0; i < s.length; i++) {
+		    set_trace(db, record, s[i]);
+		}
+	    }
+	    if (update) { update_output(); }
+	    show_status(false);
+	});
+    }
+    else if (update) { update_output(); }
 }
 
 function show_plot() {
+    var a, aname, downarrow, dy, g, grd, i, imin, imax, ia, is, pv, s, sname,
+      sva, svgts, svs, t, tf, tnext, tps, trace, tst, tt, ttick, txt, uparrow,
+      v, x, xstep, xtick, x0q, x0r, x0s, y, ytop, y0, y0s = [], y1, y0a = [], z;
+    
     width = $('#plotdata').width();  // total available width in View/edit panel
     swl = Math.round(width*svgl/svgtw);    // left column width
     sww = Math.round(width*svgw/svgtw);   // signal window width
@@ -540,16 +523,13 @@ function show_plot() {
     height = Math.round(0.55*sww);   // signal window height
 
     // calculate baselines for signals and annotators
-    var dy = Math.round(svgh/(nsig + nann + 1));
-    var y = dy;
-    var y0s = [];	// signal baselines
-    var y0a = [];	// annotator baselines
-    var ia = 0, is = 0;
+    ia = is = 0;
+    y = dy = Math.round(svgh/(nsig + nann + 1));
     while (is < nsig || ia < nann) {
 	if (is < nsig) { y0s[is] = y; y += dy; is++; }
 	if (ia < nann) { y0a[ia] = y; y += dy; ia++; }
     }
-    if (nann > 0) asy0 = y0a[0];
+    if (nann > 0) { asy0 = y0a[0]; }
 
     svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
 	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
@@ -559,42 +539,41 @@ function show_plot() {
 	+ '),translate(' + svgl + ',' + svgf + ')">\n';
     
     // background grid
-    var grd = '<g id="grid">\n';
-    grd += '<circle cx="-' + svgf + '" cy="' + svgh
+    grd = '<g id="grid">\n'
+	+ '<circle cx="-' + svgf + '" cy="' + svgh
 	+ '" r="' + svgc +'" stroke="rgb(200,100,100)"'
         + ' stroke-width="4" fill="red" fill-opacity="' + g_visible + '"/>';
-    if (g_visible == 0) {
+    if (g_visible === 0) {
 	grd += '<title>(click to show grid)</title></g>';
     }
     else {
-	var x0s = (1000-Math.floor((t0_ticks % tickfreq)*1000/tickfreq))%1000;
-	var x0r = x0s%200;
-	var x0q = Math.floor(x0s/200)*200;
+	x0s = (1000-Math.floor((t0_ticks % tickfreq)*1000/tickfreq))%1000;
+	x0r = x0s%200;
+	x0q = Math.floor(x0s/200)*200;
 	grd += '<title>(click to hide grid)</title></g>'
 	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
 	    + ' d="M' + x0r + ',0 ';
-	var uparrow = ' l-' + adx1 + ',' + ady1 + 'l' + adx2 + ',0 l-' + adx1
+	uparrow = ' l-' + adx1 + ',' + ady1 + 'l' + adx2 + ',0 l-' + adx1
 	    + ',-' + ady1 +  'm200,-';
-	for (var x = 0; x + x0r <= svgw; x += 200) {
-	    if (x%1000 == x0q)
-		grd += 'l0,' + svgh + uparrow + svgh;
-	    else
-		grd += 'l0,' + svgh + ' m200,-' + svgh;
+	for (x = 0; x + x0r <= svgw; x += 200) {
+	    if (x%1000 === x0q) { grd += 'l0,' + svgh + uparrow + svgh; }
+	    else { grd += 'l0,' + svgh + ' m200,-' + svgh; }
 	}
-	grd += 'M0,0 '
-	for (var y = 0; y <= svgh; y += 200)
+	grd += 'M0,0 ';
+	for (y = 0; y <= svgh; y += 200) {
 	    grd += 'l' + svgw + ',0 m-' + svgw +',200 ';
+	}
 	grd += '" />\n';
     }
 
     // timestamps
-    var svgts = svgh + 20*dt_sec;
-    var ttick = Math.floor(t0_ticks/tickint) * tickint;
-    if (ttick < t0_ticks) ttick += tickint;
+    svgts = svgh + 20*dt_sec;
+    ttick = Math.floor(t0_ticks/tickint) * tickint;
+    if (ttick < t0_ticks) { ttick += tickint; }
 
-    var tst = '<g id="times">\n';
+    tst = '<g id="times">\n';
     while (ttick <= tf_ticks) {
-	var xtick = Math.round((ttick - t0_ticks)*1000/tickfreq);
+	xtick = Math.round((ttick - t0_ticks)*1000/tickfreq);
 	tst += '<text x="' + xtick + '" y="' + svgts + '" font-size="' + svgtf
 	    + '" fill="red" style="text-anchor: middle;">'
 	    + timstr(ttick) + '</text>\n';
@@ -602,26 +581,27 @@ function show_plot() {
     }
     tst += '</g>\n';
 
-
     // annotator names and annotations
-    var sva = '<g id="mrkr">\n';
-    sva += '<circle cx="-' + svgf + '" cy="0" r="' + svgc
+    sva = '<g id="mrkr">\n'
+	+ '<circle cx="-' + svgf + '" cy="0" r="' + svgc
 	+ '" stroke="rgb(0,0,200)"'
         + ' stroke-width="4" fill="blue" fill-opacity="' + m_visible + '"/>';
-    if (m_visible == 0)
+    if (m_visible === 0) {
 	sva += '<title>(click to show marker bars)</title></g>';
-    else
+    }
+    else {
 	sva += '<title>(click to hide marker bars)</title></g>';
-    var downarrow = ',0 l-' + adx1 + ',-' + ady1 + ' l' + adx2 + ',0 l-' + adx1
+    }
+    downarrow = ',0 l-' + adx1 + ',-' + ady1 + ' l' + adx2 + ',0 l-' + adx1
 	+ ',' + ady1 + ' V';
     for (ia = 0; ia < nann; ia++) {
-	var y0 = y0a[ia];
-	var ytop = y0 - svgf;
-	var aname = ann[ia].name;
+	y0 = y0a[ia];
+	ytop = y0 - svgf;
+	aname = ann[ia].name;
 	sva += '<g id="ann;;' + aname + '">\n';
-	if (a_visible[aname] == 1) {
+	if (a_visible[aname] === 1) {
 	    sva += '<title>' + ann[ia].desc;
-	    if (aname == annselected) {
+	    if (aname === annselected) {
 		asy0 = y0;
 		sva += ' (click for normal view)</title>';
 		if (editing) {
@@ -639,25 +619,22 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0
 		+ '" font-size="' + svgf + '" fill="blue" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
-	    if (aname == annselected)
-		sva += ' font-weight="bold"';
+	    if (aname === annselected) { sva += ' font-weight="bold"'; }
 	    sva += '>' + aname + '</text></g>\n';
-	    var a = ann[ia].annotation;
-	    for (var i = 0; i < a.length; i++) {
-		if (a[i].t < t0_ticks) continue;
-		else if (a[i].t > tf_ticks) break;
-		var x, y, y1, txt;
+	    a = ann[ia].annotation;
+	    for (i = ann_after(a, t0_ticks);
+		 0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
 		x = Math.round((a[i].t - t0_ticks)*1000/tickfreq);
 		if (a[i].x) {
-		    if (a[i].a == '+') y = y0+svgf;
-		    else y = y0-svgf;
-		    txt = '' + a[i].x;
+		    if (a[i].a === '+') { y = y0+svgf; }
+		    else {y = y0-svgf; }
+		    txt = String(a[i].x);
 		}
 		else {
 		    y = y0;
 		    // display N annotations as bullets
-		    if (a[i].a == 'N') txt = '&bull;'
-		    else txt = a[i].a;
+		    if (a[i].a === 'N') { txt = '&bull;'; }
+		    else { txt = a[i].a; }
 		}
 		if (m_visible) {
 		    y1 = y - 150;
@@ -668,8 +645,7 @@ function show_plot() {
 		}
 		sva += '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"';
-		if (aname == annselected)
-		    sva += ' font-weight="bold"';
+		if (aname === annselected) { sva += ' font-weight="bold"'; }
 		sva += ' font-size="' + svgf + '" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
 	    }
@@ -688,20 +664,21 @@ function show_plot() {
     }
 
     // signal names and traces
-    var svs = '';
+    svs = '';
     for (is = 0; is < nsig; is++) {
-	var y0 = y0s[is];
-	var ytop = y0 - svgf;
-	var sname = signals[is].name;
-	var trace = find_trace(db, record, sname, t0_ticks);
+	y0 = y0s[is];
+	ytop = y0 - svgf;
+	sname = signals[is].name;
+	trace = find_trace(db, record, sname, t0_ticks);
 	
 	svs += '<g id="sig;;' + sname + '">\n';
-	if (trace && s_visible[sname] == 1) {
+	if (trace && s_visible[sname] === 1) {
 	    svs += '<title>' + sname;
-	    if (sname == sigselected)
+	    if (sname === sigselected) {
 		svs += ' (click for normal view)</title>';
+	    }
 	    else {
-		svs += ' (click to hide)</title>'
+		svs += ' (click to hide)</title>';
 	    }
 	    svs += '<rect x="-' + svgl + '" y="' + ytop
 		+ '" width="' + svgl + '" height="' + 2*svgf
@@ -709,67 +686,57 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0
 		+ '" font-size="' + svgf + '" fill="black" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
-	    if (sname == sigselected)
-		svs += ' font-weight="bold"';
+	    if (sname === sigselected) { svs += ' font-weight="bold"'; }
 	    svs += '>' + sname + '</text></g>\n';
 
-	    var s = trace.samp;
-	    var tps = trace.tps;
-	    var i;
-	    var imin = (t0_ticks - trace.t0)/tps;
-	    var imax = Math.min(s.length, dt_ticks/tps + imin);
-	    var g = (-400*mag[sname]/(trace.scale*trace.gain));
-	    var z = trace.zbase*g - y0;
-	    var v = Math.round(g*s[imin] - z);
+	    s = trace.samp;
+	    tps = trace.tps;
+	    imin = (t0_ticks - trace.t0)/tps;
+	    imax = Math.min(s.length, dt_ticks/tps + imin);
+	    g = (-400*mag[sname]/(trace.scale*trace.gain));
+	    z = trace.zbase*g - y0;
+	    v = Math.round(g*s[imin] - z);
 	    // move to start of trace
 	    svs += '<path stroke="black" fill="none" stroke-width="';
-	    if (sname == sigselected)
-		svs += dt_sec;
-	    else
-		svs += dt_sec/2;
-	    svs += '" d="';  // + 'M0,' + v + ' L';
-	    var t = 0;
-	    var tnext = t0_ticks;
-	    var tf = Math.min(tf_ticks, rdt_ticks);
-	    var x = 0;
-	    var xstep = 1000/tickfreq;
-	    var pv = false;
+	    if (sname === sigselected) { svs += dt_sec; }
+	    else { svs += dt_sec/2; }
+	    svs += '" d="';
+	    t = 0;
+	    tnext = t0_ticks;
+	    tf = Math.min(tf_ticks, rdt_ticks);
+	    x = 0;
+	    xstep = 1000/tickfreq;
+	    pv = false;
 	    while (tnext < tf) {
 		if (tnext > t0_ticks) {
 		    trace = find_trace(db, record, sname, tnext);
-		    if (trace == null) {
+		    if (trace === null) {
 			if (pending < 1) {
 			    read_signals(t0_ticks, true);
-			    return;
 			}
 			else if (pending < 4) {
 			    setTimeout(function() {
 				trace = find_trace(db, record, sname, tnext);
 			    },1000);  // try again after a second
-			    return;
 			}
 			else {
 			    autoplay_off();
 			    alert_server_error();
-			    return;
 			}
+			return;
 		    }
 		    s = trace.samp;
 		    imin = (tnext - trace.t0)/tps;
 		    imax = Math.min(s.length, (tf - tnext)/tps + imin);
 		}
 		for (i = imin; i < imax; i++) {
-		    if (s[i] != -32768) {
+		    if (s[i] !== -32768) {
 			v = Math.round(g*s[i] - z);
-			if (pv)
-			    svs += ' '  + x + ',' + v;
-			else
-			    svs += ' M' + x + ',' + v
-			    +  ' L' + x + ',' + v;
+			if (pv) { svs += ' '  + x + ',' + v; }
+			else { svs += ' M' + x + ',' + v  + ' L' + x + ',' + v;}
 			pv = true;
 		    }
-		    else
-			pv = false;
+		    else { pv = false; }
 		    t += tps;
 		    x = t*xstep;
 		}
@@ -792,9 +759,9 @@ function show_plot() {
     svg += grd + tst + sva + svs;
     $('#plotdata').html(svg + '</svg>\n');
     if (selann >= 0) {
-	var tt = selarr[selann].t - t0_ticks;
+	tt = selarr[selann].t - t0_ticks;
 	if (0 <= tt && tt < dt_ticks) {
-	    var x = Math.round(tt * m.a * 1000/tickfreq + m.e);
+	    x = Math.round(tt * m.a * 1000/tickfreq + m.e);
 	    highlight_selection();
 	    show_time(x, 0);
 	}
@@ -802,30 +769,198 @@ function show_plot() {
     handle_svg_events();    // Handle user input in the signal window
 }
 
-function update_output() {
-    if (current_tab == 'View/edit') show_plot();
-    else if (current_tab == 'Tables') show_tables();
+function handle_svg_events() {
+    var aname, i, sname;
+
+    $('#grid').click(function(){ g_visible = 1 - g_visible; show_plot();});
+    $('#mrkr').click(function(){ m_visible = 1 - m_visible; show_plot();});
+
+    $("[id^='ann;;']").click(function(){
+	aname = $(this).attr('id').split(";")[2];
+	if (a_visible[aname] === 0) {
+	    a_visible[aname] = 1;
+	    annselected = aname;
+	    for (i = 0; i < nann; i++) {
+		if (ann[i].name === aname) {
+		    selarr = ann[i].annotations;
+		    load_palette(ann[i].summary);
+		    break;
+		}
+	    }
+	}
+	else if (annselected === aname) {
+	    annselected = '';
+	    if (nann > 1) {selarr = null; }
+	}
+	else { a_visible[aname] = 0; }
+	show_plot();
+    });
+
+    $("[id^='sig;;']").click(function(){
+	sname = $(this).attr('id').split(";")[2];
+	if (s_visible[sname] === 0) {
+	    s_visible[sname] = 1;
+	    sigselected = sname;
+	    $('.stretch').removeAttr('disabled');
+	    $('.reset').removeAttr('disabled');
+	    $('.shrink').removeAttr('disabled');
+	}
+	else if (sigselected === sname) {
+	    sigselected = '';
+	    $('.stretch').attr('disabled', 'disabled');
+	    $('.reset').attr('disabled', 'disabled');
+	    $('.shrink').attr('disabled', 'disabled');
+	}
+	else { s_visible[sname] = 0; }
+	read_signals(t0_ticks, true);
+	show_plot();
+    });
+    $('svg').mousedown(function(event){ select_ann(event); });
+    $('svg').mouseup(function(event){ mark(event); });
 }
 
-function show_status(requestp) {
-    var i, status;
+// show the time corresponding to (x,y) as HH:MM:SS.mmm in upper right corner
+function show_time(x, y) {
+    svgxyt(x, y);
+    var boxh, boxy0, label, ts, xc;
 
-    if (requestp) {
-	requests++; pending++;
-	if (requests > 10) {
-	    for (i = rqlog.length - 5; i > 0 && rqlog[i] != '\n'; i--)
-		;
-	    rqlog = requests + ': ' + url + '<br>\n' + rqlog.substring(0, i);
+    ts = mstimstr(t_cursor);
+    $('.pointer').html(ts);
+
+    if (editing) {
+	xc = x_cursor - 2*adx4;
+	svc = '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
+	    + '" fill="none" style="cursor:pointer" d="M' + x_cursor
+	    + ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	    + ',' + ady1 + ' V' + svgh
+	    + ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
+	    + ',-' + ady1 + '" />';
+
+	boxh = 3*svgf;
+	boxy0 = asy0 - 2*svgf;
+	if (boxy0 < y_cursor && y_cursor < boxy0 + boxh) {
+	    label = insert_mode ? selkey : "&#9003;";
+	    svc += '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
+		+ '" d="M' + x_cursor + ',0 V' + boxy0
+		+ ' m0,' + 3*svgf + ' V' + svgh + '" />'
+		+ '<rect x="' + Number(x_cursor - svgf) + '" y="' + boxy0
+		+ '" width="' + 2*svgf + '" height="' + boxh
+		+ '" stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+		+ '" fill="#88f" fill-opacity="0.2" style="cursor:pointer" />'
+		+ '<text x="' + x_cursor + '" y="' + Number(y_cursor - svgf)
+		+ '" style="text-anchor: middle"'
+		+ ' font-size="' + svgf + '" fill="rgb(0,0,200)">'
+		+ label + '</text>\n';
 	}
-	else
-	    rqlog = requests + ': ' + url + '<br>\n' + rqlog;
-	$('#requests').html(rqlog);
+
+	$('#plotdata').html(svg + svc + svsa + '</svg>\n');
+    }
+    handle_svg_events();
+}
+
+function do_edit(e) {
+    var x = e.pageX, y = e.pageY;
+    c_velocity = 10;
+    show_time(x, y);
+}
+
+function handle_edit() {
+    if (editing) {
+	$('.editgroup').show();
+	if (shortcuts) {
+	    $('svg').on('mousedown', select_ann);
+	    $('svg').on('mouseup', mark);
+	    $('svg').on('mousemove', do_edit);
+	    $('svg').off('touchstart touchend');
+	}
+	else {
+	    $('svg').on("touchstart", function(e) { select_ann(e);})
+		.off('mousemove', do_edit)
+	        .off('mouseup', mark)
+	        .off('mousedown', select_ann);
+	}
     }
     else {
-	pending--;
+//	$('svg').off('mousedown mouseup touchstart touchend');
+	$('.editgroup').hide();
     }
-    status = 'Requests: ' + requests + '&nbsp;&nbsp;Pending: ' + pending;
-    $('#status').html(status);
+}
+
+function select_type(e) {
+    var ann = { a : null, s: null, c: null, n: null, x: null }, f, s;
+
+    $(seltype).css("color", "blue").css("background-color", "white");
+    seltype = '#' + e.target.id;
+    $(seltype).css("color", "white").css("background-color", "blue");
+    s = $(seltype).text();
+    f = s.split(":");
+    switch (f.length) {
+    case 1:
+	if (f[0][0] === '(' && f[0].length > 1) {
+	    ann.a = '+';
+	    ann.x = f[0];
+	}
+	else { ann.a = f[0]; }
+	break;
+    case 2:
+	ann.a = f[0];
+	ann.x = f[1];
+	break;
+    }
+    copy_to_template(ann);
+    selkey = s;
+}
+
+// initialize the palette with the most common annotation types in summary
+function load_palette(summary) {
+    var f, i, imax, ptext = '';
+
+    palette = summary;
+    imax = summary.length;
+    if (imax > 20) { imax = 20; }
+    for (i = 0; i < imax; i++) {
+	ptext += '<button class="palette_ann"';
+	if (i === 0) {
+	    ptext += ' style="color: white; background-color: blue"';
+	    seltype = '#palette_0';
+	}
+	else { ptext += ' style="color: blue; background-color: white"'; }
+	ptext += ' id="palette_' + i + '">' + summary[i][0] + '</button>';
+    }
+    f = summary[0][0].split(":");
+    switch (f.length) {
+    case 1:
+	if (f[0][0] === '(' && f[0].length > 1) {
+	    ann.a = '+';
+	    ann.x = f[0];
+	}
+	else { ann.a = f[0]; }
+	break;
+    case 2:
+	ann.a = f[0];
+	ann.x = f[1];
+	break;
+    }
+    copy_to_template(ann);
+    selkey = summary[0][0];
+    $('#palette').html(ptext);
+    $('.palette_ann').on('click', select_type);
+}
+
+function set_sw_width(seconds) {
+    dt_sec = seconds;
+    svgw = 1000*dt_sec;
+    svgh = svgw/2;
+    svgl = svgw/8;
+    svgr = svgw/24;
+    svgtw = svgl + svgw + svgr;
+    svgf = 12*dt_sec;
+    svgtf = 10*dt_sec;
+    svgc = 8*dt_sec;
+    adx1 = 2*dt_sec;
+    adx2 = 4*dt_sec;
+    adx4 = 8*dt_sec;
+    ady1 = 10*dt_sec;
 }
 
 // Create an annotation summary label from an annotation
@@ -833,23 +968,24 @@ function askey(ann)
 {
     var key;
 
-    if (ann.x != null && ann.x != '') {
-	if (ann.a == '+' && ann.x[0] == '(') key = ann.x;
-	else key = ann.a + ':' + ann.x;
+    if (ann.x !== null && ann.x !== '') {
+	if (ann.a === '+' && ann.x[0] === '(') { key = ann.x; }
+	else { key = ann.a + ':' + ann.x; }
     }
-    else
-	key = ann.a;
+    else { key = ann.a; }
 
     return key;
 }    
 
 // Retrieve one or more complete annotation files for the selected record.
 function read_annotations(t0_string) {
+    var a, annreq = '', i, j, key, len, t, s = {}, ss = [];
+
     nann = 0;	// new record -- (re)fill the cache
     if (ann_set.length) {
-	var annreq = '', i;
+
 	for (i = 0; i < ann_set.length; i++) {
-	    var a = ann_set[i].name;
+	    a = ann_set[i].name;
 	    annreq += '&annotator=' + encodeURIComponent(a);
 	}
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
@@ -860,45 +996,33 @@ function read_annotations(t0_string) {
 	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
 		ann[nann] = data.fetch.annotator[i];
 		a_visible[ann[nann].name] = 1;
-		for (var j = 0; j < ann_set.length; j++) {
-		    if (ann[nann].name == ann_set[j].name)
+		for (j = 0; j < ann_set.length; j++) {
+		    if (ann[nann].name === ann_set[j].name) {
 			ann[nann].desc = ann_set[j].desc;
+		    }
 		}
 	    }
 	    for (i = 0; i < ann.length; i++) {
-		var len, t;
 		adt_ticks = 0;
 		len = ann[i].annotation.length;
-		if (len > 0) var t = ann[i].annotation[len-1].t;
-		if (t > adt_ticks) adt_ticks = t;
+		if (len > 0) { t = ann[i].annotation[len-1].t; }
+		if (t > adt_ticks) { adt_ticks = t; }
 	    }
 
 	    // compile summaries of the annotation types in each set
 	    for (i = 0; i < nann; i++) {
-		var a = ann[i].annotation, j, key, s = {}, ss = [];
-
+		a = ann[i].annotation;
 		for (j = 0; j < a.length; j++) {
 		    key = askey(a[j]);
-/*
-		    if (a[j].x != null) {
-			if (a[j].a == '+' && a[j].x[0] == '(') key = a[j].x;
-			else key = a[j].a + ':' + a[j].x;
-		    }
-		    else
-			key = a[j].a;
-*/
-		    if (s.hasOwnProperty(key))
-			s[key]++;
-		    else
-			s[key] = 1;
+		    if (s.hasOwnProperty(key)) { s[key]++; }
+		    else { s[key] = 1; }
 		}
-		for (key in s)
-		    ss.push([key, s[key]]);
+		for (key in s) { ss.push([key, s[key]]); }
 		// sort the types by prevalence (most to least frequent)
 		ann[i].summary = ss.sort(function(a, b) {return b[1] - a[1]});
 	    }
 
-	    if (annselected != '') {
+	    if (annselected !== '') {
 		for (i = 0; i < nann; i++) {
 		    if (annselected === ann[i].name) {
 			selarr = ann[i].annotation;
@@ -906,10 +1030,9 @@ function read_annotations(t0_string) {
 			break;
 		    }
 		}
-		if (i >= nann)
-		    annselected = '';
+		if (i >= nann) { annselected = ''; }
 	    }
-	    if (annselected == '') {
+	    if (annselected === '') {
 		annselected = ann[0].name;
 		selarr = ann[0].annotation;
 		load_palette(ann[0].summary);
@@ -924,63 +1047,16 @@ function read_annotations(t0_string) {
     }
 }
 
-// Retrieve one or more signal segments starting at t for the selected record.
-function read_signals(t0, update) {
-    var i, trace = '', sigreq = '', t, tf, tr = t0 + dt_ticks;
-
-    if (signals) {
-	for (i = 0; i < signals.length; i++) {
-	    if (s_visible[signals[i].name] == 1) {
-		t = t0;
-		tf = t + dt_ticks;
-		while (t < tf) {
-		    trace = find_trace(db, record, signals[i].name, t);
-		    if (trace) {
-			trace.id = tid++;	// found, mark as recently used
-			t = trace.tf;
-		    }
-		    else {		
-			if (t < tr) tr = t; // must read samples from t to tf
-			sigreq += '&signal='
-			    + encodeURIComponent(signals[i].name);
-			break;
-		    }
-		}
-	    }
-	}
-    }
-    if (sigreq) {
-	url = server
-	    + '?action=fetch'
-	    + '&db=' + db
-	    + '&record=' + record
-	    + sigreq
-	    + '&t0=' + tr/tickfreq
-	    + '&dt=' + dt_sec
-	    + '&callback=?';
-	show_status(true);
-	$.getJSON(url, function(data) {
-	    var fetch = data.fetch;
-	    if (fetch && fetch.hasOwnProperty('signal')) {
-		var s = data.fetch.signal;
-		for (i = 0; i < s.length; i++)
-		    set_trace(db, record, s[i]);
-	    }
-	    if (update) update_output();
-	    show_status(false);
-	});
-    }
-    else if (update) update_output();
-}
-
 // Prefetch data for later use.
 function prefetch(t_ticks) {
-    if (t_ticks < 0) t_ticks = 0;
-    if (t_ticks < rdt_ticks) read_signals(t_ticks, false);
+    if (t_ticks < 0) { t_ticks = 0; }
+    if (t_ticks < rdt_ticks) { read_signals(t_ticks, false); }
 }
 
 // Button handlers
 function go_here(t_ticks) {
+    var title, t0_string, x, y;
+
     if (t_ticks >= rdt_ticks) {
 	t_ticks = rdt_ticks;
 	$('.fwd').attr('disabled', 'disabled');
@@ -990,7 +1066,7 @@ function go_here(t_ticks) {
     else {
 	$('.fwd').removeAttr('disabled');
 	$('.eor').removeAttr('disabled');
-	if (target && annselected) $('.sfwd').removeAttr('disabled');
+	if (target && annselected) { $('.sfwd').removeAttr('disabled'); }
     }
     if (t_ticks <= 0) {
 	t_ticks = 0;
@@ -1001,18 +1077,18 @@ function go_here(t_ticks) {
     else {
 	$('.rev').removeAttr('disabled');
 	$('.sor').removeAttr('disabled');
-	if (target && annselected) $('.srev').removeAttr('disabled');
+	if (target && annselected) { $('.srev').removeAttr('disabled'); }
     }
 
-    var title = 'LW: ' + sdb + '/' + record;
+    title = 'LW: ' + sdb + '/' + record;
     document.title = title;
-    var t0_string = timstr(t_ticks);
+    t0_string = timstr(t_ticks);
     $('.t0_str').val(t0_string);
     t0_ticks = t_ticks;
     tf_ticks = t_ticks + dt_ticks;
-    if (dt_sec < 10) tickint = tickfreq;
-    else if (dt_sec < 35) tickint = 5 * tickfreq;
-    else tickint = 10 * tickfreq;
+    if (dt_sec < 10) { tickint = tickfreq; }
+    else if (dt_sec < 35) { tickint = 5 * tickfreq; }
+    else { tickint = 10 * tickfreq; }
 
     read_signals(t0_ticks, true); // read signals not previously cached, if any
 
@@ -1022,38 +1098,11 @@ function go_here(t_ticks) {
 	$('.sfwd').attr('disabled', 'disabled');
     }
     if (m) {
-	var x = Math.round(x_cursor * m.a + m.e);
-	var y = Math.round(asy0 * m.d + m.f);
+	x = Math.round(x_cursor * m.a + m.e);
+	y = Math.round(asy0 * m.d + m.f);
 	show_time(x, y);
 	highlight_selection();
     }
-}
-
-function scrollrev() {
-    t0_ticks -= dt_sec;  // the increment was chosen to divide dt_ticks evenly
-    if (t0_ticks <= 0) {
-	t0_ticks = 0;
-	autoplay_off();
-    }
-    go_here(t0_ticks);
-    if (t0_ticks > 0)
-	prefetch(Math.floor((t0_ticks - 1)/dt_ticks) * dt_ticks);
-}
-
-function scrollfwd() {
-    t0_ticks += dt_sec;
-    if (t0_ticks >= rdt_ticks - dt_ticks)
-	autoplay_off();
-    go_here(t0_ticks);
-    if (t0_ticks < rdt_ticks - dt_ticks	&& (t0_ticks % dt_ticks == 0))
-	prefetch(t0_ticks + 2*dt_ticks);
-}
-
-function resize_lightwave() {
-    m = document.getElementById("viewport").getScreenCTM();
-    set_sw_width(dt_sec);
-    $('#helpframe').attr('height', $(window).height() - 180 + 'px');
-    show_plot(); // redraw signal window if resized
 }
 
 function autoplay_off() {
@@ -1065,19 +1114,51 @@ function autoplay_off() {
     }
 }
 
+function scrollrev() {
+    t0_ticks -= dt_sec;  // the increment was chosen to divide dt_ticks evenly
+    if (t0_ticks <= 0) {
+	t0_ticks = 0;
+	autoplay_off();
+    }
+    go_here(t0_ticks);
+    if (t0_ticks > 0) {
+	prefetch(Math.floor((t0_ticks - 1)/dt_ticks) * dt_ticks);
+    }
+}
+
+function scrollfwd() {
+    t0_ticks += dt_sec;
+    if (t0_ticks >= rdt_ticks - dt_ticks) { autoplay_off(); }
+    go_here(t0_ticks);
+    if (t0_ticks < rdt_ticks - dt_ticks	&& (t0_ticks % dt_ticks === 0)) {
+	prefetch(t0_ticks + 2*dt_ticks);
+    }
+}
+
+function resize_lightwave() {
+    m = document.getElementById("viewport").getScreenCTM();
+    set_sw_width(dt_sec);
+    $('#helpframe').attr('height', $(window).height() - 180 + 'px');
+    show_plot(); // redraw signal window if resized
+}
+
 function autoplay_fwd() {
-    if (autoscroll) autoplay_off();
+    var dti;
+
+    if (autoscroll) { autoplay_off(); }
     else {
-	var dti = 50+dt_ticks*nsig/1000;
+	dti = 50+dt_ticks*nsig/1000;
 	autoscroll = setInterval(scrollfwd, dti);
 	$('.scrollfwd').html('<div style="color: red">&#9632;</div>');
     }
 }
 
 function autoplay_rev() {
-    if (autoscroll) autoplay_off();
+    var dti;
+
+    if (autoscroll) { autoplay_off(); }
     else {
-	var dti = 50+dt_ticks*nsig/1000;
+	dti = 50+dt_ticks*nsig/1000;
 	autoscroll = setInterval(scrollrev, dti);
 	$('.scrollrev').html('<div style="color: red">&#9632;</div>');
     }
@@ -1088,26 +1169,35 @@ function gostart() {
 }
 
 function gorev() {
-    var t0_string = $('.t0_str').val();
-    var t_ticks = strtim(t0_string) - dt_ticks;
+    var t_ticks, t0_string;
+
+    t0_string = $('.t0_str').val();
+    t_ticks = strtim(t0_string) - dt_ticks;
     go_here(t_ticks);
     prefetch(t_ticks - dt_ticks);
 }
 
 function go_to() {
-    var t0_string;
-    if (current_tab == 'View/edit') t0_string = $('#view .t0_str').val();
-    else if (current_tab == 'Tables') t0_string = $('#tables .t0_str').val();
+    var t_ticks,  t0_string;
+
+    if (current_tab === 'View/edit') {
+	t0_string = $('#view .t0_str').val();
+    }
+    else if (current_tab === 'Tables') {
+	t0_string = $('#tables .t0_str').val();
+    }
     $('.t0_str').val(t0_string);
-    var t_ticks = strtim(t0_string);
+    t_ticks = strtim(t0_string);
     go_here(t_ticks);
 }
 
 function gofwd() {
-    var t0_string = $('.t0_str').val();
-    var t_ticks = strtim(t0_string) + dt_ticks;
+    var t_ticks,  t0_string;
+
+    t0_string = $('.t0_str').val();
+    t_ticks = strtim(t0_string) + dt_ticks;
     go_here(t_ticks);
-    prefetch(t_ticks + +dt_ticks);
+    prefetch(t_ticks + Number(dt_ticks));
 }
 
 function goend() {
@@ -1160,56 +1250,49 @@ function match(sa, i) {
 	}
 	break;
     default:
-	if (sa[i].a == target || sa[i].x == target)
-	    m = true;
+	if (sa[i].a === target || sa[i].x === target) { m = true; }
+	break;
     }
     return m;
 }
 
 function srev() {
-    var na = 0, sa = '', i, t;
+    var halfdt, i, na = 0, sa = '', t;
 
     // find the annotation set
     for (i = 0; i < nann; i++) {
-	if (ann[i].name == annselected) {
+	if (ann[i].name === annselected) {
 	    sa = ann[i].annotation;
 	    na = sa.length;
 	    break;
 	}
     }
-    if (i >= nann) return;  // annotation set not found
+    if (i >= nann) { return; }  // annotation set not found
 
-    // find the last annotation in the set before the signal window
-    for (i = na - 1; i >= 0 && sa[i].t > t0_ticks; i--)
-	;
-
-    // find the previous annotation matching the target
-    for ( ; i >= 0 && !match(sa, i); i--)
-	;
-
+    // find the previous annotation matching the target before the signal window
+    for (i = ann_before(sa, t0_ticks); i >= 0; i--) {
+	if (match(sa, i)) { break; }
+    }
     // if a match was found ...
     if (i >= 0) {
-	var halfdt = Math.floor(dt_ticks/2);
+	halfdt = Math.floor(dt_ticks/2);
 	t = sa[i].t - halfdt;
 	go_here(t);	// show it
 
 	// find the last annotation in the set before the new signal window
-	for ( ; i >= 0 && sa[i].t > t; i--)
-	    ;
+	while (i >= 0 && sa[i].t > t) { i--; }
 
 	// find and cache the previous match, if any
-	for ( ; i >= 0 && !match(sa, i); i--)
-	    ;
+	while (i >= 0 && !match(sa, i)) { i--; }
+
 	// if another match was found ...
 	if (i >= 0) {
 	    t = sa[i].t - halfdt;
 	    prefetch(t);  // cache it
-	    return;
 	}
 	else {
 	    // otherwise, disable further reverse searches
 	    $('.srev').attr('disabled', 'disabled');
-	    return;
 	}
     }
     else {  // no match found, disable further reverse searches
@@ -1220,51 +1303,43 @@ function srev() {
 }
 
 function sfwd() {
-    var na = 0, sa = '', i, t;
+    var halfdt, i, na = 0, sa = '', t;
 
     // find the annotation set
     for (i = 0; i < nann; i++) {
-	if (ann[i].name == annselected) {
+	if (ann[i].name === annselected) {
 	    sa = ann[i].annotation;
 	    na = sa.length;
 	    break;
 	}
     }
-    if (i >= nann) return;  // annotation set not found
+    if (i >= nann) { return; }  // annotation set not found
 
-    // find the first annotation in the set after the signal window
-//    i = ann_after(anns   FIXME
-
-    for (i = 0; i < na && sa[i].t < tf_ticks; i++)
-	;
-
-    // find the next annotation matching the target
-    for ( ; i < na && !match(sa, i); i++)
-	;
-
+    // find the next annotation matching the target after the signal window
+    for (i = ann_after(sa, tf_ticks); i < na; i++) {
+	if (match(sa, i)) { break; }
+    }
     // if a match was found ...
     if (i < na) {
-	var halfdt = Math.floor(dt_ticks/2);
+	halfdt = Math.floor(dt_ticks/2);
 	t = sa[i].t - halfdt;
 	go_here(t);	// show it
 
 	// find the first annotation in the set after the new signal window
 	t += +dt_ticks;
-	for ( ; i < na && sa[i].t < t; i++)
-	    ;
+	while (i < na && sa[i].t < t) { i++; }
+
 	// find and cache the next match, if any
-	for ( ; i < na && !match(sa, i); i++)
-	    ;
+	while (i < na && !match(sa, i)) { i++; }
+
 	// if another match was found ...
 	if (i < na) {
 	    t = sa[i].t - halfdt;
 	    prefetch(t);  // cache it
-	    return;
 	}
 	else {
 	    // otherwise, disable further forward searches
 	    $('.sfwd').attr('disabled', 'disabled');
-	    return;
 	}
     }
     else {  // no match found, disable further forward searches
@@ -1277,87 +1352,84 @@ function sfwd() {
 // Set target for searches.
 function find() {
     var content = '', i;
-    if (nann < 1) {
-	alert('No annotations to search!');
-	return;
-    }
-    else if ($('#findbox').dialog("isOpen")) {
-	$('#findbox').dialog("close");
-	return;
-    }
-    else if (nann == 1) {
-	annselected = ann[0].name;
-	content = '<div title= \"' + ann[0].desc + '">In: '
-	    + ann[0].name + '</div>';
-    }
+
+    if (nann < 1) { alert('No annotations to search!'); }
+    else if ($('#findbox').dialog("isOpen")) { $('#findbox').dialog("close"); }
     else {
-	content = '<div title="Select a set of annotations to search">'
-	    + 'In:&nbsp;<select name=\"annselected\" id=\"annselected\">\n';
-	for (i = 0; i < nann; i++) {
-	    if (annselected === ann[i].name) break;
+	if (nann === 1) {
+	    annselected = ann[0].name;
+	    content = '<div title= \"' + ann[0].desc + '">In: '
+		+ ann[0].name + '</div>';
 	}
-	if (i > nann) annselected = ann[0].name;
-	for (i = 0; i < nann; i++) {
-	    content += '<option value=\"' + ann[i].name + '\" title =\"'
-		+ ann[i].desc + '\" ';
-	    if (annselected === ann[i].name) {
-		content += ' selected';
+	else {
+	    content = '<div title="Select a set of annotations to search">'
+		+ 'In:&nbsp;<select name=\"annselected\" id=\"annselected\">\n';
+	    for (i = 0; i < nann; i++) {
+		if (annselected === ann[i].name) { break; }
 	    }
-	    content += '>' + ann[i].name + '</option>\n';
+	    if (i > nann) { annselected = ann[0].name; }
+	    for (i = 0; i < nann; i++) {
+		content += '<option value=\"' + ann[i].name + '\" title =\"'
+		    + ann[i].desc + '\" ';
+		if (annselected === ann[i].name) { content += ' selected'; }
+		content += '>' + ann[i].name + '</option>\n';
+	    }
+	    content += '</select></div>\n';
 	}
-	content += '</select></div>\n';
-    }
-    $('#annsets').html(content);
-    $('#target').val(target);
-    $('#target, #annselected').on("change", function() {
-	target = $('#target').val();
-	if (nann > 1) {
-	    annselected = $('#annselected').val();
-	}
-	else annselected = ann[0].name;
-	if (target != '' && annselected != '') {
-	    if (t0_ticks > 0)
-		$('.srev').removeAttr('disabled');
-	    if (tf_ticks <= rdt_ticks)
-		$('.sfwd').removeAttr('disabled');
-	}
-    });
-    
-    $('#findbox').dialog("open");
-    $('#findbox').dialog({
-        height: 'auto',
-	beforeClose: function(event, ui) {
+	$('#annsets').html(content);
+	$('#target').val(target);
+	$('#target, #annselected').on("change", function() {
 	    target = $('#target').val();
-	    if (nann > 1) annselected = $('#annselected').val();
-	    else annselected = ann[0].name;
-	},
-	close: function(event, ui) {
-	    if (target != '' && annselected != '') {
-		if (t0_ticks > 0)
+	    if (nann > 1) { annselected = $('#annselected').val(); }
+	    else { annselected = ann[0].name; }
+	    if (target !== '' && annselected !== '') {
+		if (t0_ticks > 0) {
 		    $('.srev').removeAttr('disabled');
-		if (tf_ticks <= rdt_ticks)
+		}
+		if (tf_ticks <= rdt_ticks) {
 		    $('.sfwd').removeAttr('disabled');
+		}
 	    }
-	}
-    });
+	});
+	
+	$('#findbox').dialog("open");
+	$('#findbox').dialog({
+            height: 'auto',
+	    beforeClose: function() {
+		target = $('#target').val();
+		if (nann > 1) { annselected = $('#annselected').val(); }
+		else { annselected = ann[0].name; }
+	    },
+	    close: function() {
+		if (target !== '' && annselected !== '') {
+		    if (t0_ticks > 0) {
+			$('.srev').removeAttr('disabled');
+		    }
+		    if (tf_ticks <= rdt_ticks) {
+			$('.sfwd').removeAttr('disabled');
+		    }
+		}
+	    }
+	});
+    }
 }
 
 function stretch_signal() {
-    if (sigselected != '' && mag[sigselected] < 1000) {
+    if (sigselected !== '' && mag[sigselected] < 1000) {
 	mag[sigselected] *= 1.1;
 	show_plot();
     }
 }
 
 function reset_signal() {
-    if (sigselected != '' && mag[sigselected] != 1) {
+    if (sigselected !== '' && mag[sigselected] !== 1) {
 	mag[sigselected] = 1.1;
 	show_plot();
     }
 }
 
 function shrink_signal() {
-    if (sigselected != '' && mag[sigselected] > 0.001) {
+    if (sigselected !== '' && mag[sigselected] > 0.001) {
 	mag[sigselected] /= 1.1;
 	show_plot();
     }
@@ -1367,15 +1439,12 @@ function shrink_signal() {
 function toggle_add_typebox() {
     if (!editing) {
 	$('.editgroup').hide();
-	return;
     }
-    if (nann < 1) {
+    else if (nann < 1) {
 	alert('No annotations to edit!');
-	return;
     }
     else if ($('#add_typebox').dialog("isOpen")) {
 	$('#add_typebox').dialog("close");
-	return;
     }
     else {
 	$('#add_typebox').dialog("open");
@@ -1398,43 +1467,15 @@ function popup(URL) {
 	 + "copyhistory=0,resizable=1,width=700,height=500');");
 }
 
-function ann_after(a, t) {
-    var i, imin = 0, imax = a.length - 1;
-
-    if (!a || a[imax].t <= t) return -1;
-    else if (a[0].t > t) return 0;
-    while (imax - imin > 1) {
-	i = Math.floor((imin + imax)/2);
-	if (a[i].t <= t)
-	    imin = i;
-	else
-	    imax = i;
-    }
-    return imax;
-}	    
-
-
-function ann_before(a, t) {
-    if (!a) return (-1);
-    var i, imin = 0, imax = a.length - 1;
-
-    while (imax - imin > 1) {
-	i = Math.floor((imin + imax)/2);
-	if (a[i].t > t)
-	    imax = i;
-	else
-	    imin = i;
-    }
-    return (imin);
-}	    
-
 function highlight_selection() {
+    var dt, x0, y0;
+
     svsa = '';
     if (selann >= 0) {
-	var dt = selarr[selann].t - t0_ticks;
+	dt = selarr[selann].t - t0_ticks;
 	if (0 <= dt && dt <= dt_ticks) {
-	    var x0 = Math.floor(dt*1000/tickfreq) - svgf;
-	    var y0 = asy0 - 2*svgf;
+	    x0 = Math.floor(dt*1000/tickfreq) - svgf;
+	    y0 = asy0 - 2*svgf;
 	    svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + dt_sec
 		+ '" fill="yellow" fill-opacity="0.2" d="M'
 		+ x0 + ',' + y0 + ' l' + 2*svgf + ',0 l0,' + 3*svgf
@@ -1444,9 +1485,9 @@ function highlight_selection() {
 }
 
 function jump_left() {
-    var i, x, y;
-    var t = t0_ticks + x_cursor*tickfreq/1000;
+    var i, t, x, y;
 
+    t = t0_ticks + x_cursor*tickfreq/1000;
     i = ann_before(selarr, t);
     t = selarr[i].t;
 
@@ -1456,7 +1497,7 @@ function jump_left() {
 	} while (t < t0_ticks);
 	go_here(t - dt_ticks/2);
     }
-    if (selann == i) {
+    if (selann === i) {
 	selann = -1;
 	svsa = '';
     }
@@ -1471,34 +1512,37 @@ function jump_left() {
 }
 
 function nudge_left() {
-    if (c_velocity > 0) c_velocity = -10;
-    else if (c_velocity > -100) c_velocity *= 1.1;
-    if (x_cursor > 0) x_cursor += c_velocity;
-    var x = Math.round(x_cursor * m.a + m.e);
-    var y = Math.round(asy0 * m.d + m.f);
+    var x, y;
+
+    if (c_velocity > 0) { c_velocity = -10; }
+    else if (c_velocity > -100) { c_velocity *= 1.1; }
+    if (x_cursor > 0) { x_cursor += c_velocity; }
+    x = Math.round(x_cursor * m.a + m.e);
+    y = Math.round(asy0 * m.d + m.f);
     show_time(x, y);
 }
 
 function nudge_right() {
-    if (c_velocity < 0) c_velocity = 10;
-    else if (c_velocity < 100) c_velocity *= 1.1;
-    if (x_cursor < svgw) x_cursor += c_velocity;
-    var x = Math.round(x_cursor * m.a + m.e);
-    var y = Math.round(asy0 * m.d + m.f);
+    var x, y;
+
+    if (c_velocity < 0) { c_velocity = 10; }
+    else if (c_velocity < 100) { c_velocity *= 1.1; }
+    if (x_cursor < svgw) { x_cursor += c_velocity; }
+    x = Math.round(x_cursor * m.a + m.e);
+    y = Math.round(asy0 * m.d + m.f);
     show_time(x, y);
 }
 
 function jump_right() {
-    var i, x, y;
-    var t = t0_ticks + x_cursor*tickfreq/1000;
+    var i, t, x, y;
 
+    t = t0_ticks + x_cursor*tickfreq/1000;
     i = ann_after(selarr, t);
     t = selarr[i].t;
 
-    if (t > t0_ticks + dt_ticks)
-	go_here(t - dt_ticks/2);
+    if (t > t0_ticks + dt_ticks) { go_here(t - dt_ticks/2); }
 
-    if (selann == i) {
+    if (selann === i) {
 	selann = -1;
 	svsa = '';
     }
@@ -1515,25 +1559,20 @@ function jump_right() {
 function select_ann(e) {
     var dtr, dtf, i;
 
-    if (!selarr) return;
+    if (!selarr) { return; }
     svgxyt(e.pageX, e.pageY);
     if (asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf) {
 	i = ann_after(selarr, t_cursor);
 	dtf = (i >= 0) ? selarr[i].t - t_cursor : dt_tol + 1;
 	dtr = (i > 0) ? t_cursor - selarr[i-1].t : dt_tol + 1;
 	if (dtr > dt_tol) {
-	    if (dtf > dt_tol)	// no selection
-		selann = -1;
-	    else
-		selann = i;	// select annotation just after t_cursor
+	    if (dtf > dt_tol) { selann = -1; } 	// no selection
+	    else {selann = i; }	// select annotation just after t_cursor
 	}
-	else if (dtf < dtr)
-	    selann = i;
-	else
-	    selann = i-1;	// select annotation at or just before t_cursor
+	else if (dtf < dtr) { selann = i; }
+	else { selann = i-1; }	// select annotation at or just before t_cursor
     }
-    else
-	selann = -1;
+    else { selann = -1; }
 
     highlight_selection();
 }
@@ -1565,40 +1604,41 @@ function copy_sel_to_template() {
 }
 
 function copy_template_to_palette() {
-    var a = $('#edita').val();
-    var key;
-    var x = $('#editx').val();
+    var a, f, i, key, x;
 
-    if (a == null || a.length == 0) {
-	if (x != null && x.length > 0) {
-	    if (x[0] == '(') a = '+';
-	    else a = '"';
+    a = $('#edita').val();
+    x = $('#editx').val();
+
+    if (a === null || a.length === 0) {
+	if (x !== null && x.length > 0) {
+	    if (x[0] === '(') { a = '+'; }
+	    else { a = '"'; }
 	    $('#edita').val(a);
 	}
     }
-    if (x != null && x.length > 0) {
-	if (a == '+' && x[0] == '(') key = x;
-	else key = a + ':' + x;
+    if (x !== null && x.length > 0) {
+	if (a === '+' && x[0] === '(') { key = x; }
+	else { key = a + ':' + x; }
     }
-    else
-	key = a;
-    for (var i = 0; i < palette.length; i++) {
-	if (key == palette[i][0])
-	    break;
+    else { key = a; }
+    for (i = 0; i < palette.length; i++) {
+	if (key === palette[i][0]) { break; }
     }
     if (i >= palette.length) { // add to palette if new
-	if (palette[0][1] < 0)
+	if (palette[0][1] < 0) {
 	    palette[0][0] = key;  // replace unused entry
+	}
 	else {	// add new entry at head of array
 	    palette.unshift([key, -1]);
-	    if (palette.length > 20)
+	    if (palette.length > 20) {
 		palette.pop();  // discard last entry if full
+	    }
 	}
 	load_palette(palette);
     }
     else {   // if not new, just select key in palette
-	var f = seltype.split("_");
-	if (i != f[1]) { // if key not selected already
+	f = seltype.split("_");
+	if (i !== f[1]) { // if key not selected already
 	    // deselect current selection
 	    $(seltype).css("color", "blue")
 		.css("background-color", "white");
@@ -1609,8 +1649,6 @@ function copy_template_to_palette() {
 	}
     }
 }
-
-var insert_mode = true;
 
 function toggle_insert_mode() {
     if (insert_mode) {
@@ -1625,24 +1663,24 @@ function toggle_insert_mode() {
     }
 }
 
-var changes = [];
-var undo_count = 0;
-
 function edlog(ann, etype) {
-    var aa = [ "t", "a", "s", "c", "n", "x" ], etext, i, x = '';
+    var aa = [ "t", "a", "s", "c", "n", "x" ], etext, i;
 
     if (!ann || ann.t < 0 || !ann.a || ann.a.length < 1 || /\s/g.test(ann.a)
-        || (etype != '+' && etype != '-'))
+        || (etype !== '+' && etype !== '-')) {
 	return;  // check arguments, do nothing if ann or etype is defective
-    if (ann.x != null && ann.x.length > 0) // clean up whitespace in ann.x
+    }
+    if (ann.x !== null && ann.x.length > 0) { // clean up whitespace in ann.x
 	ann.x = ann.x.replace(/\s\s*/g, ' ').replace(/^\s|\s$/g, '');
+    }
     etext = etype + ' ' + JSON.stringify(ann, aa);
     changes.unshift(etext);
     undo_count = 0;
     etext += '<br>\n' + $('#editlog').html();
     if (changes.length > 10) {
-	for (i = etext.length - 5; i > 0 && etext[i] != '\n'; i--)
-	    ;
+	for (i = etext.length - 5; i > 0; i--) {
+	    if (etext[i] === '\n') { break; }
+	}
 	etext = etext.substring(0, i);
     }
     $('#editlog').html(etext);
@@ -1663,29 +1701,24 @@ function redo() {
     }
 }
 
-var ilast = -1;
-
 function delete_ann(ann) {
-    var imin = 0, imax = selarr.length;
+    var i, imin = 0, imax = selarr.length, key;
 
-    if (selarr[ilast].t != ann.t) {
-	if (ilast < 0) ilast = Math.ceil((imin + imax)/2);
+    if (selarr[ilast].t !== ann.t) {
+	if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
 	while (imax - imin > 1) {
-	    if (selarr[ilast].t < ann.t)
-		imin = ilast;
-	    else
-		imax = ilast;
+	    if (selarr[ilast].t < ann.t) { imin = ilast; }
+	    else { imax = ilast; }
 	    ilast = Math.ceil((imin + imax)/2);
 	}
-	if (ilast == 1 && ann.t == selarr[0].t) ilast = 0;
-	if (selarr[ilast].t != ann.t)
-	    return;
+	if (ilast === 1 && ann.t === selarr[0].t) { ilast = 0; }
+	if (selarr[ilast].t !== ann.t) { return; }
     }
 
-    var key = askey(ann);
+    key = askey(ann);
 
-    for (var i = 0; i < palette.length; i++) {
-	if (palette[i][0] == key) {
+    for (i = 0; i < palette.length; i++) {
+	if (palette[i][0] === key) {
 	    palette[i][1]--;
 	    break;
 	}
@@ -1696,26 +1729,22 @@ function delete_ann(ann) {
 }
 
 function insert_ann(ann) {
-    var imin = 0, imax = selarr.length;
+    var i, imin = 0, imax = selarr.length, key;
 
-    if (ilast < 0) ilast = Math.ceil((imin + imax)/2);
+    if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
     while (imax - imin > 1) {
-	if (selarr[ilast].t < ann.t)
-	    imin = ilast;
-	else
-	    imax = ilast;
+	if (selarr[ilast].t < ann.t) { imin = ilast; }
+	else { imax = ilast; }
 	ilast = Math.ceil((imin + imax)/2);
     }
-    if (ilast == 1 && ann.t < selarr[0].t) ilast = 0;
+    if (ilast === 1 && ann.t < selarr[0].t) { ilast = 0; }
 
-    var key = askey(ann);
+    key = askey(ann);
 
-    for (var i = 0; i < palette.length; i++) {
-	if (palette[i][0] == key) {
-	    if (palette[i][1] < 0)
-		palette[i][1] = 1;
-	    else
-		palette[i][1]++;
+    for (i = 0; i < palette.length; i++) {
+	if (palette[i][0] === key) {
+	    if (palette[i][1] < 0) { palette[i][1] = 1; }
+	    else { palette[i][1]++; }
 	    break;
 	}
     }
@@ -1725,17 +1754,17 @@ function insert_ann(ann) {
 }
 
 function apply_edit(n, applyp) {
-    var ann = {}, f, g, i, insertp;
+    var ann = {}, f, insertp;
 
-    if (n < 0 || n >= changes.length) return;
+    if (n < 0 || n >= changes.length) { return; }
     f = changes[n].split(' ');
-    if (f[0] == '+') insertp = true;
-    else if (f[0] == '-') insertp = false;
-    else return;
-    if (applyp == false) insertp = !insertp;
+    if (f[0] === '+') { insertp = true; }
+    else if (f[0] === '-') { insertp = false; }
+    else { return; }
+    if (applyp === false) { insertp = !insertp; }
     ann = JSON.parse(f[1]);
-    if (insertp) insert_ann(ann);
-    else delete_ann(ann);
+    if (insertp) { insert_ann(ann); }
+    else { delete_ann(ann); }
     show_summary();
 }
 
@@ -1743,17 +1772,16 @@ function mark(e) {
     var anew, asel = null, in_box = false;
 
     svgxyt(e.pageX, e.pageY);
-    if (!editing
-	|| (!annselected && nann != 1)
-	|| x_cursor < 0
-	|| x_cursor > svgw)
+    if (!editing || (!annselected && nann !== 1)
+	|| xx_cursor < -svgf || x_cursor > svgw) {
 	return;
-
+    }
     if (selann >= 0) {
 	asel = selarr[selann];
 	if (asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf &&
-	    asel.t - svgf < t_cursor && t_cursor < asel.t + svgf)
+	    asel.t - svgf < t_cursor && t_cursor < asel.t + svgf) {
 	    in_box = true;
+	}
     }
 
     anew = { t: null, a: null, s: null, c: null, n: null, x: null };
@@ -1762,14 +1790,15 @@ function mark(e) {
 
     // commit the edit
     if (insert_mode) {
-	if (asel == null)
+	if (asel === null) {
 	    edlog(anew, '+');	// insert new annotation
+	}
 	else if (in_box) {	// change selected annotation without moving it
 	    anew.t = asel.t;	   // copy time of selected annotation
 	    edlog(asel, '-');	   // remove selected annotation
 	    edlog(anew, '+');	   // insert new annotation at old location
 	}
-	else if (asel.t != anew.t) { // move selected annot without changing it
+	else if (asel.t !== anew.t) { // move selected annot without changing it
 	    edlog(asel, '-');         // remove selected annotation
 	    asel.t = anew.t;          // change its location
 	    edlog(asel, '+');         // reinsert it
@@ -1786,12 +1815,6 @@ function mark(e) {
     }
     update_output();
 }
-
-function set_server() {
-    server = $('[name=server]').val();
-    dblist();
-}
-
 
 function toggle_show_status() {
     $('#status').toggle();
@@ -1840,7 +1863,7 @@ function toggle_editing() {
 	$('#editing').html("Disable editing");
 	alert_editing();
     }
-    if (db != '' && record != '') {
+    if (db !== '' && record !== '') {
 	$('#tabs').tabs("select", "#view");
 	show_plot();
     }
@@ -1859,7 +1882,7 @@ function toggle_shortcuts() {
 	    editing = true;
 	    $('#editing').html("Disable editing");
 	    alert_editing();
-	    if (db != '' && record != '') {
+	    if (db !== '' && record !== '') {
 		$('#tabs').tabs("select", "#view");
 		show_plot();
 	    }
@@ -1894,56 +1917,12 @@ function help_contacts() {
     $('#helpframe').attr('src', 'doc/contacts.html');
 }
 
-// convert (x,y) in pixels to SVG coords and time in ticks
-function svgxyt(x, y) {
-	m = document.getElementById("viewport").getScreenCTM();
-	x_cursor = xx_cursor = (x - m.e)/m.a;
-	if (x_cursor < 0) x_cursor = 0;
-	else if (x_cursor > svgw) x_cursor = svgw;
-	y_cursor = (y - m.f)/m.d;
-	t_cursor = t0_ticks + x_cursor*tickfreq/1000;
-}
-
-function show_time(x, y) {
-    svgxyt(x, y);
-    var ts = mstimstr(t_cursor);
-    $('.pointer').html(ts);
-
-    if (editing) {
-	var xc = x_cursor - 2*adx4;
-	svc = '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
-	    + '" fill="none" style="cursor:pointer" d="M' + x_cursor
-	    + ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
-	    + ',' + ady1 + ' V' + svgh
-	    + ' l-' + adx2 + ',' + ady1 + ' l' + adx4 + ',0 l-' + adx2
-	    + ',-' + ady1 + '" />';
-
-	var boxh = 3*svgf;
-	var boxy0 = asy0 - 2*svgf;
-	if (boxy0 < y_cursor && y_cursor < boxy0 + boxh) {
-	    var label = insert_mode ? selkey : "&#9003;";
-	    svc += '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
-		+ '" d="M' + x_cursor + ',0 V' + boxy0
-		+ ' m0,' + 3*svgf + ' V' + svgh + '" />'
-		+ '<rect x="' + Number(x_cursor - svgf) + '" y="' + boxy0
-		+ '" width="' + 2*svgf + '" height="' + boxh
-		+ '" stroke="rgb(0,0,0)" stroke-width="' + dt_sec
-		+ '" fill="#88f" fill-opacity="0.2" style="cursor:pointer" />'
-		+ '<text x="' + x_cursor + '" y="' + Number(y_cursor - svgf)
-		+ '" style="text-anchor: middle"'
-		+ ' font-size="' + svgf + '" fill="rgb(0,0,200)">'
-		+ label + '</text>\n';
-	}
-
-	$('#plotdata').html(svg + svc + svsa + '</svg>\n');
-    }
-    handle_svg_events();
-}
-
 // Load the list of signals for the selected record.
 function slist(t0_string) {
 
-    var title = 'LW: ' + sdb + '/' + record, t = 0;
+    var i, t, title;
+
+    title = 'LW: ' + sdb + '/' + record;
     $('.recann').html(sdb + '/' + record);
     document.title = title;
     $('#info').empty();
@@ -1963,8 +1942,9 @@ function slist(t0_string) {
 	    if (recinfo.signal) {
 		signals = recinfo.signal;
 		nsig = signals.length;
-		for (var i = 0; i < nsig; i++)
+		for (i = 0; i < nsig; i++) {
 		    s_visible[signals[i].name] = mag[signals[i].name] = 1;
+		}
 		init_tpool(nsig * 8);
 	    }
 	    else {
@@ -1975,21 +1955,24 @@ function slist(t0_string) {
 	$('#tabs').tabs("enable");
 	show_summary();
 	$('#tabs').tabs("select", "#view");
-	if (t0_string != '') t = strtim(t0_string);
+	if (t0_string !== '') { t = strtim(t0_string); }
+	else { t = 0; }
 	t0_string = timstr(t);
 	$('.t0_str').val(t0_string);
 	go_here(t);
 	$('#top').show();
 	show_status(false);
     });
-};
+}
 
 // When a new record is selected, reload data and show the first dt_sec seconds.
 function newrec() {
+    var prompt;
+
     record = $('[name=record]').val();
     $('#findbox').dialog("close");
     $('#add_typebox').dialog("close");
-    var prompt = 'Reading annotations for ' + sdb + '/' + record;
+    prompt = 'Reading annotations for ' + sdb + '/' + record;
     $('#prompt').html(prompt);
     read_annotations("0");
     prompt = 'Click on the <b>View/edit</b> tab to view ' + sdb + '/' + record;
@@ -2002,45 +1985,48 @@ function alist() {
     url = server + '?action=alist&callback=?&db=' + db;
     show_status(true);
     $.getJSON(url, function(data) {
-	if (data.success) ann_set = data.annotator;
-	else ann_set = '';
+	if (data.success) { ann_set = data.annotator; }
+	else { ann_set = ''; }
 	show_status(false);
     });
-};
+}
 
 // Load the list of records in the selected database, and set up an event
 // handler for record selection.
 function rlist() {
-    var i, rlist = '';
+    var i, rlist_text = '';
     url = server + '?action=rlist&callback=?&db=' + db;
     $('#rlist').html('<td colspan=2>Reading list of records in ' + sdb
 		     + '</td>');
     show_status(true);
     $.getJSON(url, function(data) {
 	if (data) {
-	    rlist += '<td align=right>Record:</td>' + 
-		'<td><select name=\"record\">\n' +
-		'<option value=\"\" selected>--Choose one--</option>\n';
-	    for (i = 0; i < data.record.length; i++)
-	        rlist += '<option value=\"' + data.record[i] +
-		    '\">' + data.record[i] + '</option>\n';
-	    rlist += '</select></td>\n';
+	    rlist_text += '<td align=right>Record:</td>'
+		+ '<td><select name=\"record\">\n'
+		+ '<option value=\"\" selected>--Choose one--</option>\n';
+	    for (i = 0; i < data.record.length; i++) {
+	        rlist_text += '<option value=\"' + data.record[i]
+		    + '\">' + data.record[i] + '</option>\n';
+	    }
+	    rlist_text += '</select></td>\n';
 	}
-	$('#rlist').html(rlist);
+	$('#rlist').html(rlist_text);
 	// fetch the list of signals when the user selects a record
 	$('[name=record]').on("change", newrec);
 	show_status(false);
     });
-};
+}
 
 // When a new database is selected, reload the annotation and record lists.
 function newdb() {
+    var dbparts, title;
+
     db = $('#db').val();
-    var dbparts = db.split('/');
-    if (dbparts.length > 1) sdb = '.../' + dbparts.pop();
-    else sdb = db;
+    dbparts = db.split('/');
+    if (dbparts.length > 1) { sdb = '.../' + dbparts.pop(); }
+    else { sdb = db; }
     record = '';
-    var title = 'LightWAVE: ' + sdb;
+    title = 'LightWAVE: ' + sdb;
     document.title = title;
     $('#tabs').tabs({disabled:[1,2]});
     $('#rlist').empty();
@@ -2062,34 +2048,33 @@ function alert_server_error() {
 
 // Load the list of databases and set up an event handler for db selection.
 function dblist() {
-    var dblist = '', i;
+    var dbi, dblist_text = '', dbparts, i, sdbi, timer;
 
-    $('#dblist').html('<td colspan=2>Loading list of databases ...</td>')
+    server = $('[name=server]').val();
+    $('#dblist').html('<td colspan=2>Loading list of databases ...</td>');
     url = server + '?action=dblist&callback=?';
-    var timer = setTimeout(alert_server_error, 10000);
+    timer = setTimeout(alert_server_error, 10000);
     show_status(true);
     $.getJSON(url, function(data) {
 	clearTimeout(timer);
 	if (data && data.database && data.database.length > 0) {
-	    dblist = '<td align=right>Database:</td>' + 
+	    dblist_text = '<td align=right>Database:</td>' + 
 		'<td><select name=\"db\" id=\"db\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
 	    for (i = 0; i < data.database.length; i++) {
-		var dbi = data.database[i].name;
-		var dbparts = dbi.split('/');
-		var sdbi;
-		if (dbparts.length > 1) sdbi = '.../' + dbparts.pop();
-		else sdbi = dbi;
-	        dblist += '<option value=\"' + dbi +
+		dbi = data.database[i].name;
+		dbparts = dbi.split('/');
+		if (dbparts.length > 1) { sdbi = '.../' + dbparts.pop(); }
+		else { sdbi = dbi; }
+	        dblist_text += '<option value=\"' + dbi +
 		'\">' + data.database[i].desc + ' (' + sdbi + ')</option>\n';
 	    }
-	    dblist += '</select></td>\n';
-	    $('#dblist').html(dblist)
+	    dblist_text += '</select></td>\n';
+	    $('#dblist').html(dblist_text);
 	    $('#sversion').html("&nbsp;version " + data.version);
 	    $('#db').on("change", newdb); // invoke newdb when db changes
 	}
-	else
-	    alert_server_error();
+	else { alert_server_error(); }
 	show_status(false);
     });
 }
@@ -2147,13 +2132,13 @@ function set_handlers() {
     $(function() {
 	$('#dtslider').slider({ value: dt_sec, min: 0, max: 60, step: 5,
 	    slide: function(event, ui) {
-		if (ui.value < 5) ui.value = 1;
+		if (ui.value < 5) { ui.value = 1; }
 		$('#swidth').val(ui.value);
 		dt_sec = ui.value;
 		dt_ticks = dt_sec * tickfreq;
-		if (dt_sec < 10) tickint = tickfreq;
-		else if (dt_sec < 35) tickint = 5 * tickfreq;
-		else tickint = 10 * tickfreq;
+		if (dt_sec < 10) { tickint = tickfreq; }
+		else if (dt_sec < 35) { tickint = 5 * tickfreq; }
+		else { tickint = 10 * tickfreq; }
 		m = document.getElementById("viewport").getScreenCTM();
 		set_sw_width(dt_sec);
 		go_here(t0_ticks);
@@ -2181,7 +2166,7 @@ function set_handlers() {
     $('#add_typebox').dialog({autoOpen: false});
 
     // on Settings tab:
-    $('[name=server]').on("change", set_server); // use another lightwave server
+    $('[name=server]').on("change", dblist); // use another lightwave server
     $('#show_status').on("click", toggle_show_status);
     $('#show_requests').on("click", toggle_show_requests);
     $('#clear_requests').on("click", clear_requests);
@@ -2199,45 +2184,46 @@ function set_handlers() {
 
 // Check for query string in URL, decode and run query or queries if present
 function parse_url() {
-    var s = window.location.href.split("?");
-    var n = s.length, t = 0;
-    var t0_string = '0';
+    var dblist_text, dbparts, n, q, s, t, title, t0_string, v;
 
-    if (n != 2) {
+    s = window.location.href.split("?");
+    n = s.length;
+    t = 0;
+    t0_string = '0';
+
+    if (n !== 2) {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
 	$('[name=server]').val(server);     // set default server URL
 	dblist();	// no query, get the list of databases
 	return;
     }
-    var q = s[1].split("&");
+    q = s[1].split("&");
     for (n = 0; n < q.length; n++) {
-	var v = q[n].split("=");
-	if (v[0] == 'db') db = v[1];
-	else if (v[0] == 'record') record = v[1];
-	else if (v[0] == 't0') {
-	    t0_string = v[1];
-	}
+	v = q[n].split("=");
+	if (v[0] === 'db') { db = v[1]; }
+	else if (v[0] === 'record') { record = v[1]; }
+	else if (v[0] === 't0') {  t0_string = v[1]; }
     }
     if (db !== '') {
-	var dbparts = db.split('/');
-	if (dbparts.length > 1) sdb = '.../' + dbparts.pop();
-	else sdb = db;
+	dbparts = db.split('/');
+	if (dbparts.length > 1) { sdb = '.../' + dbparts.pop(); }
+	else { sdb = db; }
 	if (record === '') {
-	    var title = 'LightWAVE: ' + sdb;
+	    title = 'LightWAVE: ' + sdb;
 	    document.title = title;
 	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
 	    $('#top').show();
 	    $('[name=server]').val(server);     // set default server URL
-	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
-	    $('#dblist').html(dblist);
+	    dblist_text = '<td align=right>Database:</td><td>' + db + '</td>';
+	    $('#dblist').html(dblist_text);
 	    alist();
 	    rlist();
 	}
 	else {
 	    $('#tabs').tabs();
 	    $('#tabs').tabs("remove",0);
-	    var title = 'LW: ' + sdb + '/' + record;
+	    title = 'LW: ' + sdb + '/' + record;
 	    document.title = title;
 	    $('.t0_str').val(t0_string);
 	    current_tab = 'View/edit';
@@ -2251,8 +2237,8 @@ function parse_url() {
 	    url = server + '?action=alist&callback=?&db=' + db;
 	    show_status(true);
 	    $.getJSON(url, function(data) {
-		if (data.success) ann_set = data.annotator;
-		else ann_set = '';
+		if (data.success) { ann_set = data.annotator; }
+		else { ann_set = ''; }
 		read_annotations(t0_string);
 		set_sw_width(dt_sec);
 		show_status(false);
@@ -2267,3 +2253,5 @@ $(document).ready(function(){
     help();				// load help into the help tab
     set_handlers();			// set UI event handlers
 });
+
+}());
