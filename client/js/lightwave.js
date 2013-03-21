@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  18 March 2013   version 0.50
+//			Last revised:	  21 March 2013   version 0.50
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -59,10 +59,9 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     ann_set = '', // annotators for the selected database, from alist()
     ann = [],   // annotations read and cached by read_annotations()
     nann = 0,	// number of annotators, set by read_annotations()
-    annselected = '',// name of annotator to be highlighted/searched/edited
-    selarr = null, // array of annselected annotations
+    selarr = null, // array of annotations selected for search/edit
     selann = -1,// index of selected annotation in selarr, if any
-    asy0,	// baseline y for display of labels in selected annotation set
+    asy0,	// baseline y for display of labels in selarr
     signals,    // signals for the selected record, from slist()
     nsig = 0,	// number of signals, set by read_signals()
     sigselected = '',// name of signal to be highlighted, if any
@@ -78,7 +77,6 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     target = '*',// search target, set in Find... dialog
     g_visible = 1, // visibility flag for grid (1: on, 0: off)
     m_visible = 1, // visibility flag for annotation marker bars (1: on, 0: off)
-    a_visible = [], // visibility flags for annotators
     s_visible = [], // visibility flags for signals
     x_cursor = -1, // signal window cursor x-coordinate (see svgxyt())
     xx_cursor = -1,// raw cursor x-coordinate (= x_cursor if in signal window)
@@ -277,8 +275,10 @@ function show_summary() {
 		+ ' annotations)<br>\n<table style="padding: 0 0 1em 3em">';
 	    s = ann[ia].summary;
 	    for (i = 0; i < s.length; i++) {
-		itext += '<tr><td>' + s[i][0] + '</td><td align=right>'
-		    + s[i][1] + '</td</tr>\n';
+		if (s[i][1] > 0) {
+		    itext += '<tr><td>' + s[i][0] + '</td><td align=right>'
+			+ s[i][1] + '</td</tr>\n';
+		}
 	    }
 	    itext += '</table>\n</td></tr>\n';
 	}
@@ -315,30 +315,40 @@ function show_summary() {
     $('#info').html(itext);
 }
 
+// return the index in annotation array a[] of the next annotation after t,
+// or -1 if there is no such annotation
 function ann_after(a, t) {
-    var i, imin = 0, imax;
+    var i, imin = 0, imax = -1;
     
-    if (!a) { return -1; }
-    imax = a.length - 1;
-    if (a[imax].t <= t) { return -1; }
-    if (a[0].t > t) { return 0; }
-    while (imax - imin > 1) {
-	i = Math.floor((imin + imax)/2);
-	if (a[i].t <= t) { imin = i; }
-	else { imax = i; }
+    if (a) {
+	imax = a.length - 1;
+	if (imax >= 0 && a[imax].t > t) {
+	    if (a[0].t > t) { imax = 0; }
+	    while (imax - imin > 1) {
+		i = Math.floor((imin + imax)/2);
+		if (a[i].t <= t) { imin = i; }
+		else { imax = i; }
+	    }
+	}
     }
     return imax;
 }	    
 
+// return the index in annotation array a[] of the last annotation at or before
+// t, or -1 if there is no such annotation
 function ann_before(a, t) {
-    var i, imin = 0, imax;
+    var i, imin = 0, imax = -1;
 
-    if (!a) { return (-1); }
-    imax = a.length - 1;
-    while (imax - imin > 1) {
-	i = Math.floor((imin + imax)/2);
-	if (a[i].t > t) { imax = i; }
-	else { imin = i; }
+    if (a) {
+	imax = a.length - 1;
+	if (imax >= 0 && a[0].t <= t) {
+	    if (a[imax].t <= t) { imin = imax; }
+	    while (imax - imin > 1) {
+		i = Math.floor((imin + imax)/2);
+		if (a[i].t > t) { imax = i; }
+		else { imin = i; }
+	    }
+	}
     }
     return imin;
 }	    
@@ -349,7 +359,7 @@ function show_tables() {
     if ($('#viewann').prop('checked')) {
         if (ann.length > 0) { atext += '<h3>Annotations</h3>\n'; }
 	for (ia = 0; ia < nann; ia++) {
-	    if (a_visible[ann[ia].name] === 0) {
+	    if (ann[ia].state === 0) {
 		atext += '<p>Annotator: ' + ann[ia].name + ' [hidden]</br>\n';
 	    }
 	    else {
@@ -512,7 +522,7 @@ function read_signals(t0, update) {
 }
 
 function show_plot() {
-    var a, aname, downarrow, dy, g, grd, i, imin, imax, ia, is, pv, s, sname,
+    var a, downarrow, dy, g, grd, i, imin, imax, ia, is, pv, s, sname,
       sva, svgts, svs, t, tf, tnext, tps, trace, tst, tt, ttick, txt, uparrow,
       v, x, xstep, xtick, x0q, x0r, x0s, y, ytop, y0, y0s = [], y1, y0a = [], z;
     
@@ -597,11 +607,10 @@ function show_plot() {
     for (ia = 0; ia < nann; ia++) {
 	y0 = y0a[ia];
 	ytop = y0 - svgf;
-	aname = ann[ia].name;
-	sva += '<g id="ann;;' + aname + '">\n';
-	if (a_visible[aname] === 1) {
+	sva += '<g id="ann;;' + ann[ia].name + '">\n';
+	if (ann[ia].state > 0) {
 	    sva += '<title>' + ann[ia].desc;
-	    if (aname === annselected) {
+	    if (ann[ia].state === 2) {
 		asy0 = y0;
 		sva += ' (click for normal view)</title>';
 		if (editing) {
@@ -619,8 +628,8 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0
 		+ '" font-size="' + svgf + '" fill="blue" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
-	    if (aname === annselected) { sva += ' font-weight="bold"'; }
-	    sva += '>' + aname + '</text></g>\n';
+	    if (ann[ia].state === 2) { sva += ' font-weight="bold"'; }
+	    sva += '>' + ann[ia].name + '</text></g>\n';
 	    a = ann[ia].annotation;
 	    for (i = ann_after(a, t0_ticks);
 		 0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
@@ -645,7 +654,7 @@ function show_plot() {
 		}
 		sva += '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"';
-		if (aname === annselected) { sva += ' font-weight="bold"'; }
+		if (ann[ia].state === 2) { sva += ' font-weight="bold"'; }
 		sva += ' font-size="' + svgf + '" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
 	    }
@@ -659,7 +668,7 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
 		+ '" fill="rgb(150,150,200)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ aname + '</text></g>\n';
+		+ ann[ia].name + '</text></g>\n';
 	}
     }
 
@@ -770,29 +779,41 @@ function show_plot() {
 }
 
 function handle_svg_events() {
-    var aname, i, sname;
+    var aname, i, j, sname;
 
     $('#grid').click(function(){ g_visible = 1 - g_visible; show_plot();});
     $('#mrkr').click(function(){ m_visible = 1 - m_visible; show_plot();});
 
     $("[id^='ann;;']").click(function(){
 	aname = $(this).attr('id').split(";")[2];
-	if (a_visible[aname] === 0) {
-	    a_visible[aname] = 1;
-	    annselected = aname;
-	    for (i = 0; i < nann; i++) {
-		if (ann[i].name === aname) {
-		    selarr = ann[i].annotations;
-		    load_palette(ann[i].summary);
-		    break;
+	for (i = 0; i < nann; i++) {
+	    if (ann[i].name === aname) { break; }
+	}
+	if (i < nann) {
+	    switch (ann[i].state) {
+	    case 0:   // annotator is hidden: select it
+		for (j = 0; j < nann; j++) {  // reset current selection
+		    if (ann[j].state === 2) {
+			ann[j].state = 1;
+			break;
+		    }
 		}
+		ann[i].state = 2;  // select this annotator
+		selarr = ann[i].annotation;
+		load_palette(ann[i].summary);
+		ilast = selann = -1;  // clear annotation selection, if any
+		svsa = '';
+		break;
+	    case 1:   // annotator is visible, not selected:  hide it
+		ann[i].state = 0;
+		break;
+	    case 2:   // annotator is selected: deselect it, leave it visible
+		ann[i].state = 1;
+		ilast = selann = -1;
+		svsa = '';
+		break;
 	    }
 	}
-	else if (annselected === aname) {
-	    annselected = '';
-	    if (nann > 1) {selarr = null; }
-	}
-	else { a_visible[aname] = 0; }
 	show_plot();
     });
 
@@ -887,7 +908,7 @@ function handle_edit() {
 }
 
 function select_type(e) {
-    var ann = { a : null, s: null, c: null, n: null, x: null }, f, s;
+    var annot = { a : null, s: null, c: null, n: null, x: null }, f, s;
 
     $(seltype).css("color", "blue").css("background-color", "white");
     seltype = '#' + e.target.id;
@@ -897,24 +918,26 @@ function select_type(e) {
     switch (f.length) {
     case 1:
 	if (f[0][0] === '(' && f[0].length > 1) {
-	    ann.a = '+';
-	    ann.x = f[0];
+	    annot.a = '+';
+	    annot.x = f[0];
 	}
-	else { ann.a = f[0]; }
+	else { annot.a = f[0]; }
 	break;
     case 2:
-	ann.a = f[0];
-	ann.x = f[1];
+	annot.a = f[0];
+	annot.x = f[1];
 	break;
     }
-    copy_to_template(ann);
+    copy_to_template(annot);
     selkey = s;
 }
 
 // initialize the palette with the most common annotation types in summary
 function load_palette(summary) {
-    var f, i, imax, ptext = '';
+    var annot, f, i, imax, ptext = '';
 
+    annot = { "t": null, "a": null, "c": null,
+	      "n": null, "s": null, "x": null };
     palette = summary;
     imax = summary.length;
     if (imax > 20) { imax = 20; }
@@ -931,17 +954,17 @@ function load_palette(summary) {
     switch (f.length) {
     case 1:
 	if (f[0][0] === '(' && f[0].length > 1) {
-	    ann.a = '+';
-	    ann.x = f[0];
+	    annot.a = '+';
+	    annot.x = f[0];
 	}
-	else { ann.a = f[0]; }
+	else { annot.a = f[0]; }
 	break;
     case 2:
-	ann.a = f[0];
-	ann.x = f[1];
+	annot.a = f[0];
+	annot.x = f[1];
 	break;
     }
-    copy_to_template(ann);
+    copy_to_template(annot);
     selkey = summary[0][0];
     $('#palette').html(ptext);
     $('.palette_ann').on('click', select_type);
@@ -964,26 +987,27 @@ function set_sw_width(seconds) {
 }
 
 // Create an annotation summary label from an annotation
-function askey(ann)
+function askey(annot)
 {
     var key;
 
-    if (ann.x !== null && ann.x !== '') {
-	if (ann.a === '+' && ann.x[0] === '(') { key = ann.x; }
-	else { key = ann.a + ':' + ann.x; }
+    if (annot.x !== null && annot.x !== '') {
+	if (annot.a === '+' && annot.x[0] === '(') { key = annot.x; }
+	else { key = annot.a + ':' + annot.x; }
     }
-    else { key = ann.a; }
+    else { key = annot.a; }
 
     return key;
 }    
 
 // Retrieve one or more complete annotation files for the selected record.
-function read_annotations(t0_string) {
-    var a, annreq = '', i, j, key, len, t, s = {}, ss = [];
+    function read_annotations(t0_string) {
+    var a, annreq = '', i, j, key, len, t, s, ss;
 
     nann = 0;	// new record -- (re)fill the cache
+    selann = -1;  // discard selection, if any
+    svsa = '';
     if (ann_set.length) {
-
 	for (i = 0; i < ann_set.length; i++) {
 	    a = ann_set[i].name;
 	    annreq += '&annotator=' + encodeURIComponent(a);
@@ -993,25 +1017,21 @@ function read_annotations(t0_string) {
 	show_status(true);
 	$.getJSON(url, function(data) {
 	    slist(t0_string);
+	    adt_ticks = 0;
 	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
-		ann[nann] = data.fetch.annotator[i];
-		a_visible[ann[nann].name] = 1;
+		ann[i] = data.fetch.annotator[i];
+		a = ann[i].annotation;
+		len = a.length;
+		if (len > 0) { t = a[len-1].t; }
+		if (t > adt_ticks) { adt_ticks = t; }
 		for (j = 0; j < ann_set.length; j++) {
 		    if (ann[nann].name === ann_set[j].name) {
 			ann[nann].desc = ann_set[j].desc;
 		    }
 		}
-	    }
-	    for (i = 0; i < ann.length; i++) {
-		adt_ticks = 0;
-		len = ann[i].annotation.length;
-		if (len > 0) { t = ann[i].annotation[len-1].t; }
-		if (t > adt_ticks) { adt_ticks = t; }
-	    }
-
-	    // compile summaries of the annotation types in each set
-	    for (i = 0; i < nann; i++) {
-		a = ann[i].annotation;
+		// compile a summary of the annotation types in ann[i]
+		s = {};
+		ss = [];
 		for (j = 0; j < a.length; j++) {
 		    key = askey(a[j]);
 		    if (s.hasOwnProperty(key)) { s[key]++; }
@@ -1020,28 +1040,18 @@ function read_annotations(t0_string) {
 		for (key in s) { ss.push([key, s[key]]); }
 		// sort the types by prevalence (most to least frequent)
 		ann[i].summary = ss.sort(function(a, b) {return b[1] - a[1]});
-	    }
 
-	    if (annselected !== '') {
-		for (i = 0; i < nann; i++) {
-		    if (annselected === ann[i].name) {
-			selarr = ann[i].annotation;
-			load_palette(ann[i].summary);
-			break;
-		    }
+		if (i === 0) {
+		    ann[i].state = 2;
+		    selarr = a;
+		    load_palette(ann[i].summary);
 		}
-		if (i >= nann) { annselected = ''; }
-	    }
-	    if (annselected === '') {
-		annselected = ann[0].name;
-		selarr = ann[0].annotation;
-		load_palette(ann[0].summary);
+		else { ann[i].state = 1; }
 	    }
 	    show_status(false);
 	});
     }
     else {
-	annselected = '';
 	selarr = null;
 	slist(t0_string);
     }
@@ -1066,7 +1076,7 @@ function go_here(t_ticks) {
     else {
 	$('.fwd').removeAttr('disabled');
 	$('.eor').removeAttr('disabled');
-	if (target && annselected) { $('.sfwd').removeAttr('disabled'); }
+	if (target && selarr) { $('.sfwd').removeAttr('disabled'); }
     }
     if (t_ticks <= 0) {
 	t_ticks = 0;
@@ -1077,7 +1087,7 @@ function go_here(t_ticks) {
     else {
 	$('.rev').removeAttr('disabled');
 	$('.sor').removeAttr('disabled');
-	if (target && annselected) { $('.srev').removeAttr('disabled'); }
+	if (target && selarr) { $('.srev').removeAttr('disabled'); }
     }
 
     title = 'LW: ' + sdb + '/' + record;
@@ -1257,17 +1267,17 @@ function match(sa, i) {
 }
 
 function srev() {
-    var halfdt, i, na = 0, sa = '', t;
+    var halfdt, i, ia, na = 0, sa = '', t;
 
     // find the annotation set
-    for (i = 0; i < nann; i++) {
-	if (ann[i].name === annselected) {
-	    sa = ann[i].annotation;
+    for (ia = 0; ia < nann; ia++) {
+	if (ann[ia].state === 2) {
+	    sa = ann[ia].annotation;
 	    na = sa.length;
 	    break;
 	}
     }
-    if (i >= nann) { return; }  // annotation set not found
+    if (ia >= nann) { return; }  // annotation set not found
 
     // find the previous annotation matching the target before the signal window
     for (i = ann_before(sa, t0_ticks); i >= 0; i--) {
@@ -1297,23 +1307,23 @@ function srev() {
     }
     else {  // no match found, disable further reverse searches
 	$('.srev').attr('disabled', 'disabled');
-	alert(target + ' not found in ' + annselected
+	alert(target + ' not found in ' + ann[ia].name
 	      + ' before ' + timstr(t0_ticks));
     }
 }
 
 function sfwd() {
-    var halfdt, i, na = 0, sa = '', t;
+    var halfdt, i, ia, na = 0, sa = '', t;
 
     // find the annotation set
-    for (i = 0; i < nann; i++) {
-	if (ann[i].name === annselected) {
-	    sa = ann[i].annotation;
+    for (ia = 0; ia < nann; ia++) {
+	if (ann[ia].state === 2) {
+	    sa = ann[ia].annotation;
 	    na = sa.length;
 	    break;
 	}
     }
-    if (i >= nann) { return; }  // annotation set not found
+    if (ia >= nann) { return; }  // annotation set not found
 
     // find the next annotation matching the target after the signal window
     for (i = ann_after(sa, tf_ticks); i < na; i++) {
@@ -1344,45 +1354,31 @@ function sfwd() {
     }
     else {  // no match found, disable further forward searches
 	$('.sfwd').attr('disabled', 'disabled');
-	alert(target + ' not found in ' + annselected
+	alert(target + ' not found in ' + ann[ia].name
 	      + ' after ' + timstr(tf_ticks));
     }
 }
 
 // Set target for searches.
 function find() {
-    var content = '', i;
+    var content = '', i, ia;
 
-    if (nann < 1) { alert('No annotations to search!'); }
+    if (nann <= 0) { alert('No annotations to search!'); }
+    for (ia = 0; ia < nann; ia++) {
+	if (ann[ia].state === 2) { break; }
+    }
+    if (ia >= nann) {
+	alert('No annotations have been chosen for searching!\n\n'
+	      + 'Choose an annotation set to search by\n'
+	      + 'clicking on its name (to the left of the\n'
+	      + 'signal window) until it is highlighted.');
+    }
     else if ($('#findbox').dialog("isOpen")) { $('#findbox').dialog("close"); }
     else {
-	if (nann === 1) {
-	    annselected = ann[0].name;
-	    content = '<div title= \"' + ann[0].desc + '">In: '
-		+ ann[0].name + '</div>';
-	}
-	else {
-	    content = '<div title="Select a set of annotations to search">'
-		+ 'In:&nbsp;<select name=\"annselected\" id=\"annselected\">\n';
-	    for (i = 0; i < nann; i++) {
-		if (annselected === ann[i].name) { break; }
-	    }
-	    if (i > nann) { annselected = ann[0].name; }
-	    for (i = 0; i < nann; i++) {
-		content += '<option value=\"' + ann[i].name + '\" title =\"'
-		    + ann[i].desc + '\" ';
-		if (annselected === ann[i].name) { content += ' selected'; }
-		content += '>' + ann[i].name + '</option>\n';
-	    }
-	    content += '</select></div>\n';
-	}
-	$('#annsets').html(content);
 	$('#target').val(target);
-	$('#target, #annselected').on("change", function() {
+	$('#target').on("change", function() {
 	    target = $('#target').val();
-	    if (nann > 1) { annselected = $('#annselected').val(); }
-	    else { annselected = ann[0].name; }
-	    if (target !== '' && annselected !== '') {
+	    if (target !== '') {
 		if (t0_ticks > 0) {
 		    $('.srev').removeAttr('disabled');
 		}
@@ -1397,11 +1393,9 @@ function find() {
             height: 'auto',
 	    beforeClose: function() {
 		target = $('#target').val();
-		if (nann > 1) { annselected = $('#annselected').val(); }
-		else { annselected = ann[0].name; }
 	    },
 	    close: function() {
-		if (target !== '' && annselected !== '') {
+		if (target !== '') {
 		    if (t0_ticks > 0) {
 			$('.srev').removeAttr('disabled');
 		    }
@@ -1489,26 +1483,27 @@ function jump_left() {
 
     t = t0_ticks + x_cursor*tickfreq/1000;
     i = ann_before(selarr, t);
-    t = selarr[i].t;
-
-    if (t < t0_ticks) {
-	do {
-	    t0_ticks -= dt_ticks;
-	} while (t < t0_ticks);
-	go_here(t - dt_ticks/2);
+    if (i >= 0) {
+	t = selarr[i].t;
+	if (t < t0_ticks) {
+	    do {
+		t0_ticks -= dt_ticks;
+	    } while (t < t0_ticks);
+	    go_here(t - dt_ticks/2);
+	}
+	if (selann === i) {
+	    selann = -1;
+	    svsa = '';
+	}
+	else {
+	    selann = i;
+	    highlight_selection();
+	}
+	x = Math.floor((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+	y = Math.round(asy0 * m.d + m.f);
+	c_velocity = 10;
+	show_time(x, y);
     }
-    if (selann === i) {
-	selann = -1;
-	svsa = '';
-    }
-    else {
-	selann = i;
-	highlight_selection();
-    }
-    x = Math.floor((t - t0_ticks)*1000/tickfreq * m.a + m.e);
-    y = Math.round(asy0 * m.d + m.f);
-    c_velocity = 10;
-    show_time(x, y);
 }
 
 function nudge_left() {
@@ -1538,22 +1533,22 @@ function jump_right() {
 
     t = t0_ticks + x_cursor*tickfreq/1000;
     i = ann_after(selarr, t);
-    t = selarr[i].t;
-
-    if (t > t0_ticks + dt_ticks) { go_here(t - dt_ticks/2); }
-
-    if (selann === i) {
-	selann = -1;
-	svsa = '';
+    if (i >= 0) {
+	t = selarr[i].t;
+	if (t > t0_ticks + dt_ticks) { go_here(t - dt_ticks/2); }
+	if (selann === i) {
+	    selann = -1;
+	    svsa = '';
+	}
+	else {
+	    selann = i;
+	    highlight_selection();
+	}
+	x = Math.ceil((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+	y = Math.round(asy0 * m.d + m.f);
+	c_velocity = 10;
+	show_time(x, y);
     }
-    else {
-	selann = i;
-	highlight_selection();
-    }
-    x = Math.ceil((t - t0_ticks)*1000/tickfreq * m.a + m.e);
-    y = Math.round(asy0 * m.d + m.f);
-    c_velocity = 10;
-    show_time(x, y);
 }
 
 function select_ann(e) {
@@ -1577,22 +1572,22 @@ function select_ann(e) {
     highlight_selection();
 }
 
-function copy_from_template(ann)
+function copy_from_template(annot)
 {
-    ann.a = $('#edita').val();
-    ann.s = $('#edits').val();
-    ann.c = $('#editc').val();
-    ann.n = $('#editn').val();
-    ann.x = $('#editx').val();
+    annot.a = $('#edita').val();
+    annot.s = $('#edits').val();
+    annot.c = $('#editc').val();
+    annot.n = $('#editn').val();
+    annot.x = $('#editx').val();
 }
 
-function copy_to_template(ann)
+function copy_to_template(annot)
 {
-    $('#edita').val(ann.a);
-    $('#edits').val(ann.s);
-    $('#editc').val(ann.c);
-    $('#editn').val(ann.n);
-    $('#editx').val(ann.x);
+    $('#edita').val(annot.a);
+    $('#edits').val(annot.s);
+    $('#editc').val(annot.c);
+    $('#editn').val(annot.n);
+    $('#editx').val(annot.x);
 }
 
 // copy selarr[selann] to the template and the palette, and select it
@@ -1663,17 +1658,17 @@ function toggle_insert_mode() {
     }
 }
 
-function edlog(ann, etype) {
+function edlog(annot, etype) {
     var aa = [ "t", "a", "s", "c", "n", "x" ], etext, i;
 
-    if (!ann || ann.t < 0 || !ann.a || ann.a.length < 1 || /\s/g.test(ann.a)
-        || (etype !== '+' && etype !== '-')) {
-	return;  // check arguments, do nothing if ann or etype is defective
+    if (!annot || annot.t < 0 || !annot.a || annot.a.length < 1
+	|| /\s/g.test(annot.a) || (etype !== '+' && etype !== '-')) {
+	return;  // check arguments, do nothing if annot or etype is defective
     }
-    if (ann.x !== null && ann.x.length > 0) { // clean up whitespace in ann.x
-	ann.x = ann.x.replace(/\s\s*/g, ' ').replace(/^\s|\s$/g, '');
+    if (annot.x !== null && annot.x.length > 0) { // fix whitespace in annot.x
+	annot.x = annot.x.replace(/\s\s*/g, ' ').replace(/^\s|\s$/g, '');
     }
-    etext = etype + ' ' + JSON.stringify(ann, aa);
+    etext = etype + ' ' + JSON.stringify(annot, aa);
     changes.unshift(etext);
     undo_count = 0;
     etext += '<br>\n' + $('#editlog').html();
@@ -1701,21 +1696,21 @@ function redo() {
     }
 }
 
-function delete_ann(ann) {
+function delete_ann(annot) {
     var i, imin = 0, imax = selarr.length, key;
 
-    if (selarr[ilast].t !== ann.t) {
-	if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
+    if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
+    if (selarr[ilast].t !== annot.t) {
 	while (imax - imin > 1) {
-	    if (selarr[ilast].t < ann.t) { imin = ilast; }
+	    if (selarr[ilast].t < annot.t) { imin = ilast; }
 	    else { imax = ilast; }
 	    ilast = Math.ceil((imin + imax)/2);
 	}
-	if (ilast === 1 && ann.t === selarr[0].t) { ilast = 0; }
-	if (selarr[ilast].t !== ann.t) { return; }
+	if (ilast === 1 && annot.t === selarr[0].t) { ilast = 0; }
+	if (selarr[ilast].t !== annot.t) { return; }
     }
 
-    key = askey(ann);
+    key = askey(annot);
 
     for (i = 0; i < palette.length; i++) {
 	if (palette[i][0] === key) {
@@ -1728,33 +1723,36 @@ function delete_ann(ann) {
     highlight_selection();
 }
 
-function insert_ann(ann) {
-    var i, imin = 0, imax = selarr.length, key;
+function insert_ann(annot) {
+    var i, imin = 0, imax, key;
 
-    if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
-    while (imax - imin > 1) {
-	if (selarr[ilast].t < ann.t) { imin = ilast; }
-	else { imax = ilast; }
-	ilast = Math.ceil((imin + imax)/2);
-    }
-    if (ilast === 1 && ann.t < selarr[0].t) { ilast = 0; }
-
-    key = askey(ann);
-
-    for (i = 0; i < palette.length; i++) {
-	if (palette[i][0] === key) {
-	    if (palette[i][1] < 0) { palette[i][1] = 1; }
-	    else { palette[i][1]++; }
-	    break;
+    if (selarr) {
+	imax = selarr.length;
+	if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
+	while (imax - imin > 1) {
+	    if (selarr[ilast].t < annot.t) { imin = ilast; }
+	    else { imax = ilast; }
+	    ilast = Math.ceil((imin + imax)/2);
 	}
+	if (ilast === 1 && annot.t < selarr[0].t) { ilast = 0; }
+	
+	key = askey(annot);
+	
+	for (i = 0; i < palette.length; i++) {
+	    if (palette[i][0] === key) {
+		if (palette[i][1] < 0) { palette[i][1] = 1; }
+		else { palette[i][1]++; }
+		break;
+	    }
+	}
+	selarr.splice(ilast, 0, annot);
+	selann = ilast;
+	highlight_selection();
     }
-    selarr.splice(ilast, 0, ann);
-    selann = ilast;
-    highlight_selection();
 }
 
 function apply_edit(n, applyp) {
-    var ann = {}, f, insertp;
+    var annot = {}, f, insertp;
 
     if (n < 0 || n >= changes.length) { return; }
     f = changes[n].split(' ');
@@ -1762,9 +1760,9 @@ function apply_edit(n, applyp) {
     else if (f[0] === '-') { insertp = false; }
     else { return; }
     if (applyp === false) { insertp = !insertp; }
-    ann = JSON.parse(f[1]);
-    if (insertp) { insert_ann(ann); }
-    else { delete_ann(ann); }
+    annot = JSON.parse(f[1]);
+    if (insertp) { insert_ann(annot); }
+    else { delete_ann(annot); }
     show_summary();
 }
 
@@ -1772,8 +1770,7 @@ function mark(e) {
     var anew, asel = null, in_box = false;
 
     svgxyt(e.pageX, e.pageY);
-    if (!editing || (!annselected && nann !== 1)
-	|| xx_cursor < -svgf || x_cursor > svgw) {
+    if (!editing || !selarr || xx_cursor < -svgf || x_cursor > svgw) {
 	return;
     }
     if (selann >= 0) {
@@ -1782,6 +1779,7 @@ function mark(e) {
 	    asel.t - svgf < t_cursor && t_cursor < asel.t + svgf) {
 	    in_box = true;
 	}
+	else { asel = null; }
     }
 
     anew = { t: null, a: null, s: null, c: null, n: null, x: null };
@@ -1892,7 +1890,28 @@ function toggle_shortcuts() {
 }
 
 function new_annset() {
-    alert("not yet implemented!");
+    var i, new_ann, new_ann_set, new_ann_array = [], new_summary = [];
+
+    new_ann_set = { name: "new", desc: "created using LightWAVE" };
+    ann_set.unshift(new_ann_set);
+    new_ann = { name: "new", desc: "created using LightWAVE", state: 2,
+		annotation: new_ann_array, summary: new_summary };
+    ann.unshift(new_ann);
+    nann++;
+    if (palette) {
+	for (i = 0; i < palette.length; i++) {
+	    new_ann.summary[i] = [ palette[i][0], -1 ];
+	}
+    }
+    else { new_ann.summary[0] = [ 'N', -1 ]; }
+    for (i = 1; i < nann; i++) {
+	if (ann[i].state === 2) { ann[i].state = 1; break; }
+    }
+    ann[0].state = 2;
+    selarr = ann[0].annotation;
+    load_palette(ann[0].summary);
+    ilast = selann = -1;
+    svsa = '';
 }
 
 function toggle_show_edits() {
@@ -1929,6 +1948,7 @@ function slist(t0_string) {
     $('#anndata').empty();
     $('#sigdata').empty();
     $('#plotdata').empty();
+    m = null;
     nsig = 0;
     url = server + '?action=info&db=' + db + '&record=' + record
 	+ '&callback=?';
@@ -2045,6 +2065,14 @@ function alert_server_error() {
 	  + 'the network connection.  Select another server\n'
 	  + 'on the Settings tab if necessary.');
 }
+
+function atype_menu() {
+    var amtext, i;
+
+    amtext = '<td colspan=2>Loading list of annotation types ...</td>';
+
+}
+
 
 // Load the list of databases and set up an event handler for db selection.
 function dblist() {

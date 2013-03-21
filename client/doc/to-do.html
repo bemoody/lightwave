@@ -67,6 +67,18 @@ significantly reorganized during the next several alpha releases.</s>
    <li> <s>palette should include deletion tool</s>
    </ul>
  <li> <s>unlimited undo/redo</s>
+ <li> <s>create new annotation set</s>
+ <li> <s>select a different annotation set to edit</s>
+   <ul>
+   <li> swap edit logs when changing set
+   </ul>
+ <li> save edit log(s) to localstorage
+ <li> send edit log(s) to server
+ <li> get edit log(s) from server
+  <ul>
+  <li> do this automatically when reopening previously edited annotation set
+  <li> compare with localstorage and resolve discrepancies if found
+  </ul>
  <li> "snap" mode to move new annotations to local extremum automatically
    <ul>
    <li> use gestures to move to nearest following/preceding local max/min
@@ -113,9 +125,10 @@ These tasks will be implemented in <tt>lightwave.c</tt>.  Tasks noted
 with (*) will require coordinated client-side changes.
 
 <ul>
-<li> * handler for receiving and storing annotations from clients
+<li> * handler for receiving and storing edit logs from clients
   <ul>
   <li> save in user's personal PNW workspace
+  <li> rebuild annotation files from edit logs (+ original files)
   </ul>
 <li> <s>disambiguate identically-named signals</s>
 <li> <s>short-form signal names</s>
