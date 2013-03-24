@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  21 March 2013   version 0.50
+//			Last revised:	  24 March 2013   version 0.52
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -68,7 +68,6 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     current_tab,// name of the currently selected tab
     dt_sec = 10,// window width in seconds
     dt_ticks,   // window width in ticks
-    dt_tol,	// selection window half-width in ticks (0.012*dt_ticks)
     t0_ticks = -1, // time of the first sample in the signal window, in ticks
     tf_ticks,	// time of the first sample after the signal window, in ticks
     tickint,    // interval between timestamps on plot
@@ -315,42 +314,38 @@ function show_summary() {
     $('#info').html(itext);
 }
 
-// return the index in annotation array a[] of the next annotation after t,
-// or -1 if there is no such annotation
+// Return the index in annotation array a[] of the first annotation following t.
+// If a[] is empty, or if all of a[] follows t, return 0.
+// If all of a[] precedes t, return the next index (a.length).
 function ann_after(a, t) {
-    var i, imin = 0, imax = -1;
+    var i, imin = 0, imax = 0;
     
     if (a) {
 	imax = a.length - 1;
-	if (imax >= 0 && a[imax].t > t) {
+	if (imax >= 0) {
 	    if (a[0].t > t) { imax = 0; }
-	    while (imax - imin > 1) {
-		i = Math.floor((imin + imax)/2);
-		if (a[i].t <= t) { imin = i; }
-		else { imax = i; }
+	    else if (a[imax].t > t) {
+		while (imax - imin > 1) {
+		    i = Math.floor((imin + imax)/2);
+		    if (a[i].t < t) { imin = i; }
+		    else if (a[i].t > t) { imax = i; }
+		    else { imax = imin = i + 1; }
+		}
 	    }
+	    else { imax++; }
 	}
     }
     return imax;
 }	    
 
-// return the index in annotation array a[] of the last annotation at or before
-// t, or -1 if there is no such annotation
+// Return the index in annotation array a[] of the last annotation at or before
+// t.  If all of a[] precedes t, return a.length - 1.  If a[] is empty, or if
+// all of a[] follows t, return -1.
 function ann_before(a, t) {
-    var i, imin = 0, imax = -1;
+    var i;
 
-    if (a) {
-	imax = a.length - 1;
-	if (imax >= 0 && a[0].t <= t) {
-	    if (a[imax].t <= t) { imin = imax; }
-	    while (imax - imin > 1) {
-		i = Math.floor((imin + imax)/2);
-		if (a[i].t > t) { imax = i; }
-		else { imin = i; }
-	    }
-	}
-    }
-    return imin;
+    i = ann_after(a, t) - 1;
+    return i;
 }	    
 
 function show_tables() {
@@ -365,18 +360,18 @@ function show_tables() {
 	    else {
 		atext += '<p><b>Annotator:</b> ' + ann[ia].name
 		    + '\n<p><table class="dtable">\n<tr>'
-		    + '<th>Time (elapsed)&nbsp;</th><th>Type</th>'
+		    + '<th>Time (elapsed)&nbsp;</th><th>Sample #</th><th>Type</th>'
 		    + '<th>Sub&nbsp;</th><th>Chan</th><th>Num&nbsp;</th>'
 		    + '<th>Aux</th></tr>\n';
 		a = ann[ia].annotation;
 		for (i = ann_after(a, t0_ticks);
 		     0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
 		    atext += '<tr><td>' + mstimstr(a[i].t) + '</td><td>'
+		        + a[i].t + '</td><td>'
 			+ a[i].a + '</td><td>' + a[i].s + '</td><td>'
 			+ a[i].c + '</td><td>' + a[i].n + '</td><td>';
 		    if (a[i].x) { atext += a[i].x; }
 		    atext +=  '</td></tr>\n';
-		    i++;
 		}
 		atext += '</table>\n</div></div>\n';
 		atext += '</table>\n<p>\n';
@@ -437,11 +432,16 @@ function show_tables() {
 
 // convert (x,y) in pixels to SVG coords and time in ticks
 function svgxyt(x, y) {
+    var ytemp;
+
     m = document.getElementById("viewport").getScreenCTM();
-    x_cursor = xx_cursor = (x - m.e)/m.a;
-    if (x_cursor < 0) { x_cursor = 0; }
-    else if (x_cursor > svgw) { x_cursor = svgw; }
-    y_cursor = (y - m.f)/m.d;
+    ytemp = (y - m.f)/m.d;
+    if (-svgf <= ytemp && ytemp <= svgh + svgf) {
+	x_cursor = xx_cursor = (x - m.e)/m.a;
+	if (x_cursor < 0) { x_cursor = 0; }
+	else if (x_cursor > svgw) { x_cursor = svgw; }
+	y_cursor = ytemp;
+    }
     t_cursor = t0_ticks + x_cursor*tickfreq/1000;
 }
 
@@ -767,6 +767,8 @@ function show_plot() {
 
     svg += grd + tst + sva + svs;
     $('#plotdata').html(svg + '</svg>\n');
+    m = document.getElementById("viewport").getScreenCTM();
+
     if (selann >= 0) {
 	tt = selarr[selann].t - t0_ticks;
 	if (0 <= tt && tt < dt_ticks) {
@@ -1478,8 +1480,23 @@ function highlight_selection() {
     }
 }
 
+function highlight_phantom(t) {
+    var dt, x0, y0;
+
+    svsa = '';
+    dt = t - t0_ticks;
+    if (0 <= dt && dt <= dt_ticks) {
+	x0 = Math.floor(dt*1000/tickfreq) - svgf;
+	y0 = asy0 - 2*svgf;
+	svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+	    + '" stroke-dasharray="2" fill="white" fill-opacity="0.2" d="M'
+	    + x0 + ',' + y0 + ' l' + 2*svgf + ',0 l0,' + 3*svgf
+	    + ' l-' + 2*svgf + ',0 l0,-' + 3*svgf + '" />';
+    }
+}
+
 function jump_left() {
-    var i, t, x, y;
+    var i, rr, t, t0, x, y;
 
     t = t0_ticks + x_cursor*tickfreq/1000;
     i = ann_before(selarr, t);
@@ -1499,11 +1516,28 @@ function jump_left() {
 	    selann = i;
 	    highlight_selection();
 	}
-	x = Math.floor((t - t0_ticks)*1000/tickfreq * m.a + m.e);
-	y = Math.round(asy0 * m.d + m.f);
-	c_velocity = 10;
-	show_time(x, y);
     }
+    else {
+	selann = -1;
+	if (selarr.length < 1) { t = 0; }
+	else if (selarr.length < 2) {
+	    t = selarr[0].t - tickfreq;
+	    if (t < 0) { t = 0; }
+	}
+	else {
+	    t0 = selarr[0].t;
+	    rr = selarr[1].t - selarr[0].t;
+	    if (rr > 1.5 * tickfreq) { rr = 1.5 * tickfreq; }
+	    t = t0 - rr;
+	    if (t < 0) { t = 0; }
+	}
+	t = t0 - rr;
+	highlight_phantom(t);
+    }
+    x = Math.floor((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+    y = Math.round(asy0 * m.d + m.f);
+    c_velocity = 10;
+    show_time(x, y);
 }
 
 function nudge_left() {
@@ -1513,7 +1547,7 @@ function nudge_left() {
     else if (c_velocity > -100) { c_velocity *= 1.1; }
     if (x_cursor > 0) { x_cursor += c_velocity; }
     x = Math.round(x_cursor * m.a + m.e);
-    y = Math.round(asy0 * m.d + m.f);
+    y = Math.round(asy0 * m.d + m.f) - 2*svgf;  // outside the selection box
     show_time(x, y);
 }
 
@@ -1524,17 +1558,17 @@ function nudge_right() {
     else if (c_velocity < 100) { c_velocity *= 1.1; }
     if (x_cursor < svgw) { x_cursor += c_velocity; }
     x = Math.round(x_cursor * m.a + m.e);
-    y = Math.round(asy0 * m.d + m.f);
+    y = Math.round(asy0 * m.d + m.f) - 2*svgf;  // outside the selection box
     show_time(x, y);
 }
 
 function jump_right() {
-    var i, t, x, y;
+    var i, rr, t, t0, x, y;
 
     t = t0_ticks + x_cursor*tickfreq/1000;
     i = ann_after(selarr, t);
-    if (i >= 0) {
-	t = selarr[i].t;
+    if (0 <= i && i < selarr.length) {
+	t = (selarr.length > 0) ? selarr[i].t : dt_ticks/2;
 	if (t > t0_ticks + dt_ticks) { go_here(t - dt_ticks/2); }
 	if (selann === i) {
 	    selann = -1;
@@ -1544,31 +1578,39 @@ function jump_right() {
 	    selann = i;
 	    highlight_selection();
 	}
-	x = Math.ceil((t - t0_ticks)*1000/tickfreq * m.a + m.e);
-	y = Math.round(asy0 * m.d + m.f);
-	c_velocity = 10;
-	show_time(x, y);
     }
+    else {
+	selann = -1;
+	t0 = (selarr.length > 0) ? selarr[i-1].t : t0_ticks;
+	rr = (selarr.length > 1) ? t0 - selarr[i-2].t : tickfreq;
+	if (rr > 1.5*tickfreq) { rr = 1.5*tickfreq; }
+	t = t0 + rr;
+	if (t > tf_ticks) go_here(t - dt_ticks/2);
+	highlight_phantom(t);
+    }
+    x = Math.ceil((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+    y = Math.round(asy0 * m.d + m.f);
+    c_velocity = 10;
+    show_time(x, y);
 }
 
 function select_ann(e) {
-    var dtr, dtf, i;
+    var dtr, dtf, dt_tol, i;
 
-    if (!selarr) { return; }
+    selann = -1;
     svgxyt(e.pageX, e.pageY);
-    if (asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf) {
+    if (editing && selarr && xx_cursor >= -svgf && x_cursor < svgw &&
+	asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf) {
+	dt_tol = Math.round(dt_ticks * 0.012);
+	dtr = dtf = dt_tol + 1;
 	i = ann_after(selarr, t_cursor);
-	dtf = (i >= 0) ? selarr[i].t - t_cursor : dt_tol + 1;
-	dtr = (i > 0) ? t_cursor - selarr[i-1].t : dt_tol + 1;
-	if (dtr > dt_tol) {
-	    if (dtf > dt_tol) { selann = -1; } 	// no selection
-	    else {selann = i; }	// select annotation just after t_cursor
-	}
-	else if (dtf < dtr) { selann = i; }
-	else { selann = i-1; }	// select annotation at or just before t_cursor
-    }
-    else { selann = -1; }
 
+	if (i > 0) { dtr = t_cursor - selarr[i-1].t; }
+	if (i >= 0 && i < selarr.length) { dtf = selarr[i].t - t_cursor; }
+
+	if (dtr < dtf && dtr < dt_tol) { selann = i - 1; }
+	else if (dtf < dt_tol) { selann = i; }
+    }
     highlight_selection();
 }
 
@@ -1669,22 +1711,29 @@ function edlog(annot, etype) {
 	annot.x = annot.x.replace(/\s\s*/g, ' ').replace(/^\s|\s$/g, '');
     }
     etext = etype + ' ' + JSON.stringify(annot, aa);
-    changes.unshift(etext);
+    changes.splice(0, undo_count, etext);
     undo_count = 0;
-    etext += '<br>\n' + $('#editlog').html();
-    if (changes.length > 10) {
-	for (i = etext.length - 5; i > 0; i--) {
-	    if (etext[i] === '\n') { break; }
-	}
-	etext = etext.substring(0, i);
-    }
-    $('#editlog').html(etext);
+    show_editlog();
     apply_edit(0, true);
+}
+
+function show_editlog() {
+    var etext = '', i, n = changes.length;
+
+    if (n > 10) { n = 10; }
+    if (undo_count > 0) { etext = '<div style="color: red">'; }
+    for (i = 0; i < n; i++) {
+	etext += changes[i] + '<br>\n';
+	if (i + 1 == undo_count) { etext += '</div>\n'; }
+    }
+    if (i <= undo_count) { etext += '</div>\n'; }
+    $('#editlog').html(etext);
 }
 
 function undo() {
     if (undo_count < changes.length) {
 	apply_edit(undo_count++, false);
+	show_editlog();
 	update_output();
     }
 }
@@ -1692,49 +1741,42 @@ function undo() {
 function redo() {
     if (undo_count > 0) {
 	apply_edit(--undo_count, true);
+	show_editlog();
 	update_output();
     }
 }
 
 function delete_ann(annot) {
-    var i, imin = 0, imax = selarr.length, key;
+    var i, key;
 
-    if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
-    if (selarr[ilast].t !== annot.t) {
-	while (imax - imin > 1) {
-	    if (selarr[ilast].t < annot.t) { imin = ilast; }
-	    else { imax = ilast; }
-	    ilast = Math.ceil((imin + imax)/2);
-	}
-	if (ilast === 1 && annot.t === selarr[0].t) { ilast = 0; }
-	if (selarr[ilast].t !== annot.t) { return; }
-    }
-
-    key = askey(annot);
-
-    for (i = 0; i < palette.length; i++) {
-	if (palette[i][0] === key) {
-	    palette[i][1]--;
-	    break;
+    if (selarr) {
+	i = ann_before(selarr, annot.t);
+	if (i >= 0 && selarr[i].t === annot.t) {
+	    selarr.splice(i, 1);
+	    selann = -1;
+	    key = askey(annot);
+	    for (i = 0; i < palette.length; i++) {
+		if (palette[i][0] === key) {
+		    palette[i][1]--;
+		    break;
+		}
+	    }
 	}
     }
-    selarr.splice(ilast, 1);
-    selann = -1;
     highlight_selection();
 }
 
 function insert_ann(annot) {
-    var i, imin = 0, imax, key;
+    var a = {}, i, key;
 
     if (selarr) {
-	imax = selarr.length;
-	if (ilast < 0) { ilast = Math.ceil((imin + imax)/2); }
-	while (imax - imin > 1) {
-	    if (selarr[ilast].t < annot.t) { imin = ilast; }
-	    else { imax = ilast; }
-	    ilast = Math.ceil((imin + imax)/2);
-	}
-	if (ilast === 1 && annot.t < selarr[0].t) { ilast = 0; }
+	a = annot;
+	i = ann_after(selarr, annot.t);
+	if (i === selarr.length) { selarr[i] = a; }
+	else if (i === 0) { selarr.unshift(a); i = 0; }
+	else { selarr.splice(i, 0, a); }
+	selann = i;
+	highlight_selection();
 	
 	key = askey(annot);
 	
@@ -1745,9 +1787,6 @@ function insert_ann(annot) {
 		break;
 	    }
 	}
-	selarr.splice(ilast, 0, annot);
-	selann = ilast;
-	highlight_selection();
     }
 }
 
@@ -1767,19 +1806,19 @@ function apply_edit(n, applyp) {
 }
 
 function mark(e) {
-    var anew, asel = null, in_box = false;
+    var anew, asel = null, dt_tol, in_box = false;
 
     svgxyt(e.pageX, e.pageY);
     if (!editing || !selarr || xx_cursor < -svgf || x_cursor > svgw) {
 	return;
     }
+    dt_tol = Math.round(dt_ticks * 0.012);
     if (selann >= 0) {
 	asel = selarr[selann];
 	if (asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf &&
-	    asel.t - svgf < t_cursor && t_cursor < asel.t + svgf) {
+	    asel.t - dt_tol < t_cursor && t_cursor < asel.t + dt_tol) {
 	    in_box = true;
 	}
-	else { asel = null; }
     }
 
     anew = { t: null, a: null, s: null, c: null, n: null, x: null };
@@ -1954,11 +1993,10 @@ function slist(t0_string) {
 	+ '&callback=?';
     show_status(true);
     $.getJSON(url, function(data) {
-	if (data) {
+	if (data.success) {
 	    recinfo = data.info;
 	    tickfreq = recinfo.tfreq;
 	    dt_ticks = dt_sec * tickfreq;
-	    dt_tol = Math.round(dt_ticks * 0.012);
 	    if (recinfo.signal) {
 		signals = recinfo.signal;
 		nsig = signals.length;
@@ -1971,6 +2009,10 @@ function slist(t0_string) {
 		signals = null;
 		nsig = 0;
 	    }
+	}
+	else {
+	    alert('Record ' + db + '/' + record + ' is not readable.\n');
+	    return;
 	}
 	$('#tabs').tabs("enable");
 	show_summary();

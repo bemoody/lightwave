@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	16 February 2013  version 0.45
+			Last revised:	  24 March 2013  version 0.52
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -144,8 +144,10 @@ void prep_signals()
 	SUALLOC(s, nsig, sizeof(WFDB_Siginfo));
 	nsig = isigopen(recpath, s, nsig);
     } 
-    else
+    else {
+	tfreq = ffreq = sampfreq(NULL);
 	return;
+    }
 
     /* Shorten signal names of the form "record xxx, signal N" to "v[N]" */
     for (n = 0; n < nsig; n++) {
