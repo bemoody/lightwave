@@ -56,7 +56,7 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     adt_ticks,  // length of longest annotation set, in ticks
     sdt_ticks,  // length of signals, in ticks
     rdt_ticks,	// record length, in ticks (max of adt_ticks and sdt_ticks)
-    ann_set = '', // annotators for the selected database, from alist()
+    ann_set = [], // annotators for the selected database, from alist()
     ann = [],   // annotations read and cached by read_annotations()
     nann = 0,	// number of annotators, set by read_annotations()
     selarr = null, // array of annotations selected for search/edit
@@ -93,6 +93,7 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     rqlog = '',	// AJAX request log (hidden by default)
     autoscroll = null, // autoplay_fwd/rev timer
     editing = false,   // editing controls hidden if false
+    mouse = false,     // true if user selected 'Edit using mouse'
     shortcuts = false, // editing mode (true: use shortcuts, false: don't)
     palette = null,    // annotation palette (see load_palette())
     seltype, // id of the current selection in the palette ('#palette_N')
@@ -360,9 +361,10 @@ function show_tables() {
 	    else {
 		atext += '<p><b>Annotator:</b> ' + ann[ia].name
 		    + '\n<p><table class="dtable">\n<tr>'
-		    + '<th>Time (elapsed)&nbsp;</th><th>Sample #</th><th>Type</th>'
-		    + '<th>Sub&nbsp;</th><th>Chan</th><th>Num&nbsp;</th>'
-		    + '<th>Aux</th></tr>\n';
+		    + '<th>Time (elapsed)&nbsp;</th>'
+		    + '<th>Sample #</th><th>Type</th>'
+		    + '<th>Sub&nbsp;</th><th>Chan</th>'
+		    + '<th>Num&nbsp;</th><th>Aux</th></tr>\n';
 		a = ann[ia].annotation;
 		for (i = ann_after(a, t0_ticks);
 		     0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
@@ -838,8 +840,15 @@ function handle_svg_events() {
 	read_signals(t0_ticks, true);
 	show_plot();
     });
-    $('svg').mousedown(function(event){ select_ann(event); });
-    $('svg').mouseup(function(event){ mark(event); });
+    if (mouse) {
+	$('svg').on('mousedown', select_ann)
+	    .on('mousemove', track_pointer)
+	    .on('mouseup', mark)
+    }
+    else {
+	$('svg').on('touchstart', select_ann)
+	    .on('touchend', track_pointer);
+    }
 }
 
 // show the time corresponding to (x,y) as HH:MM:SS.mmm in upper right corner
@@ -881,7 +890,7 @@ function show_time(x, y) {
     handle_svg_events();
 }
 
-function do_edit(e) {
+function track_pointer(e) {
     var x = e.pageX, y = e.pageY;
     c_velocity = 10;
     show_time(x, y);
@@ -890,15 +899,15 @@ function do_edit(e) {
 function handle_edit() {
     if (editing) {
 	$('.editgroup').show();
-	if (shortcuts) {
+	if (mouse) {
 	    $('svg').on('mousedown', select_ann);
 	    $('svg').on('mouseup', mark);
-	    $('svg').on('mousemove', do_edit);
+	    $('svg').on('mousemove', track_pointer);
 	    $('svg').off('touchstart touchend');
 	}
 	else {
 	    $('svg').on("touchstart", function(e) { select_ann(e);})
-		.off('mousemove', do_edit)
+		.off('mousemove', track_pointer)
 	        .off('mouseup', mark)
 	        .off('mousedown', select_ann);
 	}
@@ -1890,52 +1899,57 @@ function alert_editing() {
 	  + "features will appear in the next few releases.");
 }
 
-function toggle_editing() {
+function handle_editmode() {
+    if (!editing) { alert_editing(); } // FIXME
+
+    // set state based on edit_mode radio buttons
+    if ($('#no_edit').attr('checked')) { editing = mouse = false; }
+    else if ($('#mouse_edit').attr('checked')) { editing = mouse = true; }
+    else { editing = true; mouse = false; }
+
     if (editing) {
-	editing = false;
-	$('#editing').html("Enable editing");
+	$('.editgroup').show();
+	if (mouse) {  // use mouse/trackball interface
+	    $('svg').on('mousedown', select_ann)
+		    .on('mousemove', track_pointer)
+		    .on('mouseup', mark)
+		    .off('touchstart touchend touchmove');
+	}
+	else {       // use touch interface (note: touchmove ignored)
+	    $('svg').on('touchstart', select_ann)
+		    .on('touchend', track_pointer)
+		    .off('touchmove mousedown mousemove mouseup');
+	}
     }
-    else {
-	editing = true;
-	$('#editing').html("Disable editing");
-	alert_editing();
-    }
+    else { $('.editgroup').hide(); }
     if (db !== '' && record !== '') {
 	$('#tabs').tabs("select", "#view");
 	show_plot();
     }
-    handle_edit();
-}
-
-function toggle_shortcuts() {
-    if (shortcuts) {
-	shortcuts = false;
-	$('#shortcuts').html("Enable mouse shortcuts");
-    }
-    else {
-	shortcuts = true;
-	$('#shortcuts').html("Disable mouse shortcuts");
-	if (!editing) {
-	    editing = true;
-	    $('#editing').html("Disable editing");
-	    alert_editing();
-	    if (db !== '' && record !== '') {
-		$('#tabs').tabs("select", "#view");
-		show_plot();
-	    }
-	}
-    }
-    handle_edit();
 }
 
 function new_annset() {
     var i, new_ann, new_ann_set, new_ann_array = [], new_summary = [];
 
     new_ann_set = { name: "new", desc: "created using LightWAVE" };
-    ann_set.unshift(new_ann_set);
     new_ann = { name: "new", desc: "created using LightWAVE", state: 2,
 		annotation: new_ann_array, summary: new_summary };
-    ann.unshift(new_ann);
+    if (nann === 0) {
+	ann_set[0] = new_ann_set;
+	ann[0] = new_ann;
+    }
+    else {
+	if (ann[0].name.substring(0,3) === "new") {
+	    if (ann[0].annotation.length > 0) {
+		if (ann[0].name.length === 3) { i = 1; }
+		else { i = Number(ann[0].name.substring(3)) + 1; }
+		new_ann_set.name = new_ann.name = "new" + i;
+	    }
+	    else { return;}  // don't create another if previous "new" is empty
+	}
+	ann_set.unshift(new_ann_set);
+	ann.unshift(new_ann);
+    }
     nann++;
     if (palette) {
 	for (i = 0; i < palette.length; i++) {
@@ -2048,7 +2062,7 @@ function alist() {
     show_status(true);
     $.getJSON(url, function(data) {
 	if (data.success) { ann_set = data.annotator; }
-	else { ann_set = ''; }
+	else { ann_set = []; }
 	show_status(false);
     });
 }
@@ -2240,8 +2254,11 @@ function set_handlers() {
     $('#show_status').on("click", toggle_show_status);
     $('#show_requests').on("click", toggle_show_requests);
     $('#clear_requests').on("click", clear_requests);
+    $("#edit_mode").buttonset().on("change", handle_editmode);
+/*
     $('#editing').on("click", toggle_editing);
     $('#shortcuts').on("click", toggle_shortcuts);
+*/
     $('#new_annset').on("click", new_annset);
     $('#show_edits').on("click", toggle_show_edits);
 

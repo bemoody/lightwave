@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  19 March 2013   version 0.51
+			Last revised:	  24 March 2013   version 0.53
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -359,12 +359,17 @@ signal window if selected below">&#x21b4;</button>
     </td>
     <td>
       <b>Editing</b><br>
-	<button id="editing">Enable editing</button>
-	<br>
-	<button id="shortcuts">Enable mouse shortcuts</button>
+      <div id="edit_mode">
+	<input type="radio" id="no_edit" name="edit_mode" checked="checked"><br>
+	  <label for="no_edit">View (no editing)</label>
+	<input type="radio" id="mouse_edit" name="edit_mode"><br>
+	  <label for="mouse_edit">Edit using mouse</label>
+	<input type="radio" id="touch_edit" name="edit_mode">
+	  <label for="touch_edit">Edit using touch</label>
+      </div>
 	<br>
 	<button id="new_annset">Set up new annotation set</button>
-	<br><br>
+	<br>
 	<button title="Display the edit log, most recent first"
 		id="show_edits">Show edit log</button>
     </td>
