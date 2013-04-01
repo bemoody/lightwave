@@ -1,5 +1,5 @@
 /* file: lightwave.css	G. Moody	18 November 2012
-			Last revised:	 1 February 2013  version 0.38
+			Last revised:	  1 April 2013  version 0.54
 */
 
 body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -8,7 +8,6 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
              overflow-y: scroll; }
 .dtable { table-layout: fixed; }
 div.notice { width: 90%; margin: auto; padding: 2em; background: #cdf; }
-
 #tabs {
 	padding: 0px;
 	background: none;
@@ -16,7 +15,8 @@ div.notice { width: 90%; margin: auto; padding: 2em; background: #cdf; }
 }
 #tabs .ui-tabs-nav {
 	padding-left: 0px;
-	background: url('../animation.svg'), url('../lightwave.svg');
+	background: url('../images/animation.svg'),
+	  url('../images/lightwave.svg');
 	background-position: top right;
 	background-repeat: no-repeat;
 	border-width: 0px 0px 1px 0px;
@@ -28,7 +28,6 @@ div.notice { width: 90%; margin: auto; padding: 2em; background: #cdf; }
 	background: #fff;
 	border-width: 0px 1px 1px 1px;
 }
-
 .ui-slider { width: 10em; height: .2em; margin-top: .3em; }
 .ui-slider-handle { width: .7em !important; height: .55em !important;
 		  margin-top: .1em; }

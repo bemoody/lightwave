@@ -1,0 +1,30 @@
+#!/usr/bin/perl
+# file: lw-scribe		G. Moody	26 March 2013
+#				Last revised:   27 March 2013
+# Receive and save annotations uploaded from a LightWAVE client
+
+use CGI qw/:standard/;
+use strict;
+use warnings;
+
+chdir('/tmp');
+
+my $file = param('file');
+
+if ($file) {
+    my $ofile = $file;
+    my $len;
+    my $data;
+    $ofile =~ s/[^a-zA-Z0-9._+]/-/g;
+
+    open(SAVE, ">$ofile") || die $!;
+    while ($len = read($file, $data, 1024)) {
+	print SAVE $data;
+    }
+    close(SAVE);
+    print header(-charset=>'utf-8', -status => "200 OK");
+}
+else {
+    print header(-charset=>'utf-8', -status => "404 Not Found");
+}
+exit;

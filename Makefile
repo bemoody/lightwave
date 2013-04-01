@@ -1,6 +1,6 @@
-LWVERSION = 0.53
+LWVERSION = 0.54
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	17 February 2013 (version 0.44)
+#			Last revised:	  1 April 2013 (version 0.54)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -33,18 +33,21 @@ LWVERSION = 0.53
 # Install the three libraries where the compiler/linker will find them (on
 # Linux or MacOS X, /usr/lib is usually the best choice).
 #
-# If you are using Apache, make sure that the values of DocumentRoot
-# and ScriptAlias below match those given in your Apache configuration
-# file.  ("lw-apache.conf" is provided in this directory to illustrate
-# settings you might use if you have not previously configured Apache;
-# it is meant as a supplement to the standard Apache configuration
-# file, which contains many more settings and should not be edited
-# unless you know what you are doing.  If you decide to use
-# "lw-apache.conf", copy it into Apache's conf.d directory, which is
-# used for customized configuration modules; typically this directory
-# is /etc/httpd/conf.d or /etc/apache2/conf.d, but you may need to
-# hunt around for it.)  If you make any changes to Apache's configuration,
-# restart Apache and verify that it is (still) working before continuing.
+# If you are using Apache, make sure that the values of DocumentRoot,
+# ScriptAlias1, ScriptAlias2, and ServerName below match those given in your
+# Apache configuration file.
+#
+# "server/lw-apache.conf" is provided to illustrate settings you might use if
+# you have not previously configured Apache; it is meant as a supplement to the
+# standard Apache configuration file, which contains many more settings and
+# should not be edited unless you know what you are doing.  If you decide to use
+# "lw-apache.conf", copy it into Apache's conf.d directory, which is used for
+# customized configuration modules; typically this directory is
+# /etc/httpd/conf.d or /etc/apache2/conf.d, but you may need to hunt around for
+# it.
+#
+# If you make any changes to Apache's configuration, restart Apache and verify
+# that it is (still) working before continuing.
 #
 # Return to this directory and type 'make' to build and install LightWAVE.
 # Then type 'make check' to run a basic test of the LightWAVE server.
@@ -53,37 +56,61 @@ LWVERSION = 0.53
 # by pointing your browser to http://myserver.com/lightwave/.  If you have
 # installed LightWAVE on a standalone computer without a network connection,
 # use any of these URLs:
-#  http://localhost/lightwave/
-#  http://127.0.0.1/lightwave/
-#  http://0.0.0.0/lightwave/
+#    http://localhost/lightwave/
+#    http://127.0.0.1/lightwave/
+#    http://0.0.0.0/lightwave/
 
-# LW_WFDB is the LightWAVE server's WFDB path, a list of locations (data
-# repositories) where the server will look for requested data.
+# LW_WFDB is the LightWAVE server's WFDB path, a space-separated list of
+# locations (data repositories) where the server will look for requested data.
 LW_WFDB = "/usr/local/database http://physionet.org/physiobank/database"
 
 # DocumentRoot is the web server's top-level directory of (HTML) content.
 # The values below and in your Apache configuration file should match.
+# Note that it does not end with '/'.
 DocumentRoot = /home/physionet/html
 
-# ScriptAlias is the prefix of URLs for server scripts (CGI applications).
+# ServerName is the hostname of the web server, as specified in your Apache
+# configuration file.  The default setting below attempts to guess your server's
+# hostname from the output of the 'hostname' command.  Servers often have
+# multiple hostnames, however.  If the output of 'hostname' does not match the
+# value of ServerName in your Apache configuration file, change the value below
+# to match the Apache configuration file.
+ServerName = `hostname`
+
+# ScriptAlias1 is the prefix of URLs for server scripts (CGI applications).
 # It should match the first argument of the ScriptAlias directive in your
 # Apache configuration file.
-ScriptAlias = /cgi-bin/
+ScriptAlias1 = /cgi-bin/
 
-# BINDIR is the directory containing server scripts.  It should match the
-# second argument of the ScriptAlias directive in your Apache configuration
-# file.
-BINDIR = /home/physionet/cgi-bin
+# ScriptAlias2 is the directory in which server scripts are to be installed.
+# It should match the second argument of the ScriptAlias directive in your
+# Apache configuration file.
+ScriptAlias2 = /home/physionet/cgi-bin/
 
-# LWDIR is the directory containing the LightWAVE client.  It should be
-# within DocumentRoot.
-LWDIR = $(DocumentRoot)/lightwave
+# LWCLIENTDIR, LWSERVERDIR, and LWSCRIBEDIR are the directories for the
+# installed LightWAVE client, server, and scribe.
+LWCLIENTDIR = $(DocumentRoot)/lightwave
+LWSERVERDIR = $(ScriptAlias2)
+LWSCRIBEDIR = $(ScriptAlias2)
+# The client should be installed in a subdirectory of DocumentRoot, and the
+# server should go into the directory named in the second argument of the
+# ScriptAlias directive in your Apache configuration file.  The scribe goes
+# into the same directory as the server, unless authentication is required
+# for annotation backup but not for viewing data.
 
-# CC is the default C compiler
+# LWCLIENTURL, LWSERVERURL, and LWSCRIBEURL are the URLs of the installed
+# LightWAVE client, server, and scribe.
+LWCLIENTURL = http://$(ServerName)/lightwave/
+LWSERVERURL = http://$(ServerName)$(ScriptAlias1)lightwave
+LWSCRIBEURL = http://$(ServerName)$(ScriptAlias1)lw-scribe
+# The LW*URLs should match up with the corresponding LW*DIRs above.
+
+# CC is the default C compilerxque
+
 CC = gcc
 
 # CFLAGS is a set of options for the C compiler.
-CFLAGS = -O -DLWDIR=\"$(LWDIR)\" -DLWVER=\"$(LWVERSION)\" \
+CFLAGS = -O -DLWDIR=\"$(LWCLIENTDIR)\" -DLWVER=\"$(LWVERSION)\" \
         -DLW_WFDB=\"$(LW_WFDB)\"
 
 # LDFLAGS is a set of options for the linker.
@@ -92,34 +119,40 @@ LDFLAGS = -lcgi -lwfdb -lcurl
 # Install both the lightwave server and client on this machine.
 install:	server client
 	@echo
-	@echo "LightWAVE has been installed.  If an HTTP server is running,"
-	@echo "use LightWAVE by opening your web browser and visiting"
-	@echo "    http://HOST/lightwave/"
-	@echo "(replacing HOST by the hostname of this server, or by localhost"
-	@echo "or 127.0.0.1 to run without a network connection)."
+	@echo "LightWAVE has been installed.  If an HTTP server is running on"
+	@echo "$(ServerName), run LightWAVE by pointing your web browser to"
+	@echo "    $(LWCLIENTURL)"
 
 # Check that the server is working.
 test:
-	check/lw-test $(BINDIR)
+	check/lw-test $(LWSERVERDIR)
 
 # Install the lightwave client.
 client:	  clean FORCE
-	mkdir -p $(LWDIR)
-	mv client/lightwave.html .
-	cp -pr client/* $(LWDIR)
-	sed s+http://physionet.org/cgi-bin/+$(ScriptAlias)+ \
-	 <client/js/lightwave.js >$(LWDIR)/js/lightwave.js
-	sed "s/\[local\]/$(LWVERSION)/" <lightwave.html >$(LWDIR)/index.html
-	mv lightwave.html client
+	mkdir -p $(LWCLIENTDIR)
+	cp -pr client/* $(LWCLIENTDIR)
+	rm -f $(LWCLIENTDIR)/lightwave.html
+	sed s+http://physionet.org/cgi-bin/lightwave+$(LWSERVERURL)+ \
+	 <client/js/lightwave.js | \
+	sed s+https://physionet.org/cgi-bin/lw-scribe+$(LWSCRIBEURL)+ \
+	  >$(LWCLIENTDIR)/js/lightwave.js
+	sed "s/\[local\]/$(LWVERSION)/" <client/lightwave.html \
+	  >$(LWCLIENTDIR)/index.html
 
-# Install the lightwave server.
+# Install the lightwave server and scribe.
 server:	lightwave
-	mkdir -p $(BINDIR)
-	cp -p lightwave $(BINDIR)
+	mkdir -p $(LWSERVERDIR)
+	cp -p lightwave $(LWSERVERDIR)
+	mkdir -p $(LWSCRIBEDIR)
+	cp -p server/lw-scribe $(LWSCRIBEDIR)
 
 # Compile the lightwave server.
 lightwave:	server/lightwave.c
 	$(CC) $(CFLAGS) server/lightwave.c -o lightwave $(LDFLAGS)
+
+# Compile patchann.
+patchann:	server/patchann.c
+	$(CC) $(CFLAGS) server/patchann.c -o patchann $(LDFLAGS)
 
 # Make a tarball of sources.
 tarball: 	 clean
@@ -127,6 +160,6 @@ tarball: 	 clean
 
 # 'make clean': Remove unneeded files from package.
 clean:
-	rm -f lightwave *~ */*~ */*/*~
+	rm -f lightwave patchann *~ */*~ */*/*~
 
 FORCE:

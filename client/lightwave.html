@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  24 March 2013   version 0.53
+			Last revised:	  1 April 2013   version 0.54
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -128,34 +128,47 @@ or an 'aux' string, or one of:
 
  <div id="add_typebox" title="Add a new type to the palette">
  <table width="100%">
- <tr title='Annotation types are single-character mnemomics.
-Commonly-used annotation types are:
-
- N   normal beat (displayed as &bull; once inserted)
- L   left bundle branch block beat
- R   right bundle branch block beat
- A   atrial premature beat
- a   aberrated atrial premature beat
- J    nodal (junctional) premature beat
- S   supraventricular premature beat (A or J)
- V   premature ventricular contraction
- r   R-on-T premature ventricular contraction
- F   fusion of V and N
- e   atrial escape beat
- j    nodal (junctional) escape beat
- n   supraventricular escape beat (e or j)
- E   ventricular escape beat
- /    paced beat
- f    fusion of / and N
- Q   unclassifiable beat
-
- +   rhythm change (enter new rhythm in aux)
- "   comment (enter comment in aux)
-
- .   [marks a selected annotation for deletion]'>
-<!-- " -->
+ <tr title='Choose the primary annotation type.  If the desired
+choice is not in the list, choose " (comment) and
+enter the type as an Aux string.'>
    <td align="right">Annotation&nbsp;type:&nbsp;</td>
-   <td align="left"><input type="text" name="edita" id="edita" value=""></td>
+   <td align="left">
+     <select name="edita" id="edita">
+     <option value="N"
+         selected>N (normal beat [displayed as &bull;])</option>
+     <option value="L">L (left bundle branch block beat)</option>
+     <option value="R">R (right bundle branch block beat)</option>
+     <option value="B">B (bundle branch block beat [L or R])
+     <option value="A">A (atrial premature beat)</option>
+     <option value="a">a (aberrated atrial premature beat)</option>
+     <option value="J">J (junctional premature beat)</option>
+     <option value="S">S (supraventricular premature beat [A or J])</option>
+     <option value="V">V (premature ventricular contraction)</option>
+     <option value="r">r (R-on-T premature ventricular contraction)</option>
+     <option value="F">F (fusion of V and N)</option>
+     <option value="e">e (atrial escape beat)</option>
+     <option value="j">j (junctional escape beat</option>
+     <option value="n">n (supraventricular escape beat [e or j])</option>
+     <option value="E">E (ventricular escape beat)</option>
+     <option value="/">/ (paced beat)</option>
+     <option value="f">f (fusion of / and N)</option>
+     <option value="Q">Q (unclassifiable beat)</option>
+     <option disabled>&nbsp;&nbsp;[waveform peaks and limits]</option>
+     <option value="(">( (waveform onset)</option>
+     <option value=")">) (waveform end)</option>
+     <option value="p">p (peak of P-wave)</option>
+     <option value="t">t (peak of T-wave)</option>
+     <option value="u">u (peak of U-wave)</option>
+     <option value="`">` (PQ junction)</option>
+     <option value="'">' (J-point)</option>
+     <option disabled>&nbsp;&nbsp;[other non-beat types]</option>
+     <option value="|">| (isolated QRS-like artifact)</option>
+     <option value="+">+ (rhythm change [enter new rhythm in aux])</option>
+     <option value="s">s (ST segment change [describe in aux])</option>
+     <option value="~">~ (signal quality change [describe in aux])</option>
+     <option value='"'>" (comment [enter comment in aux])</option>
+     </select>
+    </td>
  </tr>
  <tr title='New rhythm, comment, etc.
 Use annotation type "+" to mark a rhythm change. 
@@ -174,26 +187,23 @@ Standard aux strings for rhythms begin with "(":
  (SBR   sinus bradycardia
  (SVTA  supraventricular tachyarrhythmia
  (T        ventricular trigeminy
+ (VFIB   ventricular fibrillation
  (VFL    ventricular flutter
- (VT     ventricular tachycardia
-
-Mark onset and end of ventricular fibrillation with
-annotation types "[" and "]", not with rhythm change
-annotations.'>
+ (VT     ventricular tachycardia'>
    <td align="right">Aux&nbsp;string:&nbsp;</td>
    <td align="left"><input type="text" name="editx" id="editx" value=""></td>
  </tr>
- <tr title="Subtype (an integer between -128 and 127)">
-   <td align="right">Subtype:&nbsp;</td>
-   <td align="left"><input type="text" name="edits" id="edits" value=""></td>
- </tr>
- <tr title="Chan (an integer between 0 and 255)">
-   <td align="right">Chan:&nbsp;</td>
-   <td align="left"><input type="text" name="editc" id="editc" value=""></td>
- </tr>
- <tr title="Num (an integer between -128 and 127)">
-   <td align="right">Num:&nbsp;</td>
-   <td align="left"><input type="text" name="editn" id="editn" value=""></td>
+ <tr>
+   <td align="right">S/C/N:&nbsp;</td>
+   <td align="left">
+     <input type="text" name="edits" id="edits" size="4" value=""
+	    title="Subtype (an integer between -128 and 127)">/
+     <input type="text" name="editc" id="editc" size="3" value=""
+	    title="Chan (an integer between 0 and 255)">/
+     <input type="text" name="editn" id="editn" size="4" value=""
+	    title="Num (an integer between -128 and 127)">
+     (current annotation only)
+   </td>
  </tr>
 </table>
 
@@ -345,6 +355,11 @@ signal window if selected below">&#x21b4;</button>
   <tr>
     <td align="left">Client: lightwave [local]</td><td>&nbsp;</td>
   </tr>
+  <tr>
+    <td align="left">Scribe:
+      <span id="scribe"><input type="text" name="scribe" size="50"
+      title="URL of LightWAVE's edit backup server (reload to restore default)">
+      </span>
   <tr><td>&nbsp;</td></tr>
   <tr>
     <td>
@@ -372,7 +387,9 @@ signal window if selected below">&#x21b4;</button>
 	<br>
 	<button title="Display the edit log, most recent first"
 		id="show_edits">Show edit log</button>
-    </td>
+	<br>
+	<button title="Back up the edit log"
+		id="sync_edits">Save pending edits</button>
   <tr>
  </table>
 
@@ -380,6 +397,8 @@ signal window if selected below">&#x21b4;</button>
  <div id="calibrate-display" style='width: 1in; height: 1in;
       border: 2px solid red'></div>
 -->
+<p>
+<div id="syncnote"></div>
 
 </div>
 

@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  24 March 2013   version 0.52
+//			Last revised:	  1 April 2013   version 0.54
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -43,9 +43,10 @@
 (function(){
 "use strict";
 
-// 'server' is the first part of every AJAX request.  Change it if you are
-// not using the public LightWAVE server.
+// 'server' and 'scribe' are the URLs of the LightWAVE server and its edit
+// backup server.  Change them if you are not using the public server.
 var server = 'http://physionet.org/cgi-bin/lightwave',
+    scribe = 'https://physionet.org/cgi-bin/lw-scribe',
 
     url,	// request sent to server (server + request-specific string)
     db = '',	// name of the selected database
@@ -544,7 +545,7 @@ function show_plot() {
     if (nann > 0) { asy0 = y0a[0]; }
 
     svg = '<br><svg xmlns=\'http://www.w3.org/2000/svg\''
-	+ ' xmlns:xlink=\'http:/www.w3.org/1999/xlink\' class="svgplot"'
+	+ ' xmlns:xlink=\'http://www.w3.org/1999/xlink\' class="svgplot"'
 	+ ' width="' + width + '" height="' + height
 	+ '" preserveAspectRatio="xMidYMid meet">\n';
     svg += '<g id="viewport" transform="scale(' + width/svgtw
@@ -1454,7 +1455,7 @@ function toggle_add_typebox() {
     else {
 	$('#add_typebox').dialog("open");
 	$('#add_typebox').dialog({
-	    width: '500px',
+	    width: '650px',
 	    height: 'auto',
 	    dialogClass: "no-close",
 	    buttons: [
@@ -1625,19 +1626,32 @@ function select_ann(e) {
 
 function copy_from_template(annot)
 {
+    var i;
+
     annot.a = $('#edita').val();
-    annot.s = $('#edits').val();
-    annot.c = $('#editc').val();
-    annot.n = $('#editn').val();
+    i = Number($('#edits').val());
+    if (i < -128 || i > 127) { i = 0; $('#edits').val(null); }
+    annot.s = i;
+    i = Number($('#editc').val());
+    if (i < 0    || i > 255) { i = 0; $('#edits').val(null); }
+    annot.c = i;
+    i = Number($('#editn').val());
+    if (i < -128 || i > 127) { i = 0; $('#edits').val(null); }
+    annot.n = i;
     annot.x = $('#editx').val();
 }
 
 function copy_to_template(annot)
 {
+    var i;
     $('#edita').val(annot.a);
-    $('#edits').val(annot.s);
-    $('#editc').val(annot.c);
-    $('#editn').val(annot.n);
+    i = Number(annot.s);
+    if (i < -128 || i > 127) { annot.s = 0; $('#edits').val(null); }
+    else { $('#edits').val(annot.s); }
+    if (i < 0    || i > 255) { annot.c = 0; $('#editc').val(null); }
+    else { $('#editc').val(annot.c); }
+    if (i < -128 || i > 127) { annot.n = 0; $('#editn').val(null); }
+    else { $('#editn').val(annot.n); }
     $('#editx').val(annot.x);
 }
 
@@ -1709,17 +1723,135 @@ function toggle_insert_mode() {
     }
 }
 
+function alert_scribe_error() {
+    $('#syncnote').html("<b>Warning</b>: Pending edits cannot be backed up.");
+    alert('The LightWAVE scribe at\n' + scribe
+	  + '\nis not responding properly.  Please check\n'
+	  + 'the network connection.  Select another scribe\n'
+	  + 'on the Settings tab if necessary.');
+}
+
+function test_sync() {
+    var body, boundary, timer;
+
+    timer = setTimeout(alert_scribe_error, 2000);
+    boundary = '-----------------------------' +
+	Math.floor(Math.random() * Math.pow(10, 8));
+    body = '--' + boundary
+        + '\r\nContent-Disposition: form-data; name="file";'
+        + ' filename="empty.txt"\r\nContent-type: text/plain\r\n\r\n'
+        + '\r\n--' + boundary + '--\r\n';
+    scribe = $('[name=scribe]').val();
+    $.ajax({
+	contentType: "multipart/form-data",
+	data: body,
+	type: 'POST',
+	url: scribe,
+	complete:  function(e, xhr, settings){
+	    clearTimeout(timer);
+	    if (e.status === 200) {
+		$('#syncnote').html("Edit backup test successful.");
+	    }
+	    else {
+		$('#syncnote').html("Edit backup test failed.");
+		alert_editing();
+	    };
+	}});
+}
+
+// FIXME
+// 	        alert("Edit backup rejected by " + scribe
+//		      + "\nTry again later, or try a different scribe.");
+//	success:  function(data, result) {
+//	    clearTimeout(timer);
+//	    $('#syncnote').html("Edit backup test successful.");
+//	},
+//	statusCode: { 404: function() {
+//	    clearTimeout(timer);
+//	    $('#syncnote').html("Edit backup test failed.");
+//	    alert_editing();  // FIXME
+//	    alert("Edit backup rejected by " + scribe
+//		  + "\nTry again later, or try a different scribe.");
+//	}
+//    });
+// }
+
+function sync_edits() {
+    var body, boundary, etext = '', fname, i, timer;
+
+    if (changes.length - undo_count < 1) { alert("No pending edits!"); return; }
+
+    for (i = changes.length - 1; i >= undo_count; i--) {
+	etext += changes[i] + '\r\n';
+    }
+
+    for (i = 0; i < nann; i++) {
+	if (ann[i].state === 2) break;
+    }
+    if (i >= nann) { alert("Select an annotation set to back up!");  return; }
+
+    timer = setTimeout(alert_scribe_error, 2000);
+    boundary = '-----------------------------' +
+	Math.floor(Math.random() * Math.pow(10, 8));
+    fname = "foo.txt";
+    body = '--' + boundary
+        + '\r\nContent-Disposition: form-data; name="file";'
+        + ' filename="' + fname + '"\r\nContent-type: text/plain\r\n\r\n'
+	+ '[LWEditLog-1.0] Record ' + db + '/' + record
+	+ ', annotator ' + ann[i].name + ' (' + tickfreq
+        + ' samples/second)\r\n\r\n' + etext
+        + '\r\n--' + boundary + '--\r\n';
+
+    scribe = $('[name=scribe]').val();
+    $('#syncnote').html('<p>Waiting for edit backup (sending to ' + scribe
+			+ ') ...');
+
+    $.ajax({
+	contentType: "multipart/form-data",
+	data: body,
+	type: 'POST',
+	url: scribe,
+	success:  function(data, result) {
+	    clearTimeout(timer);
+	    $('#syncnote').html('<p>These edits have been backed up:<p><pre>'
+				+ etext + '</pre>\n');
+	},
+	statusCode: { 404: function() {
+	    clearTimeout(timer);
+	    $('#syncnote').html("Edit backup failed.");
+	    alert_scribe_error();
+	}}});
+}
+
 function edlog(annot, etype) {
-    var aa = [ "t", "a", "s", "c", "n", "x" ], etext, i;
+
+    var etext = '', scn;
 
     if (!annot || annot.t < 0 || !annot.a || annot.a.length < 1
 	|| /\s/g.test(annot.a) || (etype !== '+' && etype !== '-')) {
 	return;  // check arguments, do nothing if annot or etype is defective
     }
-    if (annot.x !== null && annot.x.length > 0) { // fix whitespace in annot.x
+    if (annot.x && annot.x.length > 0) { // fix whitespace in annot.x
 	annot.x = annot.x.replace(/\s\s*/g, ' ').replace(/^\s|\s$/g, '');
     }
-    etext = etype + ' ' + JSON.stringify(annot, aa);
+
+    if (annot.s || annot.c || annot.n) {
+	scn = '{';
+	if (annot.s && annot.s !== 0) { scn += annot.s; }
+	scn += '/';
+	if (annot.c && annot.c !== 0) { scn += annot.c; }
+	scn += '/';
+	if (annot.n && annot.n !== 0) { scn += annot.n; }
+	scn += '}';
+    }
+    if (etype == '-') { etext = etype; }
+    etext += annot.t;
+    if (annot.a != 'N' || scn || annot.x) {
+	etext += ',' + annot.a;
+	if (scn) { etext += scn; }
+	if (annot.x) { etext += ',' + annot.x; }
+    }
+
     changes.splice(0, undo_count, etext);
     undo_count = 0;
     show_editlog();
@@ -1760,14 +1892,16 @@ function delete_ann(annot) {
 
     if (selarr) {
 	i = ann_before(selarr, annot.t);
-	if (i >= 0 && selarr[i].t === annot.t) {
-	    selarr.splice(i, 1);
-	    selann = -1;
-	    key = askey(annot);
-	    for (i = 0; i < palette.length; i++) {
-		if (palette[i][0] === key) {
-		    palette[i][1]--;
-		    break;
+	if (i >= 0) {
+	    if (Number(selarr[i].t) === annot.t) {
+		selarr.splice(i, 1);
+		selann = -1;
+		key = askey(annot);
+		for (i = 0; i < palette.length; i++) {
+		    if (palette[i][0] === key) {
+			palette[i][1]--;
+			break;
+		    }
 		}
 	    }
 	}
@@ -1800,15 +1934,28 @@ function insert_ann(annot) {
 }
 
 function apply_edit(n, applyp) {
-    var annot = {}, f, insertp;
+    var annot = {}, f, g, h, insertp;
 
     if (n < 0 || n >= changes.length) { return; }
-    f = changes[n].split(' ');
-    if (f[0] === '+') { insertp = true; }
-    else if (f[0] === '-') { insertp = false; }
-    else { return; }
+
+    annot.a = 'N';
+    annot.s = annot.c = annot.n = 0;
+    annot.x = null;
+    f = changes[n].split(',');
+    if (f[0][0] === '-') { insertp = false; annot.t = -f[0]; }
+    else { insertp = true; annot.t = +f[0]; }
+    if (f.length > 1) {
+	if (f.length > 2) { annot.x = f.slice(2).join(','); }
+	g = f[1].split('{');
+	annot.a = g[0];
+	if (g.length > 1) {
+	    h = g[1].slice(0,-1).split('/');
+	    if (h[0]) { annot.s = +h[0]; }
+	    if (h[1]) { annot.c = +h[1]; }
+	    if (h[2]) { annot.n = +h[2]; }
+	}
+    }
     if (applyp === false) { insertp = !insertp; }
-    annot = JSON.parse(f[1]);
     if (insertp) { insert_ann(annot); }
     else { delete_ann(annot); }
     show_summary();
@@ -1900,7 +2047,7 @@ function alert_editing() {
 }
 
 function handle_editmode() {
-    if (!editing) { alert_editing(); } // FIXME
+    if (!editing) { test_sync(); }
 
     // set state based on edit_mode radio buttons
     if ($('#no_edit').attr('checked')) { editing = mouse = false; }
@@ -2122,19 +2269,12 @@ function alert_server_error() {
 	  + 'on the Settings tab if necessary.');
 }
 
-function atype_menu() {
-    var amtext, i;
-
-    amtext = '<td colspan=2>Loading list of annotation types ...</td>';
-
-}
-
-
 // Load the list of databases and set up an event handler for db selection.
 function dblist() {
     var dbi, dblist_text = '', dbparts, i, sdbi, timer;
 
     server = $('[name=server]').val();
+    scribe = $('[name=scribe]').val();
     $('#dblist').html('<td colspan=2>Loading list of databases ...</td>');
     url = server + '?action=dblist&callback=?';
     timer = setTimeout(alert_server_error, 10000);
@@ -2255,12 +2395,9 @@ function set_handlers() {
     $('#show_requests').on("click", toggle_show_requests);
     $('#clear_requests').on("click", clear_requests);
     $("#edit_mode").buttonset().on("change", handle_editmode);
-/*
-    $('#editing').on("click", toggle_editing);
-    $('#shortcuts').on("click", toggle_shortcuts);
-*/
     $('#new_annset').on("click", new_annset);
     $('#show_edits').on("click", toggle_show_edits);
+    $('#sync_edits').on("click", sync_edits);
 
     // on Help tab:
     $('#helpframe').attr('height', $(window).height() - 180 + 'px');
@@ -2282,6 +2419,7 @@ function parse_url() {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
 	$('[name=server]').val(server);     // set default server URL
+	$('[name=scribe]').val(scribe);     // set default server URL
 	dblist();	// no query, get the list of databases
 	return;
     }
@@ -2302,6 +2440,7 @@ function parse_url() {
 	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
 	    $('#top').show();
 	    $('[name=server]').val(server);     // set default server URL
+	    $('[name=scribe]').val(scribe);     // set default server URL
 	    dblist_text = '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#dblist').html(dblist_text);
 	    alist();
@@ -2318,6 +2457,7 @@ function parse_url() {
 	    $('.recann').html(sdb + '/' + record);
 	    dblist =  '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#server').html(server);
+	    $('#scribe').html(scribe);
 	    $('#dblist').html(dblist);
 	    rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
 	    $('#rlist').html(rlist);
