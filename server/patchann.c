@@ -1,5 +1,5 @@
 /* file: patchann.c		G. Moody	27 March 2013
-				Last revised:	31 March 2013
+				Last revised:	 5 April 2013
 Create or patch a PhysioBank-compatible annotation file from a LightWAVE editlog
 
 Copyright (C) 2012-2013 George B. Moody
@@ -36,8 +36,9 @@ An edit log deletion entry results in a deletion only if the array contains an
 exact match for the log entry. (If there is no match, this program issues a
 warning and continues to process the remaining log entries.)  When all edit log
 entries have been processed, the program writes the contents of the array to a
-new annotation file, which can be distinguished from the original by the '_'
-appended to its annotator name.
+new annotation file.  If a set of original annotations exists, a '_' is
+appended to the name of the new annotation file so that they can be
+distinguished from each other.
 
 LightWAVE edit log format spec:
     http://physionet.org/lightwave/doc/edit-log-format.html
@@ -93,10 +94,10 @@ WFDB_Annotation annot;	/* current annotation to be processed */
 int delete_ann(), insert_ann(), get_log_entry(), parse_log_header();
 
 int main(int argc, char **argv) {
-    char *oaname, *pname = argv[0];
+    char *oaname = NULL, *pname = argv[0];
     int n;
     struct ax *ap, *apthis;
-    WFDB_Anninfo ai[2];
+    WFDB_Anninfo ai;
 
     if (parse_log_header() == 0) {
 	fprintf(stderr, "%s: can't parse input file (format error)\n", pname);
@@ -105,22 +106,24 @@ int main(int argc, char **argv) {
 
     SUALLOC(aphead, sizeof(struct ax), 1);
     aptail = aphead;
+    wfdbquiet();
+    ai.name = annotator;
+    ai.stat = WFDB_READ;
     SUALLOC(oaname, strlen(annotator) + 2, 1);
     sprintf(oaname, "%s_", annotator);
-    wfdbquiet();
-    ai[0].name = annotator; ai[1].name = oaname;
-    ai[0].stat = WFDB_READ; ai[1].stat = WFDB_WRITE;
-    n = annopen(record, ai, 2);  /* open original annotation file if possible */
-    if (n > -3) {  /* input and output annotators were opened successfully */
+    if (annopen(record, &ai, 1) == 0){ /* input annotator opened successfully */
 	while (getann(0, &annot) == 0)  /* read the original annotations */
 	    (void)insert_ann();    /* copy them into the in-memory array */
+	ai.name = oaname;	/* use oaname only if input annotator exists */
     }
     /* Failure to open the original annotation file is not an error (it simply
        means that the edit log will be used to create an entirely new set of
        annotations).  Failure to open the output is fatal, however. */
-    else if (n == -4) {	/* can't open output annotator */
+    ai.stat = WFDB_WRITE;
+    if (annopen(record, &ai, 1) != 0) {  /* can't open output annotator */
 	fprintf(stderr, "%s: can't write output annotation file '%s.%s\n",
-		record, oaname);
+		record, ai.name);
+	SFREE(oaname);
 	SFREE(record);
 	SFREE(annotator);
 	wfdbquit();
@@ -151,6 +154,7 @@ int main(int argc, char **argv) {
 	SFREE(annot.aux);
     }
     SFREE(aptail);
+    SFREE(oaname);
     SFREE(record);
     SFREE(annotator);
 

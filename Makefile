@@ -1,6 +1,6 @@
-LWVERSION = 0.54
+LWVERSION = 0.55
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	  1 April 2013 (version 0.54)
+#			Last revised:	  1 April 2013 (version 0.55)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -105,8 +105,7 @@ LWSERVERURL = http://$(ServerName)$(ScriptAlias1)lightwave
 LWSCRIBEURL = http://$(ServerName)$(ScriptAlias1)lw-scribe
 # The LW*URLs should match up with the corresponding LW*DIRs above.
 
-# CC is the default C compilerxque
-
+# CC is the default C compiler
 CC = gcc
 
 # CFLAGS is a set of options for the C compiler.

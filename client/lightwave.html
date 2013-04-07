@@ -8,13 +8,15 @@
 <link rel="stylesheet" href="css/lightwave.css">
 <script src="js/jquery.min.js"></script>
 <script src="js/jquery-ui.min.js"></script>
-<script src="js/jquery.ui.touch.js"></script>
+<!--<script src="js/jquery.ui.touch-lw.js"></script>-->
+<!--<script src="js/jquery.ui.touch-punch.min.js"></script>-->
+<script src="js/touch-lw.js"></script>
 <script src="js/lightwave.js"></script>
 <noscript><style>.js { display: none; }</style></noscript>
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  1 April 2013   version 0.54
+			Last revised:	  4 April 2013   version 0.55
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -207,14 +209,7 @@ Standard aux strings for rhythms begin with "(":
  </tr>
 </table>
 
-<!--
-<p>See <a href="http://physionet.org/physiobank/annotations.shtml"
-target="_blank">PhysioBank Annotations</a> for standard annotation types.
--->
-
-<p>See
-<a href="javascript:popup('http://physionet.org/physiobank/annotations.shtml')">
-<b>PhysioBank Annotations</b></a> for standard annotation types.
+<p>See <em>Help topics</em> -> <em>Standard annotation types</em> for more.
 
 </div>
 
@@ -349,7 +344,7 @@ signal window if selected below">&#x21b4;</button>
 	title="URL of LightWAVE server (reload to restore default)"></span>
       <span id="sversion">&nbsp;</span>
     </td>
-    <td align="right"><div class="recann"><div>
+    <td align="right"><div class="recann"></div>
     </td>
   </tr>
   <tr>
@@ -363,6 +358,24 @@ signal window if selected below">&#x21b4;</button>
   <tr><td>&nbsp;</td></tr>
   <tr>
     <td>
+      <b>Editing</b><br>
+      <div id="edit_mode">
+	<input type="radio" id="no_edit" name="edit_mode" checked="checked">
+	  <label for="no_edit">View (no editing)</label>
+	<input type="radio" id="mouse_edit" name="edit_mode">
+	  <label for="mouse_edit">Edit using mouse</label>
+	<input type="radio" id="touch_edit" name="edit_mode">
+	  <label for="touch_edit">Edit using touch</label>
+      </div>
+	<br>
+	<button id="new_annset">Set up new annotation set</button>
+	<br>
+	<button title="Display the current edit log, most recent first"
+		id="show_edits">Show pending edit log</button>
+	<br>
+	<button title="Back up the edit log(s)"
+		id="sync_edits">Save pending edits</button>
+    </td><td>
       <button title="Display counters of total and pending requests"
 	      id="show_status">Show status</button>
       <br>
@@ -372,25 +385,7 @@ signal window if selected below">&#x21b4;</button>
       <button title="Clear the request log and counters"
 	      id="clear_requests">Reset request log</button>
     </td>
-    <td>
-      <b>Editing</b><br>
-      <div id="edit_mode">
-	<input type="radio" id="no_edit" name="edit_mode" checked="checked"><br>
-	  <label for="no_edit">View (no editing)</label>
-	<input type="radio" id="mouse_edit" name="edit_mode"><br>
-	  <label for="mouse_edit">Edit using mouse</label>
-	<input type="radio" id="touch_edit" name="edit_mode">
-	  <label for="touch_edit">Edit using touch</label>
-      </div>
-	<br>
-	<button id="new_annset">Set up new annotation set</button>
-	<br>
-	<button title="Display the edit log, most recent first"
-		id="show_edits">Show edit log</button>
-	<br>
-	<button title="Back up the edit log"
-		id="sync_edits">Save pending edits</button>
-  <tr>
+  </tr>
  </table>
 
 <!--
@@ -413,7 +408,7 @@ and links to more information">Main help</button>
    <button id="help_topics" title="Topic index">Help topics</button>
    <button id="help_contacts"
    title="Contacts for feature requests and bug reports">Contacts</button></td>
-   <td align="right"><div class="recann"><div></td>
+   <td align="right"><div class="recann"></div></td>
   </tr>
  </table>
 
@@ -423,11 +418,12 @@ and links to more information">Main help</button>
 </form>
 </div>  <!-- end of "tabs" div -->
 
-<div id="status" style="display: none"></div>
-<p>
-<div id="requests" style="display: none"></div>
-<p>
+<table width="99%"><tr><td width="50%">
 <div id="editlog" style="display: none"></div>
+</td><td width="45%">
+<div id="status" style="display: none"></div><br>
+<div id="requests" style="display: none"></div>
+</td></tr></table>
 
 </div>  <!-- end of "js" div -->
 </div>  <!-- end of "top" div -->

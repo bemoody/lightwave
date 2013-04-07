@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  1 April 2013   version 0.54
+//			Last revised:	  6 April 2013   version 0.55
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -93,6 +93,7 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     pending = 0,  // count of pending AJAX requests
     rqlog = '',	// AJAX request log (hidden by default)
     autoscroll = null, // autoplay_fwd/rev timer
+    emode = 1, // edit mode (1: no edit, 2: edit with mouse, 3: edit with touch)
     editing = false,   // editing controls hidden if false
     mouse = false,     // true if user selected 'Edit using mouse'
     shortcuts = false, // editing mode (true: use shortcuts, false: don't)
@@ -103,6 +104,13 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     changes = [],	// edit log
     undo_count = 0,	// number of undos that are possible from current state
     ilast = -1,		// index in selarr of annot most recently found
+
+// SVG click targets
+    $grid,	// grid click target
+    $mrkr,	// marker bar click target
+    $anames,	// annotator name click targets
+    $snames,	// signal name click targets
+    $svg,       // signal window
 
 // View/edit panel geometry
     width,	// width of View/edit panel, in pixels
@@ -780,76 +788,114 @@ function show_plot() {
 	    show_time(x, 0);
 	}
     }
-    handle_svg_events();    // Handle user input in the signal window
+
+    // Reset the svg handlers since the svg elements have changed.
+    reset_svg_handlers();
 }
 
-function handle_svg_events() {
-    var aname, i, j, sname;
-
-    $('#grid').click(function(){ g_visible = 1 - g_visible; show_plot();});
-    $('#mrkr').click(function(){ m_visible = 1 - m_visible; show_plot();});
-
-    $("[id^='ann;;']").click(function(){
-	aname = $(this).attr('id').split(";")[2];
-	for (i = 0; i < nann; i++) {
-	    if (ann[i].name === aname) { break; }
+function reset_svg_handlers() {
+    if ($grid) { $grid.off('click'); }
+    $grid = $('#grid');
+    $grid.on('click', grid_mode); 
+    if ($mrkr) { $mrkr.off('click'); }
+    $mrkr = $('#mrkr');
+    $mrkr.on('click', mrkr_mode);
+    if ($anames) { $anames.off('click'); }
+    $anames = $("[id^='ann;;']");
+    $anames.on('click', anames_mode); 
+    if ($snames) { $snames.off('click'); }
+    $snames = $("[id^='sig;;']");
+    $snames.on('click', snames_mode); 
+    if ($svg) {
+	switch (emode) {
+	case 1: $svg.off('mousemove'); break;
+	case 2: $svg.off('mousedown mousemove mouseup'); break;
+	case 3: $svg.off('mousedown mousemove mouseup'); break;
 	}
-	if (i < nann) {
-	    switch (ann[i].state) {
-	    case 0:   // annotator is hidden: select it
-		for (j = 0; j < nann; j++) {  // reset current selection
-		    if (ann[j].state === 2) {
-			ann[j].state = 1;
-			break;
-		    }
-		}
-		ann[i].state = 2;  // select this annotator
-		selarr = ann[i].annotation;
-		load_palette(ann[i].summary);
-		ilast = selann = -1;  // clear annotation selection, if any
-		svsa = '';
-		break;
-	    case 1:   // annotator is visible, not selected:  hide it
-		ann[i].state = 0;
-		break;
-	    case 2:   // annotator is selected: deselect it, leave it visible
-		ann[i].state = 1;
-		ilast = selann = -1;
-		svsa = '';
-		break;
-	    }
-	}
-	show_plot();
-    });
-
-    $("[id^='sig;;']").click(function(){
-	sname = $(this).attr('id').split(";")[2];
-	if (s_visible[sname] === 0) {
-	    s_visible[sname] = 1;
-	    sigselected = sname;
-	    $('.stretch').removeAttr('disabled');
-	    $('.reset').removeAttr('disabled');
-	    $('.shrink').removeAttr('disabled');
-	}
-	else if (sigselected === sname) {
-	    sigselected = '';
-	    $('.stretch').attr('disabled', 'disabled');
-	    $('.reset').attr('disabled', 'disabled');
-	    $('.shrink').attr('disabled', 'disabled');
-	}
-	else { s_visible[sname] = 0; }
-	read_signals(t0_ticks, true);
-	show_plot();
-    });
-    if (mouse) {
-	$('svg').on('mousedown', select_ann)
+    }
+    $svg = $('svg');
+    switch (emode) {
+    case 1: $svg.on('mousemove', track_pointer); break;
+    case 2: 
+	$svg.on('mousedown', select_ann)
 	    .on('mousemove', track_pointer)
-	    .on('mouseup', mark)
+	    .on('mouseup', mark);
+	break;
+    case 3:
+	$svg.on('mousedown', select_ann)
+	    .on('mousemove', track_pointer)
+	    .on('mouseup', track_pointer);
+	break;
     }
-    else {
-	$('svg').on('touchstart', select_ann)
-	    .on('touchend', track_pointer);
+}
+
+// handle click on grid mode button
+function grid_mode() {
+    g_visible = 1 - g_visible; show_plot();
+}
+
+// handle click on marker mode button
+function mrkr_mode() {
+    m_visible = 1 - m_visible; show_plot();
+}
+
+// handle click on annotator name label
+function anames_mode() {
+    var aname, i, j;
+
+    aname = $(this).attr('id').split(";")[2];
+    for (i = 0; i < nann; i++) {
+	if (ann[i].name === aname) { break; }
     }
+    if (i < nann) {
+	switch (ann[i].state) {
+	case 0:   // annotator is hidden: select it
+	    for (j = 0; j < nann; j++) {  // reset current selection
+		if (ann[j].state === 2) {
+		    ann[j].state = 1;
+		    break;
+		}
+	    }
+	    ann[i].state = 2;  // select this annotator
+	    selarr = ann[i].annotation;
+	    load_palette(ann[i].summary);
+	    ilast = selann = -1;  // clear annotation selection, if any
+	    svsa = '';
+	    break;
+	case 1:   // annotator is visible, not selected:  hide it
+	    ann[i].state = 0;
+	    break;
+	case 2:   // annotator is selected: deselect it, leave it visible
+	    ann[i].state = 1;
+	    ilast = selann = -1;
+	    svsa = '';
+	    break;
+	}
+    }
+    show_plot();
+}
+
+// handle click on signal name label
+function snames_mode() {
+    var sname;
+
+    sname = $(this).attr('id').split(";")[2];
+    if (s_visible[sname] === 0) {
+	s_visible[sname] = 1;
+	sigselected = sname;
+	$('.stretch').removeAttr('disabled');
+	$('.reset').removeAttr('disabled');
+	$('.shrink').removeAttr('disabled');
+    }
+    else if (sigselected === sname) {
+	sigselected = '';
+	$('.stretch').attr('disabled', 'disabled');
+	$('.reset').attr('disabled', 'disabled');
+	$('.shrink').attr('disabled', 'disabled');
+    }
+    else { s_visible[sname] = 0; }
+    read_signals(t0_ticks, true);
+    show_plot();
 }
 
 // show the time corresponding to (x,y) as HH:MM:SS.mmm in upper right corner
@@ -859,8 +905,9 @@ function show_time(x, y) {
 
     ts = mstimstr(t_cursor);
     $('.pointer').html(ts);
+    if (xx_cursor < 0) { return; }
 
-    if (editing) {
+    if (y != 0 && editing) {
 	xc = x_cursor - 2*adx4;
 	svc = '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
 	    + '" fill="none" style="cursor:pointer" d="M' + x_cursor
@@ -887,36 +934,21 @@ function show_time(x, y) {
 	}
 
 	$('#plotdata').html(svg + svc + svsa + '</svg>\n');
+
+	reset_svg_handlers();
     }
-    handle_svg_events();
 }
 
 function track_pointer(e) {
-    var x = e.pageX, y = e.pageY;
-    c_velocity = 10;
-    show_time(x, y);
-}
+    var ts, x = e.pageX, y = e.pageY;
 
-function handle_edit() {
-    if (editing) {
-	$('.editgroup').show();
-	if (mouse) {
-	    $('svg').on('mousedown', select_ann);
-	    $('svg').on('mouseup', mark);
-	    $('svg').on('mousemove', track_pointer);
-	    $('svg').off('touchstart touchend');
-	}
-	else {
-	    $('svg').on("touchstart", function(e) { select_ann(e);})
-		.off('mousemove', track_pointer)
-	        .off('mouseup', mark)
-	        .off('mousedown', select_ann);
-	}
+    c_velocity = 10;
+    if (emode === 3 && e.type === 'mousemove') { //FIXME
+	svgxyt(x, y);
+	ts = mstimstr(t_cursor);
+	$('.pointer').html(ts);
     }
-    else {
-//	$('svg').off('mousedown mouseup touchstart touchend');
-	$('.editgroup').hide();
-    }
+    else { show_time(x, y); }
 }
 
 function select_type(e) {
@@ -1759,23 +1791,6 @@ function test_sync() {
 	}});
 }
 
-// FIXME
-// 	        alert("Edit backup rejected by " + scribe
-//		      + "\nTry again later, or try a different scribe.");
-//	success:  function(data, result) {
-//	    clearTimeout(timer);
-//	    $('#syncnote').html("Edit backup test successful.");
-//	},
-//	statusCode: { 404: function() {
-//	    clearTimeout(timer);
-//	    $('#syncnote').html("Edit backup test failed.");
-//	    alert_editing();  // FIXME
-//	    alert("Edit backup rejected by " + scribe
-//		  + "\nTry again later, or try a different scribe.");
-//	}
-//    });
-// }
-
 function sync_edits() {
     var body, boundary, etext = '', fname, i, timer;
 
@@ -1813,8 +1828,7 @@ function sync_edits() {
 	url: scribe,
 	success:  function(data, result) {
 	    clearTimeout(timer);
-	    $('#syncnote').html('<p>These edits have been backed up:<p><pre>'
-				+ etext + '</pre>\n');
+	    $('#syncnote').html('<p>Edits backed up successfully.');
 	},
 	statusCode: { 404: function() {
 	    clearTimeout(timer);
@@ -2050,26 +2064,26 @@ function handle_editmode() {
     if (!editing) { test_sync(); }
 
     // set state based on edit_mode radio buttons
-    if ($('#no_edit').attr('checked')) { editing = mouse = false; }
-    else if ($('#mouse_edit').attr('checked')) { editing = mouse = true; }
-    else { editing = true; mouse = false; }
-
-    if (editing) {
-	$('.editgroup').show();
-	if (mouse) {  // use mouse/trackball interface
-	    $('svg').on('mousedown', select_ann)
-		    .on('mousemove', track_pointer)
-		    .on('mouseup', mark)
-		    .off('touchstart touchend touchmove');
-	}
-	else {       // use touch interface (note: touchmove ignored)
-	    $('svg').on('touchstart', select_ann)
-		    .on('touchend', track_pointer)
-		    .off('touchmove mousedown mousemove mouseup');
-	}
+    if ($('#no_edit').attr('checked')) {
+	if (emode === 1) { return; } // do nothing if emode unchanged
+	emode = 1;  // view only, no editing
+	editing = mouse = false;
+	$('.editgroup').hide();
     }
-    else { $('.editgroup').hide(); }
-    if (db !== '' && record !== '') {
+    else if ($('#mouse_edit').attr('checked')) {
+	if (emode === 2) { return; }
+	emode = 2;  // use mouse/trackball interface for editing
+	editing = mouse = true;
+	$('.editgroup').show();
+    }
+    else {
+	if (emode === 3) { return; }
+	emode = 3;  // use touch interface for editing
+	editing = true; mouse = false;
+	$('.editgroup').show();
+    }
+
+    if (db !== '' && record !== '') {  // return to View/edit tab if record open
 	$('#tabs').tabs("select", "#view");
 	show_plot();
     }
@@ -2303,10 +2317,18 @@ function dblist() {
     });
 }
 
+function close_warning(){
+    if (changes.length - undo_count >= 1) {
+	return 'You have edits that will be lost if you reload or leave '
+	    + 'this page without saving them first.';
+    }
+    return null;
+}
 // Set up user interface event handlers.
 function set_handlers() {
     $('#lwform').on("submit", false);      // disable form submission
-    $(window).resize(resize_lightwave);
+    $(window).resize(resize_lightwave)
+        .on("beforeunload", close_warning);
     // Allow the browser to redraw content from its cache when switching tabs
     // (using jQuery UI 1.9 interface; use 'cache: true' with older jQuery UI)
     $('#tabs').tabs({
@@ -2318,6 +2340,12 @@ function set_handlers() {
 	    current_tab = $(ui.tab).text();
 	}
     });
+
+    // Add touch handlers for View/edit tab if on iPad or other touch device.
+    if ($.support.touch) {
+	$('#view').addTouch();  // see jquery.ui.touch-lw.js
+    }
+
     // Handlers for buttons and other controls:
     //  on View/edit and Tables tabs:
     $('.go_to').on("click", go_to);      // go to selected location
@@ -2334,8 +2362,6 @@ function set_handlers() {
     $('.sfwd').on("click", sfwd);	 // search for next 'Find' target
 
     // signal window
-    $('#plotdata').on("mousemove", function(e){ show_time(e.pageX, e.pageY); });
-
     $('.stretch').on("click", stretch_signal); // enlarge selected signal
     $('.reset').on("click", reset_signal);     // reset scale of selected signal
     $('.shrink').on("click", shrink_signal);   // reduce selected signal

@@ -27,6 +27,7 @@ significantly reorganized during the next several alpha releases.</s>
 
 <ul>
 <li> <s>tabbed interface</s>
+<li> record sub-menus as on ATM (e.g., to provide access to MIMIC II numerics records)
 <li> <s>checkboxes for annotators</s>, <s>allow selection/display of multiple annotators</s>
 <li> <s>toggle signal and annotator visibility</s>
 <li> <s>improve default vertical spacing of signals and annotators</s>
@@ -72,16 +73,25 @@ significantly reorganized during the next several alpha releases.</s>
    <li> <s>properly handle multiple new annotation sets</s>
    </ul>
  <li> <s>select a different annotation set to edit</s>
+ <li> <s>edit logs</s>
    <ul>
-   <li> swap edit logs when changing set
+   <li> separate edit logs for each annotation set
+   <li> save edit log(s) to localstorage
+   <li> restore edit log(s) from localstorage
+   <li> clear edit logs after save/reload/validate
+   <li> <s>warn user before reload/exit if there are unsaved edits</s>
+   <li> <s>send edit log(s) to server</s>
+     <ul>
+       <li> on PhysioNetWorks: authenticated archival storage, accessible
+	 in future sessions by LightWAVE and downloadable for other uses
+       <li> on PhysioNet: short-term storage identified by cookie?
+   <li> get edit log(s) from server
+     <ul>
+       <li> do this automatically when reopening previously edited annotation
+	 set
+       <li> compare with localstorage and resolve discrepancies if found
+     </ul>
    </ul>
- <li> save edit log(s) to localstorage
- <li> <s>send edit log(s) to server</s>
- <li> get edit log(s) from server
-  <ul>
-  <li> do this automatically when reopening previously edited annotation set
-  <li> compare with localstorage and resolve discrepancies if found
-  </ul>
  <li> "snap" mode to move new annotations to local extremum automatically
    <ul>
    <li> use gestures to move to nearest following/preceding local max/min
@@ -128,10 +138,14 @@ These tasks will be implemented in <tt>lightwave.c</tt>.  Tasks noted
 with (*) will require coordinated client-side changes.
 
 <ul>
-<li> * <s>handler for receiving and storing edit logs from clients</s>
+<li> collate DBS from all WFDB path components
+<li> * <s>lw-scribe: receiver for (bulk) edit logs from clients</s>
+<li> * receiver for "dribbled" edits when file upload is not possible
+<li> <s>patchann: rebuild annotation files from edit logs (+ original files)</s>
   <ul>
-  <li> save in user's personal PNW workspace
-  <li> <s>rebuild annotation files from edit logs (+ original files)</s>
+    <li> authenticated uploads: archive in user's personal PNW workspace
+    <li> anonymous uploads: short-term storage identified by cookie
+    <li> * pages with links for user retrieval of edited annotation files
   </ul>
 <li> <s>disambiguate identically-named signals</s>
 <li> <s>short-form signal names</s>
