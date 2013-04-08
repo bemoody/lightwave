@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  6 April 2013   version 0.55
+//			Last revised:	  8 April 2013   version 0.56
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -96,7 +96,6 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     emode = 1, // edit mode (1: no edit, 2: edit with mouse, 3: edit with touch)
     editing = false,   // editing controls hidden if false
     mouse = false,     // true if user selected 'Edit using mouse'
-    shortcuts = false, // editing mode (true: use shortcuts, false: don't)
     palette = null,    // annotation palette (see load_palette())
     seltype, // id of the current selection in the palette ('#palette_N')
     selkey,  // button text for the current palette selection
@@ -130,6 +129,52 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     adx2,	// arrow width / edit marker half-width
     adx4,	// edit marker width
     ady1;	// arrow height
+
+// minimal jQuery plugin for touch event support, based on Stephen von Takach's
+// jquery.ui.touch.js; emulates mousedown, mousemove, mouseup only
+(function($) {
+    function sim_event(event, type) {
+	var sim = document.createEvent("MouseEvent"),
+            touch = event.changedTouches[0];
+
+	sim.initMouseEvent(type, true, true, window, 1,
+			   touch.screenX, touch.screenY,
+			   touch.clientX, touch.clientY,
+			   false, false, false, false, 0, null);
+	touch.target.dispatchEvent(sim);
+    }
+
+    function touchstart_handler(event) {
+	if (event.touches.length <= 1) {
+	    sim_event(event, "mousedown");
+	}
+    }
+
+    function touchmove_handler(event) {
+	if (event.touches.length <= 1) {
+	    event.preventDefault();
+	    sim_event(event, "mousemove");
+	}
+    }
+
+    function touchend_handler(event) {
+	if (event.touches.length <= 1) {
+	    sim_event(event, "mouseup");
+	}
+    }
+
+    $.extend($.support, { touch: "ontouchend" in document });
+    
+    $.fn.addTouch = function() {
+	if ($.support.touch) {
+            this.each(function(i,el){
+		el.addEventListener("touchstart", touchstart_handler, false);
+		el.addEventListener("touchmove", touchmove_handler, false);
+		el.addEventListener("touchend", touchend_handler, false);
+            });
+	}
+    };
+})(jQuery);
 
 // Initialize or expand tpool
 function init_tpool(ntrace) {
@@ -823,7 +868,7 @@ function reset_svg_handlers() {
 	break;
     case 3:
 	$svg.on('mousedown', select_ann)
-	    .on('mousemove', track_pointer)
+	    .on('mousemove', track_touch)
 	    .on('mouseup', track_pointer);
 	break;
     }
@@ -939,16 +984,18 @@ function show_time(x, y) {
     }
 }
 
-function track_pointer(e) {
-    var ts, x = e.pageX, y = e.pageY;
+function track_touch(e) {
+    var ts;
 
     c_velocity = 10;
-    if (emode === 3 && e.type === 'mousemove') { //FIXME
-	svgxyt(x, y);
-	ts = mstimstr(t_cursor);
-	$('.pointer').html(ts);
-    }
-    else { show_time(x, y); }
+    svgxyt(e.pageX, e.pageY);
+    ts = mstimstr(t_cursor);
+    $('.pointer').html(ts);
+}
+
+function track_pointer(e) {
+    c_velocity = 10;
+    show_time(e.pageX, e.pageY);
 }
 
 function select_type(e) {
@@ -2106,12 +2153,14 @@ function new_annset() {
 		else { i = Number(ann[0].name.substring(3)) + 1; }
 		new_ann_set.name = new_ann.name = "new" + i;
 	    }
-	    else { return;}  // don't create another if previous "new" is empty
+	    else { return; }  // don't create another if previous "new" is empty
 	}
 	ann_set.unshift(new_ann_set);
 	ann.unshift(new_ann);
     }
     nann++;
+    $('#syncnote').html("Annotation set <b>"
+			+ new_ann.name + "</b> has been initialized.");
     if (palette) {
 	for (i = 0; i < palette.length; i++) {
 	    new_ann.summary[i] = [ palette[i][0], -1 ];
@@ -2131,10 +2180,10 @@ function new_annset() {
 function toggle_show_edits() {
     $('#editlog').toggle();
     if ($('#editlog').is(":hidden")) {
-	$('#show_edits').html("Show edit log");
+	$('#show_edits').html("Show pending edit log");
     }
     else {
-	$('#show_edits').html("Hide edit log");
+	$('#show_edits').html("Hide pending edit log");
     }
 }
 

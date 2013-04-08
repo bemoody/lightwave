@@ -50,25 +50,37 @@ LightWAVE URLs with query strings may be useful for communicating with
 colleagues, since it's easy to send an email with a URL that opens a
 specific record at a point of interest.  On PhysioNet, we are planning
 to incorporate such URLs in PhysioBank database home pages and in
-tutorials and reference materials.  For example, this code can be inserted
-in an HTML page to embed an instance of LightWAVE in the page:
+tutorials and reference materials.   For example, this code can be inserted
+in a page based on the <a href="http://physionet.org/pn/template.shtml">PhysioNet
+template</a> to embed an instance of LightWAVE in it:
 
 <pre>
-    &lt;iframe id="lightwave" width="100%"
-        src="http://physionet.org/lightwave?db=mitdb&amp;record=200&amp;t0=12:34"&gt;
-    &lt;/iframe&gt;
-
-    &lt;script&gt;
-        $('#lightwave').attr('height', $(window).width() * 0.6 + 'px');
-        $(window).on('resize', function() {
-            $('#lightwave').attr('height', $(window).width() * 0.6 + 'px');
-        });
-    &lt;/script&gt;
+&lt;iframe id="lightwave" width="100%"
+  src="http://physionet.org/lightwave?db=mitdb&amp;record=200&amp;t0=12:34"&gt;
+&lt;/iframe&gt;
+&lt;script&gt;
+  $('#lightwave').attr('height', $(window).width() * 0.6 + 'px');
+  $(window).on('resize', function() {
+    $('#lightwave').attr('height', $(window).width() * 0.6 + 'px');
+  });
+&lt;/script&gt;
 </pre>
 
 <p>
 The snippet of JavaScript code ensures that the browser allocates sufficient
 room for LightWAVE on the page at load time, and resizes LightWAVE if the
-browser window is resized by the user.
+browser window is resized by the user.  If you are not starting with the
+PhysioNet template, include this code in the HTML &lt;head&gt; section of
+the web page:
+
+<pre>
+&lt;meta http-equiv="X-UA-Compatible" content="chrome=1"&gt;
+&lt;script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"&gt;
+</pre>
+
+<p>
+The first of these lines ensures that the page will load properly in MSIE if
+Google Chrome Frame is installed, and the second line line loads jQuery (needed
+by the code that follows the &lt:iframe&gt; above).
 </html>
 

@@ -96,6 +96,14 @@ attempt to compile and run the LightWAVE server on Mac OS X or on
 Windows, please let me know if you were successful, and if so, please
 send me a brief description of what steps were needed.)
 
+<p>
+To receive edits made using LightWAVE clients hosted on the same web
+server, a second CGI application (lw-scribe, written in Perl) is needed.
+This application uses a command-line application (patchann, written in
+C) to merge edit logs with original annotation files and write new
+annotation files.  lw-scribe and patchann are not needed unless you
+need to handle annotation edits.
+
 <h3>Download the LightWAVE sources</h3>
 
 <p>
@@ -150,6 +158,9 @@ Currently, these components include:
      and a few other standard POSIX tools including 'make', 'cp',
      'mkdir', 'mv', 'rm', 'sed', and 'tar' (all standard on Linux and Mac OS X,
      components of <a href="http://www.cygwin.com/">Cygwin</a> on Windows)
+<li> <a href="http://www.perl.org/">perl</a>
+     and <a href="http://search.cpan.org/dist/CGI/">CGI.pm</a> (for lw-scribe
+     only)
 </ul>
 
 <p>

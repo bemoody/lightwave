@@ -8,15 +8,12 @@
 <link rel="stylesheet" href="css/lightwave.css">
 <script src="js/jquery.min.js"></script>
 <script src="js/jquery-ui.min.js"></script>
-<!--<script src="js/jquery.ui.touch-lw.js"></script>-->
-<!--<script src="js/jquery.ui.touch-punch.min.js"></script>-->
-<script src="js/touch-lw.js"></script>
 <script src="js/lightwave.js"></script>
 <noscript><style>.js { display: none; }</style></noscript>
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  4 April 2013   version 0.55
+			Last revised:	  8 April 2013   version 0.56
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -339,12 +336,12 @@ signal window if selected below">&#x21b4;</button>
 
  <table width="100%">
   <tr>
-    <td align="left">Server:
+    <td align="left" width="50%">Server:
       <span id="server"><input type="text" name="server" size="50"
 	title="URL of LightWAVE server (reload to restore default)"></span>
       <span id="sversion">&nbsp;</span>
     </td>
-    <td align="right"><div class="recann"></div>
+    <td align="right" width="45%"><div class="recann"></div>
     </td>
   </tr>
   <tr>
@@ -356,9 +353,9 @@ signal window if selected below">&#x21b4;</button>
       title="URL of LightWAVE's edit backup server (reload to restore default)">
       </span>
   <tr><td>&nbsp;</td></tr>
+  <tr><td colspan=2><b>Editing</b></td></tr>
   <tr>
-    <td>
-      <b>Editing</b><br>
+    <td colspan=2>
       <div id="edit_mode">
 	<input type="radio" id="no_edit" name="edit_mode" checked="checked">
 	  <label for="no_edit">View (no editing)</label>
@@ -367,12 +364,16 @@ signal window if selected below">&#x21b4;</button>
 	<input type="radio" id="touch_edit" name="edit_mode">
 	  <label for="touch_edit">Edit using touch</label>
       </div>
-	<br>
+    </td>
+  </tr>
+  <tr><td>&nbsp;</td></tr>
+  <tr>
+    <td>
 	<button id="new_annset">Set up new annotation set</button>
 	<br>
 	<button title="Display the current edit log, most recent first"
 		id="show_edits">Show pending edit log</button>
-	<br>
+	<br><br>
 	<button title="Back up the edit log(s)"
 		id="sync_edits">Save pending edits</button>
     </td><td>
@@ -386,15 +387,9 @@ signal window if selected below">&#x21b4;</button>
 	      id="clear_requests">Reset request log</button>
     </td>
   </tr>
+  <tr><td><div id="syncnote"></div></td>
+      <td><div id="status" style="display: none"></div></td></tr>
  </table>
-
-<!--
- <div id="calibrate-display" style='width: 1in; height: 1in;
-      border: 2px solid red'></div>
--->
-<p>
-<div id="syncnote"></div>
-
 </div>
 
 <!-- *** 'Help' panel *** -->
@@ -420,11 +415,9 @@ and links to more information">Main help</button>
 
 <table width="99%"><tr><td width="50%">
 <div id="editlog" style="display: none"></div>
-</td><td width="45%">
-<div id="status" style="display: none"></div><br>
+&nbsp;</td><td width="45%">&nbsp;
 <div id="requests" style="display: none"></div>
 </td></tr></table>
-
 </div>  <!-- end of "js" div -->
 </div>  <!-- end of "top" div -->
 </body>
