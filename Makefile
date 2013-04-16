@@ -1,6 +1,6 @@
-LWVERSION = 0.57
+LWVERSION = 0.58
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	  1 April 2013 (version 0.55)
+#			Last revised:	 16 April 2013 (version 0.58)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -24,6 +24,11 @@ LWVERSION = 0.57
 #  libcgi	 (from http://libcgi.sourceforge.net/)
 #  libwfdb	 (from http://physionet.org/physiotools/wfdb.shtml)
 #  libcurl	 (from http://curl.haxx.se/libcurl/)
+#
+# In addition, the LightWAVE scribe (a separate server-side CGI application
+# that receives edit logs transmitted from the LightWAVE client) requires
+# 'perl' and 'cgi.pm' (standard on Linux, available for all platforms from
+# http://search.cpan.org/).
 #
 # To build and install LightWAVE using this Makefile, you will also need
 # a few standard POSIX tools including 'gcc' (or another ANSI/ISO compiler)

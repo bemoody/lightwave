@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  14 April 2013   version 0.57
+//			Last revised:	  16 April 2013   version 0.58
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -797,6 +797,10 @@ function sync_edits() {
     var body, boundary, etext = '', fname, i, timer;
 
     if (changes.length - undo_count < 1) { alert("No pending edits!"); return; }
+
+    // Save current edits to local storage first, then reload them
+    save_editlog(db, record, annselected);
+    load_editlog(db, record, annselected, false);
 
     for (i = changes.length - 1; i >= undo_count; i--) {
 	etext += changes[i] + '\r\n';
@@ -2296,6 +2300,10 @@ function jump_right() {
 function undo() {
     if (undo_count < changes.length) {
 	apply_edit(undo_count++, false);
+	$('#redo').removeAttr('disabled');
+	if (undo_count >= changes.length) {
+	    $('#undo').attr('disabled', 'disabled');
+	}
 	show_editlog();
 	update_output();
     }
@@ -2354,6 +2362,10 @@ function mark(e) {
 function redo() {
     if (undo_count > 0) {
 	apply_edit(--undo_count, true);
+	$('#undo').removeAttr('disabled');
+	if (undo_count <= 0) {
+	    $('#redo').attr('disabled', 'disabled');
+	}
 	show_editlog();
 	update_output();
     }
@@ -2371,9 +2383,12 @@ function alert_server_error() {
 }
 
 function alert_close_warning(){
-    if (changes.length - undo_count >= 1) {
-	return 'You have edits that will be lost if you reload or leave '
-	    + 'this page without saving them first.';
+    if (changes.length > undo_count) {
+	save_editlog(db, record, annselected);
+	return 'Your pending edits have been saved in local storage only. '
+	    + ' If you wish to access them from another browser or computer,'
+	    + ' click "Save pending edits" on the Settings tab before'
+	    + ' reloading or leaving this page.';
     }
     return null;
 }
@@ -2417,11 +2432,14 @@ function edits_pending(db, record, annotator) {
 //  This function is hidden;  to use it, click on "Show pending edit log" on,
 //  the Settings tab, then change the database on the Choose input tab.
 function show_localstorage() {
-    var etext = '', i;
+    var etext = '', i, key;
 
     for (i = 0; i < localStorage.length; i++) {
-	etext += '<p><b>' + localStorage.key(i) + '</b>: <pre>'
-	    + localStorage.getItem(localStorage.key(i)) + '</pre><br><hr>';
+	key = localStorage.key(i);
+	if (key.match(/^LightWAVE/)) {
+	    etext += '<p><b>' + key + '</b>: <pre>'
+		+ localStorage.getItem(key) + '</pre><br><hr>';
+	}
     }
     $('#editlog').html(etext);
     etext = '';
@@ -2442,7 +2460,13 @@ function load_editlog(db, record, annotator, redo) {
 		if (changes[i]) { apply_edit(i, true); }
 	    }
 	}
+	$('#redo').attr('disabled', 'disabled');
+	$('#undo').removeAttr('disabled');
 	undo_count = 0;
+    }
+    else {
+	$('#redo').attr('disabled', 'disabled');
+	$('#undo').attr('disabled', 'disabled');
     }
 }
 
