@@ -1,30 +1,97 @@
 #!/usr/bin/perl
 # file: lw-scribe		G. Moody	26 March 2013
-#				Last revised:   27 March 2013
+#				Last revised:   22 April 2013  version 0.59
 # Receive and save annotations uploaded from a LightWAVE client
 
 use CGI qw/:standard/;
+use File::Path qw/make_path/;
 use strict;
 use warnings;
 
-chdir('/tmp');
+# ------------------------------------------------------------------------------
+# Site-specific code:  customize as appropriate.
 
-my $file = param('file');
-
-if ($file) {
-    my $ofile = $file;
-    my $len;
-    my $data;
-    $ofile =~ s/[^a-zA-Z0-9._+]/-/g;
-
-    open(SAVE, ">$ofile") || die $!;
-    while ($len = read($file, $data, 1024)) {
-	print SAVE $data;
+# Create a working directory,  $wdir, for the output files.
+use CGI::Cookie;
+my %cookies = CGI::Cookie->fetch;
+my $id = 0;
+if ($cookies{'LightWAVE-ID'}) {
+    $id = $cookies{'LightWAVE-ID'}->value;
+}
+unless ($id) {
+    # This block is based on sub unique_id (CGI Programming with Perl, ch. 11)
+    $id = $ENV{UNIQUE_ID};  # use Apache's mod_unique_id if available
+    unless ($id) {
+	require Digest::MD5;
+    
+	my $md5 = new Digest::MD5;
+	my $remote = 'local';
+	if (defined $ENV{REMOTE_ADDR} && defined $ENV{REMOTE_PORT}) {
+	    $remote = $ENV{REMOTE_ADDR} . $ENV{REMOTE_PORT};
+	}
+    	$id = $md5->md5_base64( time, $$, $remote );
+	$id =~ tr|+/=|-_.|;
     }
-    close(SAVE);
-    print header(-charset=>'utf-8', -status => "200 OK");
 }
-else {
-    print header(-charset=>'utf-8', -status => "404 Not Found");
+my $lwc = CGI::Cookie->new(-name=>'LightWAVE-ID',-value=>$id,-expires=>'+10d');
+my $wdir = "/ptmp/lw/$id";
+unless (-d $wdir) {
+    make_path($wdir);
 }
-exit;
+
+# Change the next line if patchann is not in the standard location.
+my $patchann = '/usr/local/bin/patchann';
+
+# success200 is executed if log and annotation files are created successfully
+sub success200() {
+    system("ln -sf /ptmp/lw/download.html $wdir/index.html");
+    print header(-charset=>'utf-8', -cookie=>$lwc, -status => "200 OK");
+    exit;
+}
+
+# err404 is executed if there is a fatal error
+sub err404() {
+    print header(-charset=>'utf-8', -cookie=>$lwc, -status => "404 Not Found");
+    exit;
+}
+
+# It should not be necessary to modify anything below this line.
+# ------------------------------------------------------------------------------
+
+unless (-d $wdir) { err404(); } # nonexistent working directory, quit
+
+my $file = param("file");
+unless ($file) { err404(); } # no file upload, quit
+my $ofile = $file;
+$ofile =~ s/[^a-zA-Z0-9._+]/-/g;  # sanitize the file name
+
+my $data;
+my $dbdir = "$wdir/database";
+my $logdir = "$wdir/logs";
+
+unless (-d $logdir) {
+    make_path($logdir);
+    unless (-d $logdir) { err404(); } # can't create directory for logs
+}
+
+unless (-d $dbdir) {
+    make_path($dbdir);
+    unless (-d $dbdir) { err404(); } # can't create directory for annotations
+}
+
+if (open LOG, ">$logdir/$ofile") {
+    while (read($file, $data, 1024)) {
+	print LOG $data;
+    }
+    close(LOG);
+    if ($ofile eq "empty.txt") {
+	unlink $logdir . "/empty.txt";
+	success200();
+    }
+
+    chdir($dbdir);
+    unless (system("$patchann <$logdir/$ofile")) {
+	success200(); # successful exit
+    }
+}
+err404(); # quit if log or annotation file can't be written

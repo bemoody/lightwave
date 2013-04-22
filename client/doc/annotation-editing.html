@@ -9,16 +9,6 @@
 
 <h2>Editing annotations with LightWAVE</h2>
 
-<p style="background-color: red; border: 5px solid #800; padding: 2em">
-<b>This page describes features that are not yet implemented in LightWAVE!</b>
-Backup of your edits is not yet completely implemented.  Any edits you make are
-saved in your browser's local storage and will be available in future sessions
-unless you delete them.  Edits will be unavailable to other applications until
-a future revision of LightWAVE allows them to be backed up on the LightWAVE
-server.  Methods for saving edits on PhysioNet, on other servers, and on
-your own computer will appear in the next several versions of LightWAVE.
-</p>
-
 <p>
 LightWAVE allows you to create new sets of annotations, either from scratch or
 by copying and modifying an existing set of annotations.
@@ -55,7 +45,7 @@ custom LightWAVE clients for the use of project members.
 Alternatively, you can edit existing PhysioBank records anonymously by
 launching <a href="http://physionet.org/lightwave/">PhysioNet's public LightWAVE
 client</a>.  Using this service, you can save your edits temporarily on
-PhysioNet for up to a week, and download them to your computer for
+PhysioNet for up to 10 days, and download them to your computer for
 permanent storage at your convenience.
 
 <p>
@@ -71,19 +61,15 @@ To avoid unintended edits, annotation editing is disabled by default.  To enable
 editing:
 
 <ol>
+<li> From the <b>Choose input</b> tab, select a database and a record.
 <li> Open the <b>Settings</b> tab.
 <li> [Optional] If you wish to create a new set of annotations from scratch rather than
 editing an existing set, click <button>Set up new annotation set</button>.
 (This is unnecessary if the open record is unannotated.)
-<li> Choose <button>Edit using mouse</button> or <button>Edit using
-touch</button>. The <b>View/Edit</b> tab opens automatically.
+<li> Choose <button>Edit using mouse</button> if you use a mouse or trackball,
+or <button>Edit using touch</button> if you use a touch device (iPad or other
+tablet, or smart phone). The <b>View/Edit</b> tab opens automatically.
 </ol>
-
-<p>
-If you use a mouse or trackball, either choice is acceptable, but most users
-will prefer the mouse interface.  If you use a touch device (iPad or other
-tablet, or smart phone), choose the touch interface; the mouse interface is
-awkward to use with a touch device.
 
 <h3>Choosing a set of annotations to edit</h3>
 
@@ -97,13 +83,20 @@ next to its name at the left of the signal window, until it is highlighted.
 modes.)
 
 <p>
-If you reopen a set that you edited in a previous session using the same
-computer and browser, your previous edits will be loaded unless you confirm that
-you wish to discard them and start over.
+If you reopen a record that you edited in a previous session using the same
+computer and browser, your previous edits will be loaded.  The current version
+of LightWAVE does not include a method for disabling this feature.  You can view
+the original annotations (without your edits) by using a different browser.
+You can delete your edits by using your browser's controls for clearing local
+storage, but be certain that you wish to clear <b>all</b> local storage
+associated with the LightWAVE host before using such a feature.  Another way
+to do this is to use <button>Undo</button> (see below) to delete your changes
+one at a time.
 
 <p>
 During your editing session, you may switch between annotation sets as often as
-you wish.
+you wish.  Whenever you do so, the edits for the previously open annotation set
+are saved in the browser's local storage automatically.
 
 <h3>Editing controls</h3>
 
@@ -427,19 +420,30 @@ writes the results to a PhysioBank-compatible (binary) annotation file on the
 LightWAVE server's host file system.
 
 <p>
-Once your edits have been saved on the LightWAVE server, you may download the
-updated annotation file and save a copy of it on your computer.
+<em>If you have used PhysioNet's public LightWAVE client</em>, a status message
+appears within a few seconds below the <button>Save pending edits</button>, like
+this:
+
+<blockquote>
+Edits for record <b>ahadb/0201</b>, annotator <b>atr</b> backed up successfully.
+<br>
+<u style="color: blue">Download (opens in another browser tab or window)</u>
+</blockquote>
 
 <p>
-If you have used the standard LightWAVE client hosted on PhysioNetWorks, your
-saved annotations are written to your workspace, where they are accessible only
-to you.  For example, if your PhysioNetWorks user name is
+Once your edits have been saved on the LightWAVE server, you may download the
+updated annotation file and save a copy of it on your computer.  Click on the
+download link to access the edit logs and PhysioBank-compatible annotation files
+that you have backed up.  
+
+<p>
+<em>If you have used the PhysioNetWorks-hosted LightWAVE client</em>, your saved
+annotations are written to your workspace, where they are accessible only to
+you.  For example, if your PhysioNetWorks user name is
 <tt>harry@gryffindor.hogwarts.ac.uk</tt>, and you have saved an edited set
 of <tt>fqrs</tt> annotations for record <tt>challenge/2013/set-a/a03</tt>, they
 will be accessible to you (only) at
-<tt>https://physionet.org/users/harry@gryffindor.hogwarts.ac.uk/works/challenge/2013/set-a/a03.fqrs</tt>.
-
-<p>
+<tt>https://physionet.org/users/harry@gryffindor.hogwarts.ac.uk/works/database/challenge/2013/set-a/a03.fqrs</tt>.
 The LightWAVE scribe creates any missing directories as needed so that you will
 be able to access your uploaded annotations using LightWAVE for PhysioNetWorks,
 or using any other WFDB applications if you have authenticated yourself

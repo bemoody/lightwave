@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv='content-type' content='text/html; charset=utf-8'>
+<title>LightWAVE backup files</title>
+<style>
+<!--
+body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+       color: #444; font-size: 100%; background: #fff; margin: 0 10px; }
+-->
+</style>
+</head>
+<body>
+<h2>LightWAVE backup files</h2>
+
+<p>
+This page contains links to two <b>temporary</b> directories where files are
+kept for up to 10 days after you back them up from LightWAVE:
+
+<dl>
+<dt><a href="logs/">logs</a></dt>
+<dd> This directory contains edit logs that you have backed up within the past
+10 days.  Their names are formed from the names of the annotation files with
+which they are associated.  For example, if you edited the qrs annotation set
+for record <tt>slpdb/slp60</tt>, the associated edit log is
+<tt>logs/slpdb-slp60.qrs.log</tt>.  Note that any '/' (path separator)
+characters in the record name are replaced by '-' characters in the name of the
+edit log.  Edit logs are text files.  After the first two lines (a header and an
+empty line), each edit appears on a line of the log, in the same order in which
+you made the edits (oldest first).  This order is opposite to the order in which
+they can be displayed within LightWAVE (newest first).
+
+<dt><a href="database/">database</a></dt>
+<dd> This directory contains PhysioBank-compatible binary annotation
+files that include your edits.  The annotation files are stored within
+subdirectories that have the same structure as the PhysioBank data
+archive.  For example, if you created a new annotation file for record
+<tt>challenge/2013/set-b/b01</tt>, you will find it within
+<tt>database/challenge/2013/set-b/</tt>, and its name will be <tt>b01.new</tt>
+(or <tt>b01.new1</tt>, etc.).  If you edited an existing annotation file from
+PhysioBank, its name will have an appended underscore, to distinguish it from
+the original.  For example, if you edited <tt>mitdb/100.atr</tt>, your edited
+version will be stored in <tt>database/mitdb/</tt>, and its name will
+be <tt>100.atr_</tt>.
+</dl>
+
+<p>
+<b>To preserve these files it is essential to copy them to permanent
+storage!</b>
+Transfer them to another location within 10 days of backing them up here.
+After 10 days, they are automatically deleted and cannot be recovered.
+
+<p>
+Note, however, that LightWAVE preserves the edit logs in local storage (on your
+computer) indefinitely, and the annotation files can be recreated from the edit
+logs.  If your backup files are deleted from this server, you can simply back
+them up again if you have not deleted them from your browser's local storage.
+
+</body>
+</html>

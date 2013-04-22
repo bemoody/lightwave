@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  16 April 2013   version 0.58
+//			Last revised:	  21 April 2013   version 0.59
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -787,14 +787,14 @@ function test_sync() {
 	    }
 	    else {
 		$('#syncnote').html("Edit backup test failed.");
-		alert_editing();
+		alert_scribe_error();
 	    };
 	}});
 }
 
 // "Save pending edits" button handler
 function sync_edits() {
-    var body, boundary, etext = '', fname, i, timer;
+    var body, boundary, cookie, etext = '', fname, i, timer;
 
     if (changes.length - undo_count < 1) { alert("No pending edits!"); return; }
 
@@ -814,7 +814,8 @@ function sync_edits() {
     timer = setTimeout(alert_scribe_error, 2000);
     boundary = '-----------------------------' +
 	Math.floor(Math.random() * Math.pow(10, 8));
-    fname = "foo.txt";
+    fname = db.replace(/\//g, "+") + '+' + record.replace(/\//g, "+")
+	+ ann[i].name + '.log';
     body = '--' + boundary
         + '\r\nContent-Disposition: form-data; name="file";'
         + ' filename="' + fname + '"\r\nContent-type: text/plain\r\n\r\n'
@@ -826,7 +827,6 @@ function sync_edits() {
     scribe = $('[name=scribe]').val();
     $('#syncnote').html('<p>Waiting for edit backup (sending to ' + scribe
 			+ ') ...');
-
     $.ajax({
 	contentType: "multipart/form-data",
 	data: body,
@@ -835,9 +835,16 @@ function sync_edits() {
 	success:  function(data, result) {
 	    clearTimeout(timer);
 	    // remove_editlog(db, record, annselected);
-	    $('#syncnote').html('<p>Edits for record <b>' + sdb + '/' + record
+	    etext = '<p>Edits for record <b>' + sdb + '/' + record
 				+ '</b>, annotator <b>' + annselected
-				+ '</b> backed up successfully.');
+				+ '</b> backed up successfully.';
+	    cookie = $.cookie("LightWAVE-ID");
+	    if (cookie) {
+		etext += '<p><a href="/lw/' + cookie
+		    + '/" target="other">Download'
+		    + ' (opens in another browser tab or window)</a>';
+	    }
+	    $('#syncnote').html(etext);			
 	},
 	statusCode: {
 	    404: function() {
@@ -2395,24 +2402,10 @@ function alert_close_warning(){
 
 // Warn if LightWAVE scribe is unresponsive/not running/not reachable
 function alert_scribe_error() {
-    $('#syncnote').html("<b>Warning</b>: Pending edits cannot be backed up.");
     alert('The LightWAVE scribe at\n' + scribe
 	  + '\nis not responding properly.  Please check\n'
 	  + 'the network connection.  Select another scribe\n'
 	  + 'on the Settings tab if necessary.');
-}
-
-// Warn about (current) incomplete edit implementation
-function alert_editing() {
-    alert("WARNING: Backup of your edits is not yet completely implemented!\n\n"
-	  + "Any edits you make are saved in your browser's local storage"
-	  + " and will be available in future sessions unless you delete them."
-	  + "  Edits will be unavailable to other applications until a future"
-	  + " revision of LightWAVE allows them to be backed up on the"
-	  + " LightWAVE server.  See help topic 'Editing annotations with"
-	  + " LightWAVE for information about planned features, some of which"
-	  + " have been implemented in this version.  More of these "
-	  + "features will appear in the next few releases.");
 }
 
 //-----------------------------------------------------------------------------

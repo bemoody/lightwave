@@ -1,6 +1,6 @@
-LWVERSION = 0.58
+LWVERSION = 0.59
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	 16 April 2013 (version 0.58)
+#			Last revised:	 21 April 2013 (version 0.59)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -90,27 +90,29 @@ ScriptAlias1 = /cgi-bin/
 # ScriptAlias2 is the directory in which server scripts are to be installed.
 # It should match the second argument of the ScriptAlias directive in your
 # Apache configuration file.
-ScriptAlias2 = /home/physionet/cgi-bin/
+CGIDIR = /home/physionet/cgi-bin/
 
-# LWCLIENTDIR, LWSERVERDIR, and LWSCRIBEDIR are the directories for the
-# installed LightWAVE client, server, and scribe.
+# LWCLIENTDIR is the directory for the installed LightWAVE client.
 LWCLIENTDIR = $(DocumentRoot)/lightwave
-LWSERVERDIR = $(ScriptAlias2)
-LWSCRIBEDIR = $(ScriptAlias2)
 # The client should be installed in a subdirectory of DocumentRoot, and the
-# server should go into the directory named in the second argument of the
-# ScriptAlias directive in your Apache configuration file.  The scribe goes
-# into the same directory as the server, unless authentication is required
-# for annotation backup but not for viewing data.
+# server and scribe should go into CGIDIR.
 
 # LWCLIENTURL, LWSERVERURL, and LWSCRIBEURL are the URLs of the installed
 # LightWAVE client, server, and scribe.
 LWCLIENTURL = http://$(ServerName)/lightwave/
 LWSERVERURL = http://$(ServerName)$(ScriptAlias1)lightwave
 LWSCRIBEURL = http://$(ServerName)$(ScriptAlias1)lw-scribe
-# The LW*URLs should match up with the corresponding LW*DIRs above.
 
-# CC is the default C compiler
+# LWTMP is a temporary directory for server-side backup of edit logs uploaded
+# from LightWAVE clients to the scribe, and annotation files created from the
+# edit logs by patchann.
+LWTMP = /ptmp/lw
+
+# Directory for installation of the WFDB software package;  patchann is
+# installed there, where the scribe expects to find it.
+WFDBROOT = /usr/local
+
+# CC is the default C compiler.
 CC = gcc
 
 # CFLAGS is a set of options for the C compiler.
@@ -121,7 +123,7 @@ CFLAGS = -O -DLWDIR=\"$(LWCLIENTDIR)\" -DLWVER=\"$(LWVERSION)\" \
 LDFLAGS = -lcgi -lwfdb -lcurl
 
 # Install both the lightwave server and client on this machine.
-install:	server client
+install:	server scribe client
 	@echo
 	@echo "LightWAVE has been installed.  If an HTTP server is running on"
 	@echo "$(ServerName), run LightWAVE by pointing your web browser to"
@@ -129,7 +131,7 @@ install:	server client
 
 # Check that the server is working.
 test:
-	check/lw-test $(LWSERVERDIR)
+	check/lw-test $(CGIDIR)
 
 # Install the lightwave client.
 client:	  clean FORCE
@@ -145,18 +147,25 @@ client:	  clean FORCE
 
 # Install the lightwave server and scribe.
 server:	lightwave
-	mkdir -p $(LWSERVERDIR)
-	cp -p lightwave $(LWSERVERDIR)
-	mkdir -p $(LWSCRIBEDIR)
-	cp -p server/lw-scribe $(LWSCRIBEDIR)
+	mkdir -p $(CGIDIR)
+	cp -p lightwave $(CGIDIR)
+
+
+# Install the LightWAVE scribe.
+scribe:	  patchann
+	mkdir -p $(CGIDIR)
+	sed s+/usr/local+$(WFDBROOT)+ <server/lw-scribe | \
+	 sed s+/ptmp/lw+$(LWTMP)+ >$(CGIDIR)/lw-scribe
+	chmod 755 $(CGIDIR)/lw-scribe
+	sudo cp -p server/download.html $(LWTMP)
 
 # Compile the lightwave server.
 lightwave:	server/lightwave.c
 	$(CC) $(CFLAGS) server/lightwave.c -o lightwave $(LDFLAGS)
 
-# Compile patchann.
+# Compile and install patchann.
 patchann:	server/patchann.c
-	$(CC) $(CFLAGS) server/patchann.c -o patchann $(LDFLAGS)
+	$(CC) $(CFLAGS) server/patchann.c -o $(WFDBROOT)/bin/patchann $(LDFLAGS)
 
 # Make a tarball of sources.
 tarball: 	 clean

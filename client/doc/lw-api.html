@@ -18,13 +18,12 @@ used for communicating with <tt>lightwave</tt>.  It will be of interest to
 developers wishing to create custom clients and standalone applications that
 make use of <tt>lightwave</tt>.
 
-<p style="color: red">
-This note describes only the parts of the protocol that have been
-implemented to date.  At this time, LightWAVE's annotation editing capabilities
-have not yet been implemented, so this note does not describe any mechanism
-for a client to transmit annotations to the LightWAVE server;  extensions
-to support this function will be described in a future revision of this
-note.</p>
+<p>
+This note does not describe communications with the LightWAVE scribe
+(<tt>lw-scribe</tt>), an independent server-side component that receives edit
+logs uploaded by the LightWAVE client via standard HTTP file uploads.  These
+logs are described in a separate note, <a href="edit-log.html">LightWAVE edit
+logs</a>.
 
 <p>
 The LightWAVE server returns data
