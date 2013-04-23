@@ -1,6 +1,6 @@
-LWVERSION = 0.59
+LWVERSION = 0.60
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	 21 April 2013 (version 0.59)
+#			Last revised:	 23 April 2013 (version 0.60)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -39,8 +39,8 @@ LWVERSION = 0.59
 # Linux or MacOS X, /usr/lib is usually the best choice).
 #
 # If you are using Apache, make sure that the values of DocumentRoot,
-# ScriptAlias1, ScriptAlias2, and ServerName below match those given in your
-# Apache configuration file.
+# ScriptAlias1, ScriptAlias2, ServerName, and User below match those given in
+# your Apache configuration file.
 #
 # "server/lw-apache.conf" is provided to illustrate settings you might use if
 # you have not previously configured Apache; it is meant as a supplement to the
@@ -91,6 +91,10 @@ ScriptAlias1 = /cgi-bin/
 # It should match the second argument of the ScriptAlias directive in your
 # Apache configuration file.
 CGIDIR = /home/physionet/cgi-bin/
+
+# User is the user who "owns" processes started by the web server.
+# It should match the value of User in your Apache configuration file.
+User = apache
 
 # LWCLIENTDIR is the directory for the installed LightWAVE client.
 LWCLIENTDIR = $(DocumentRoot)/lightwave
@@ -152,12 +156,19 @@ server:	lightwave
 
 
 # Install the LightWAVE scribe.
-scribe:	  patchann
+scribe:	  patchann scribedir
 	mkdir -p $(CGIDIR)
 	sed s+/usr/local+$(WFDBROOT)+ <server/lw-scribe | \
 	 sed s+/ptmp/lw+$(LWTMP)+ >$(CGIDIR)/lw-scribe
 	chmod 755 $(CGIDIR)/lw-scribe
+
+# Set up a temporary directory on the server for backups of edit logs, and
+# make it writeable by the web server and the processes that it spawns.
+scribedir:
+	[ -d $(LWTMP) ] || sudo mkdir -p $(LWTMP)
+	sudo chmod 755 $(LWTMP)
 	sudo cp -p server/download.html $(LWTMP)
+	sudo chown $(User) $(LWTMP)
 
 # Compile the lightwave server.
 lightwave:	server/lightwave.c

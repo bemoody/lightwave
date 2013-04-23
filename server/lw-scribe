@@ -1,9 +1,10 @@
 #!/usr/bin/perl
 # file: lw-scribe		G. Moody	26 March 2013
-#				Last revised:   22 April 2013  version 0.59
+#				Last revised:   23 April 2013  version 0.60
 # Receive and save annotations uploaded from a LightWAVE client
 
 use CGI qw/:standard/;
+use CGI::Cookie;
 use File::Path qw/make_path/;
 use strict;
 use warnings;
@@ -12,15 +13,14 @@ use warnings;
 # Site-specific code:  customize as appropriate.
 
 # Create a working directory,  $wdir, for the output files.
-use CGI::Cookie;
 my %cookies = CGI::Cookie->fetch;
-my $id = 0;
-if ($cookies{'LightWAVE-ID'}) {
-    $id = $cookies{'LightWAVE-ID'}->value;
+my $lwurl = 0;
+if ($cookies{'LWURL'}) {
+    $lwurl = $cookies{'LWURL'}->value;
 }
-unless ($id) {
+unless ($lwurl) {
     # This block is based on sub unique_id (CGI Programming with Perl, ch. 11)
-    $id = $ENV{UNIQUE_ID};  # use Apache's mod_unique_id if available
+    my $id = $ENV{UNIQUE_ID};  # use Apache's mod_unique_id if available
     unless ($id) {
 	require Digest::MD5;
     
@@ -29,18 +29,22 @@ unless ($id) {
 	if (defined $ENV{REMOTE_ADDR} && defined $ENV{REMOTE_PORT}) {
 	    $remote = $ENV{REMOTE_ADDR} . $ENV{REMOTE_PORT};
 	}
-    	$id = $md5->md5_base64( time, $$, $remote );
+    	$id = $md5->md5_base64(time, $$, $remote);
 	$id =~ tr|+/=|-_.|;
     }
+    $lwurl = "/lw/$id";
 }
-my $lwc = CGI::Cookie->new(-name=>'LightWAVE-ID',-value=>$id,-expires=>'+10d');
-my $wdir = "/ptmp/lw/$id";
+my $lwc = CGI::Cookie->new(-name=>'LWURL', -value=>$lwurl, -expires=>'+10d');
+my $wdir = "/ptmp$lwurl";
 unless (-d $wdir) {
     make_path($wdir);
 }
 
 # Change the next line if patchann is not in the standard location.
 my $patchann = '/usr/local/bin/patchann';
+
+# It should not be necessary to modify anything below this line.
+# ------------------------------------------------------------------------------
 
 # success200 is executed if log and annotation files are created successfully
 sub success200() {
@@ -54,9 +58,6 @@ sub err404() {
     print header(-charset=>'utf-8', -cookie=>$lwc, -status => "404 Not Found");
     exit;
 }
-
-# It should not be necessary to modify anything below this line.
-# ------------------------------------------------------------------------------
 
 unless (-d $wdir) { err404(); } # nonexistent working directory, quit
 

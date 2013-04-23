@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  21 April 2013   version 0.59
+//			Last revised:	  23 April 2013   version 0.60
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -46,7 +46,7 @@
 // 'server' and 'scribe' are the URLs of the LightWAVE server and its edit
 // backup server.  Change them if you are not using the public server.
 var server = 'http://physionet.org/cgi-bin/lightwave',
-    scribe = 'https://physionet.org/cgi-bin/lw-scribe',
+    scribe = 'http://physionet.org/cgi-bin/lw-scribe',
 
     url,	// request sent to server (server + request-specific string)
     db = '',	// name of the selected database
@@ -815,7 +815,7 @@ function sync_edits() {
     boundary = '-----------------------------' +
 	Math.floor(Math.random() * Math.pow(10, 8));
     fname = db.replace(/\//g, "+") + '+' + record.replace(/\//g, "+")
-	+ ann[i].name + '.log';
+	+ '.' + ann[i].name + '.log';
     body = '--' + boundary
         + '\r\nContent-Disposition: form-data; name="file";'
         + ' filename="' + fname + '"\r\nContent-type: text/plain\r\n\r\n'
@@ -838,9 +838,9 @@ function sync_edits() {
 	    etext = '<p>Edits for record <b>' + sdb + '/' + record
 				+ '</b>, annotator <b>' + annselected
 				+ '</b> backed up successfully.';
-	    cookie = $.cookie("LightWAVE-ID");
+	    cookie = $.cookie("LWURL");
 	    if (cookie) {
-		etext += '<p><a href="/lw/' + cookie
+		etext += '<p><a href="' + cookie
 		    + '/" target="other">Download'
 		    + ' (opens in another browser tab or window)</a>';
 	    }

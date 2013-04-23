@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  27 April 2013   version 0.59
+			Last revised:	  23 April 2013   version 0.60
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -337,12 +337,12 @@ signal window if selected below">&#x21b4;</button>
 
  <table width="100%">
   <tr>
-    <td align="left" width="50%">Server:
+    <td align="left">Server:
       <span id="server"><input type="text" name="server" size="50"
 	title="URL of LightWAVE server (reload to restore default)"></span>
       <span id="sversion">&nbsp;</span>
     </td>
-    <td align="right" width="45%"><div class="recann"></div>
+    <td align="right"><div class="recann"></div>
     </td>
   </tr>
   <tr>
@@ -353,10 +353,13 @@ signal window if selected below">&#x21b4;</button>
       <span id="scribe"><input type="text" name="scribe" size="50"
       title="URL of LightWAVE's edit backup server (reload to restore default)">
       </span>
-  <tr><td>&nbsp;</td></tr>
-  <tr><td colspan=2><b>Editing</b></td></tr>
-  <tr>
-    <td colspan=2>
+    </td>
+  </tr>
+ </table>
+
+ <h3>Editing</h3>
+ <table>
+  <tr><td>
       <div id="edit_mode">
 	<input type="radio" id="no_edit" name="edit_mode" checked="checked">
 	  <label for="no_edit">View (no editing)</label>
@@ -365,11 +368,13 @@ signal window if selected below">&#x21b4;</button>
 	<input type="radio" id="touch_edit" name="edit_mode">
 	  <label for="touch_edit">Edit using touch</label>
       </div>
-    </td>
-  </tr>
-  <tr><td>&nbsp;</td></tr>
+  </td></tr>
+</table>
+
+<p>
+<table width="100%">
   <tr>
-    <td>
+    <td width="50%">
 	<button id="new_annset">Set up new annotation set</button>
 	<br>
 	<button title="Display the current edit log, most recent first"
@@ -377,7 +382,8 @@ signal window if selected below">&#x21b4;</button>
 	<br><br>
 	<button title="Back up the current edit log"
 		id="sync_edits">Save pending edits</button>
-    </td><td>
+    </td>
+    <td align="right" width="45%">
       <button title="Display counters of total and pending requests"
 	      id="show_status">Show status</button>
       <br>
