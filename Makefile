@@ -1,4 +1,4 @@
-LWVERSION = 0.60
+LWVERSION = 0.62
 # file: Makefile	G. Moody	18 November 2012
 #			Last revised:	 23 April 2013 (version 0.60)
 # 'make' description file for building and installing LightWAVE
@@ -144,12 +144,12 @@ client:	  clean FORCE
 	rm -f $(LWCLIENTDIR)/lightwave.html
 	sed s+http://physionet.org/cgi-bin/lightwave+$(LWSERVERURL)+ \
 	 <client/js/lightwave.js | \
-	sed s+https://physionet.org/cgi-bin/lw-scribe+$(LWSCRIBEURL)+ \
+	sed s+http://physionet.org/cgi-bin/lw-scribe+$(LWSCRIBEURL)+ \
 	  >$(LWCLIENTDIR)/js/lightwave.js
 	sed "s/\[local\]/$(LWVERSION)/" <client/lightwave.html \
 	  >$(LWCLIENTDIR)/index.html
 
-# Install the lightwave server and scribe.
+# Install the LightWAVE server.
 server:	lightwave
 	mkdir -p $(CGIDIR)
 	cp -p lightwave $(CGIDIR)

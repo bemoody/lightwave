@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	  24 March 2013  version 0.52
+			Last revised:	  13 May 2013  version 0.62
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -52,12 +52,23 @@ _______________________________________________________________________________
 #define BUFSIZE 1024	/* bytes read at a time */
 #endif
 
-#define NAMAX	16	/* maximum number of simultaneously open annotators */
+/* MFNLEN is the max length of a WFDB filename, defined in wfdb/lib/wfdbio.c. */
+#define MFNLEN	1024
 
-#define TOL	0.001	/* tolerance for error in approximate equality */
+/* NAMAX is the maximum number of annotators that fetchannotations() will
+attempt to read at one time.  The value is arbitrary and can be increased
+if necessary.  Ideally, if NAMAX annotators are displayed simultaneously
+in LightWAVE's signal window, the user should be able to read all of them. */
+#define NAMAX	16
+
+/* TOL is the tolerance for error in approx_LCM, which is used to find the
+(approximate) least common multiple of sampling frequencies that may not
+be integers.  The default value of 0.001 means that the maximum error is
+one part in a thousand (0.1%). */
+#define TOL	0.001
 
 static char *action, *annotator[NAMAX], buf[BUFSIZE], *db, *record, *recpath,
-    **sname;
+    **sname, wfdb_filename[MFNLEN];
 static int interactive, nann, nsig, nosig, *sigmap;
 WFDB_FILE *ifile;
 WFDB_Frequency ffreq, tfreq;
@@ -341,32 +352,46 @@ void jsonp_end(void)
 
 void dblist(void)
 {
-    if (ifile = wfdb_open("DBS", NULL, WFDB_READ)) {
-        int first = 1;
-        printf("{ \"database\": [\n");
-	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
-	    char *p, *name, *desc;
+    char *next, *wfdb = getwfdb();
+    int first = 1;
+   
+    while (*wfdb) {
+	/* Isolate the next component of the WFDB path. */
+	for (next = wfdb; *next && next - wfdb < MFNLEN - 6; next++)
+	    if (*next == ' ') { *next++ = '\0'; break; }
+	/* Look for a "DBS" file in the next possible location. */
+	sprintf(wfdb_filename, "%s/DBS", wfdb);
+	if ((ifile = wfdb_fopen(wfdb_filename, "rb")) != NULL) {
+	    if (first) printf("{ \"database\": [\n");
+	    while (wfdb_fgets(buf, sizeof(buf), ifile)) {
+		char *p, *name, *desc;
 
-	    for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
-		;
-	    if (*p != '\t') continue;
-	    *p++ = '\0';
-	    while (p < buf + sizeof(buf) - 1 && *p == '\t')
-		p++;
-	    p[strlen(p)-1] = '\0';
-	    if (!first) printf(",\n");
-	    else first = 0;
-	    name = strjson(buf);
-	    desc = strjson(p);
-	    printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
-		   name, desc);
-	    SFREE(desc);
-	    SFREE(name);
+		for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
+		    ;
+		if (*p != '\t') continue;
+		*p++ = '\0';
+		while (p < buf + sizeof(buf) - 1 && *p == '\t')
+		    p++;
+		p[strlen(p)-1] = '\0';
+		if (!first) printf(",\n");
+		else first = 0;
+		name = strjson(buf);
+		desc = strjson(p);
+		printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
+		       name, desc);
+		SFREE(desc);
+		SFREE(name);
+	    }
+	    wfdb_fclose(ifile);
+	    first = 0; /* ensure that the database array will be closed in the
+			  output even if the DBS file was empty */
 	}
+	wfdb = next;  /* prepare to search the next location in the WFDB path */
+    }
+    if (!first) {
 	printf("\n  ],\n");
 	printf("  \"version\": \"%s\",\n", LWVER);
         lwpass();
-	wfdb_fclose(ifile);
     }
     else {
 	lwfail("The list of databases could not be read");
@@ -398,32 +423,45 @@ void rlist(void)
 
 void alist(void)
 {
-    sprintf(buf, "%s/ANNOTATORS", db);
-    if (ifile = wfdb_open(buf, NULL, WFDB_READ)) {
-        int first = 1;
-        printf("{ \"annotator\": [\n");
-	while (wfdb_fgets(buf, sizeof(buf), ifile)) {
-	    char *p, *name, *desc;
+    char *next, *wfdb = getwfdb();
+    int first = 1, mfnlen = MFNLEN - strlen(db) - 12;
+   
+    while (*wfdb) {
+	/* Isolate the next component of the WFDB path. */
+	for (next = wfdb; *next && next - wfdb < mfnlen; next++)
+	    if (*next == ' ') { *next++ = '\0'; break; }
+	/* Look for an "ANNOTATORS" file in the next possible location. */
+	sprintf(wfdb_filename, "%s/%s/ANNOTATORS", wfdb, db);
+	if (ifile = wfdb_fopen(wfdb_filename, "rb")) {
+	    if (first) printf("{ \"annotator\": [\n");
+	    while (wfdb_fgets(buf, sizeof(buf), ifile)) {
+		char *p, *name, *desc;
 
-	    for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
-		;
-	    if (*p != '\t') continue;
-	    *p++ = '\0';
-	    while (p < buf + sizeof(buf) - 1 && *p == '\t')
-		p++;
-	    p[strlen(p)-1] = '\0';
-	    if (!first) printf(",\n");
-	    else first = 0;
-	    name = strjson(buf);
-	    desc = strjson(p);
-	    printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
-		   name, desc);
-	    SFREE(desc);
-	    SFREE(name);
+		for (p = buf; p < buf + sizeof(buf) && *p != '\t'; p++)
+		    ;
+		if (*p != '\t') continue;
+		*p++ = '\0';
+		while (p < buf + sizeof(buf) - 1 && *p == '\t')
+		    p++;
+		p[strlen(p)-1] = '\0';
+		if (!first) printf(",\n");
+		else first = 0;
+		name = strjson(buf);
+		desc = strjson(p);
+		printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
+		       name, desc);
+		SFREE(desc);
+		SFREE(name);
+	    }
+	    wfdb_fclose(ifile);
+	    first = 0; /* ensure that the annotator array will be closed in the
+			  output even if the ANNOTATORS file was empty */
 	}
+	wfdb = next;  /* prepare to search the next location in the WFDB path */
+    }
+    if (!first) {
 	printf("\n  ],\n");
 	lwpass();
-	wfdb_fclose(ifile);
     }
     else
 	lwfail("The list of annotators could not be read");

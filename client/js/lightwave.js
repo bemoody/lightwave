@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  23 April 2013   version 0.60
+//			Last revised:	  13 May 2013	   version 0.62
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -622,7 +622,7 @@ function dblist() {
 	    }
 	    dblist_text += '</select></td>\n';
 	    $('#dblist').html(dblist_text);
-	    $('#sversion').html("&nbsp;version " + data.version);
+	    $('#sversion').html("version " + data.version);
 	    $('#db').on("change", newdb); // invoke newdb when db changes
 	}
 	else { alert_server_error(); }
@@ -633,15 +633,14 @@ function dblist() {
 // Retrieve one or more complete annotation files for the selected record
 //  If pending edits exist in local storage, merge them
 function read_annotations(t0_string) {
-    var a, annreq = '', i, j, key, len, t, s, ss;
+    var annreq = '', i, j, key, len, t, s, ss;
 
     nann = 0;	// new record -- (re)fill the cache
     selann = -1;  // discard selection, if any
     svsa = '';
     if (ann_set.length) {
 	for (i = 0; i < ann_set.length; i++) {
-	    a = ann_set[i].name;
-	    annreq += '&annotator=' + encodeURIComponent(a);
+	    annreq += '&annotator=' + encodeURIComponent(ann_set[i].name);
 	}
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
 	    + '&dt=0&callback=?';
@@ -649,33 +648,40 @@ function read_annotations(t0_string) {
 	$.getJSON(url, function(data) {
 	    slist(t0_string);
 	    adt_ticks = 0;
-	    for (i = data.fetch.annotator.length - 1; i >= 0; i--, nann++) {
+	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
 		ann[i] = data.fetch.annotator[i];
-		selarr = a = ann[i].annotation;
 		ann[i].state = 1;
-		len = a.length;
-		if (len > 0) { t = a[len-1].t; }
+		len = ann[i].annotation.length;
+		if (len > 0) { t = ann[i].annotation[len-1].t; }
 		if (t > adt_ticks) { adt_ticks = t; }
 		for (j = 0; j < ann_set.length; j++) {
-		    if (ann[nann].name === ann_set[j].name) {
-			ann[nann].desc = ann_set[j].desc;
+		    if (ann[i].name === ann_set[j].name) {
+			ann[i].desc = ann_set[j].desc;
 		    }
 		}
 		// if an edit log exists for this annotator, load and reapply it
+		selarr = ann[i].annotation;
 		load_editlog(db, record, ann[i].name, true);
 		summarize(ann[i]);
 	    }
 	    if (nann > 0) {
 		ann[0].state = 2;
 		annselected = ann[0].name;
+		selarr = ann[0].annotation;
 		load_palette(ann[0].summary);
 	    }
 	    // also load any annotators created from scratch using LightWAVE
 	    if (edits_pending(db, record, "new")) {
-		new_annset();
+		for (i = 0; i < nann; i++) {
+		    if (ann[i].name === "new") { break; }
+		}
+		if (i >= nann) { new_annset(); }
 		for (i = 1; i <= 4; i++) {  // allow up to 5 new annotators
 		    if (edits_pending(db, record, "new" + i)) {
-			new_annset();
+			for (j = 0; j < nann; j++) {
+			    if (ann[j].name === "new" + i) { break; }
+			}
+			if (j >= nann) { new_annset(); }
 		    }
 		}
 	    }
@@ -2801,11 +2807,12 @@ function parse_url() {
     t = 0;
     t0_string = '0';
 
+    $('#client').html('&nbsp;' + s[0]);   // show the client URL
     if (n !== 2) {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
 	$('[name=server]').val(server);     // set default server URL
-	$('[name=scribe]').val(scribe);     // set default server URL
+	$('[name=scribe]').val(scribe);     // set default scribe URL
 	dblist();	// no query, get the list of databases
 	return;
     }

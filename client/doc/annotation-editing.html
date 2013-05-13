@@ -22,13 +22,40 @@ before posting them, with acknowledgement to their contributors.  Similarly,
 many owners of PhysioNetWorks projects encourage such contributions to their
 projects.
 
+<div style="background-color: #ffb; border: 1px dotted gray; padding: 5px;">
+<p align="center"><b>Cookies, local storage, and backups</b></p>
+<p>
+Unless you enable editing, LightWAVE does not save any information on your
+computer.
+
+<p>
+If you edit annotations, LightWAVE saves information on your computer in order
+to retain your annotation edits across sessions.  For each annotation file that
+you have edited, your edits are saved (until you delete them manually) in an
+HTML5 local storage string with a key of the form
+<b>LightWAVE-editlog|</b><em>record</em><b>|</b><em>annotator</em>.  HTML5
+local storage is not intended to be readable by any software other than the
+web browser that created it;  the difficulty of doing so depends on the
+browser's implementation of HTML5 local storage.
+
+<p>
+If you use the <button>Save pending edits</button> button, the LightWAVE scribe
+copies the edits for the currently open annotation file from local storage to
+the LightWAVE host, and it sets a cookie (<b>LWURL</b>) that specifies the URL
+on the LightWAVE host where your edits have been backed up.  If you use the
+public PhysioNet-hosted LightWAVE scribe, your edits are backed up to an
+unpublished private URL; although the URL is difficult to guess, this storage is
+not secure.  If you use the PhysioNetWorks-hosted LightWAVE scribe, your edits
+are backed up to your personal workspace on PhysioNetWorks.
+</div>
+
 <p>
 <b>Before starting to edit, launch LightWAVE from the server on which you will
 save your edits.</b>  
 
 <p>
-Edit annotations using
-the <a href="https://physionet.org/pnw/a/lightwave/">PhysioNetWorks-hosted
+Edit annotations using the
+<a href="https://physionet.org/users/shared/lightwave/">PhysioNetWorks-hosted
 LightWAVE client</a> if you wish to back up your edits securely in your
 PhysioNetWorks workspace (and share them if you wish).  Use this version of
 LightWAVE to edit your own previously uploaded PhysioBank-compatible records.

@@ -1,5 +1,5 @@
 /* file: patchann.c		G. Moody	27 March 2013
-				Last revised:	 5 April 2013
+				Last revised:	 13 May 2013
 Create or patch a PhysioBank-compatible annotation file from a LightWAVE editlog
 
 Copyright (C) 2012-2013 George B. Moody
@@ -36,9 +36,9 @@ An edit log deletion entry results in a deletion only if the array contains an
 exact match for the log entry. (If there is no match, this program issues a
 warning and continues to process the remaining log entries.)  When all edit log
 entries have been processed, the program writes the contents of the array to a
-new annotation file.  If a set of original annotations exists, a '_' is
-appended to the name of the new annotation file so that they can be
-distinguished from each other.
+new annotation file.  If the annotator name does not begin with 'new' or end
+with '_', a set of original annotations exists, a '_' is appended to the name of
+the new annotation file so that they can be distinguished from each other.
 
 LightWAVE edit log format spec:
     http://physionet.org/lightwave/doc/edit-log-format.html
@@ -94,8 +94,9 @@ WFDB_Annotation annot;	/* current annotation to be processed */
 int delete_ann(), insert_ann(), get_log_entry(), parse_log_header();
 
 int main(int argc, char **argv) {
-    char *oaname = NULL, *pname = argv[0];
-    int n;
+    char *abuf, buf[256], *fname, *oaname = NULL, *p, *pname = argv[0];
+    FILE *afile;
+    int match = 0, n;
     struct ax *ap, *apthis;
     WFDB_Anninfo ai;
 
@@ -110,7 +111,10 @@ int main(int argc, char **argv) {
     ai.name = annotator;
     ai.stat = WFDB_READ;
     SUALLOC(oaname, strlen(annotator) + 2, 1);
-    sprintf(oaname, "%s_", annotator);
+    if (strncmp(annotator, "new", 3) && annotator[strlen(annotator)-1] != '_')
+	sprintf(oaname, "%s_", annotator);
+    else
+	sprintf(oaname, "%s", annotator);
     if (annopen(record, &ai, 1) == 0){ /* input annotator opened successfully */
 	while (getann(0, &annot) == 0)  /* read the original annotations */
 	    (void)insert_ann();    /* copy them into the in-memory array */
@@ -154,6 +158,27 @@ int main(int argc, char **argv) {
 	SFREE(annot.aux);
     }
     SFREE(aptail);
+
+    /* Create or update ANNOTATORS. */
+    for (p = record + strlen(record) - 1; p > record && *p != '/'; p--)
+	;
+    *p = '\0';  /* what's left of record is the directory name */
+    SUALLOC(fname, strlen(record) + 12, 1);
+    sprintf(fname, "%s/ANNOTATORS", record);  /* pathname of ANNOTATORS */
+    SUALLOC(abuf, strlen(ai.name) + 30, 1);
+    sprintf(abuf, "%s\tcreated using LightWAVE\n", ai.name);
+    if (afile = fopen(fname, "r")) {
+	while (!match && fgets(buf, sizeof(buf), afile))
+	    if (strncmp(abuf, buf, strlen(ai.name) + 1) == 0) match = 1;
+	fclose(afile);
+    }
+    if (!match && (afile = fopen(fname, "a"))) {
+	fprintf(afile, "%s", abuf);
+	fclose(afile);
+    }
+    SFREE(abuf);
+    SFREE(fname);
+
     SFREE(oaname);
     SFREE(record);
     SFREE(annotator);

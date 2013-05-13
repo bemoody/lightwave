@@ -1,0 +1,16 @@
+On opening an annotation file with annotator name aname for editing:
+  if aname does not begin with 'new-' {
+    if new-{aname} does not exist {
+        annotations(new-{aname}) = annotations(aname)
+    }
+    aname = new-{aname}
+  }
+  if localeditlog(aname) exists {
+    sync localeditlog(aname), servereditlog(aname)
+  }
+
+On closing an annotation file with annotator name aname:
+  update localeditlog(aname)
+
+Periodically (or on exit):
+  sync all localeditlogs with server
