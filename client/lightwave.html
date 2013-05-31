@@ -14,7 +14,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  23 April 2013   version 0.60
+			Last revised:	  31 May 2013   version 0.63
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -59,9 +59,11 @@ provides some of the functions of LightWAVE without Javascript.
 
 <div id="choose">
  <table>
-  <tr id="dblist"><td colspan=2>Loading LightWAVE ...</td></tr>
+  <tr id="dblist"><td colspan=3>Loading LightWAVE ...</td></tr>
 
-  <tr id="rlist"><td colspan=2>&nbsp;</td></tr>
+  <tr><td id="rlname" align="right">&nbsp;</td>
+      <td><span id="rlist">&nbsp;</span><span id="rslist">&nbsp;</span></td>
+  </tr>
 
   <tr><td colspan=2 align="center" id="prompt">
      First visit? Click on the <b>Help</b> tab above.</td></tr>
@@ -275,7 +277,7 @@ button in this group for insert mode)">&#9003;</button>
       <div style="font-size: 10px;">
 	<label for="dtslider">Window duration:</label>
 	<input type="text" id="swidth" value="10"
-	       style="border: 0; width: 2em; font-weight: bold"/>seconds
+	       style="border: 0; width: 2em; font-weight: bold"/><span id="dtsliderunits">seconds</span>
       </div>
       <div id="dtslider"></div>
     </td>

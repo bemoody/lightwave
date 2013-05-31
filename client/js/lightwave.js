@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  13 May 2013	   version 0.62
+//			Last revised:	  31 May 2013	   version 0.63
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -72,7 +72,10 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     dt_ticks,   // window width in ticks
     t0_ticks = -1, // time of the first sample in the signal window, in ticks
     tf_ticks,	// time of the first sample after the signal window, in ticks
-    tickint,    // interval between timestamps on plot
+    tscl = 1000,// time scale, in SVG units per second
+    tickint,    // interval (in ticks) between timestamps on plot
+    griddt,	// interval (in ticks) between vertical grid-lines on plot
+    griddx,	// interval (in SVG x-units) between vertical grid-lines on plot
     tpool = [], // cache of 'trace' objects (10-second signal segments)
     tid = 0,	// next trace id (all traces have id < tid)
     target = '*',// search target, set in Find... dialog
@@ -126,6 +129,9 @@ var server = 'http://physionet.org/cgi-bin/lightwave',
     svgf,	// font-size for signal/annotation labels
     svgtf,	// small font-size for timestamps
     svgc,	// size for small elements (circles, etc.)
+    lwl,	// light stroke-width
+    lwn,	// normal stroke-width
+    lwb,	// emphasized stroke-width
     adx1,	// arrow half-width
     adx2,	// arrow width / edit marker half-width
     adx4,	// edit marker width
@@ -503,7 +509,7 @@ function svgxyt(x, y) {
 	else if (x_cursor > svgw) { x_cursor = svgw; }
 	y_cursor = ytemp;
     }
-    t_cursor = t0_ticks + x_cursor*tickfreq/1000;
+    t_cursor = t0_ticks + x_cursor*tickfreq/tscl;
 }
 
 // Functions for communicating with the LightWAVE server
@@ -528,7 +534,26 @@ function slist(t0_string) {
 	if (data.success) {
 	    recinfo = data.info;
 	    tickfreq = recinfo.tfreq;
+	    if (tickfreq > 5) {
+		$('#dtsliderunits').html('seconds');
+		tscl = 1000;
+		if (dt_sec > 60) { dt_sec = 10; }
+		$('#swidth').val(dt_sec);
+	    }
+	    else {
+		$('#dtsliderunits').html('minutes');
+		if (tickfreq > 0.1) {
+		    tscl = 100;
+		    if (dt_sec < 60) { dt_sec = 60; }
+		}
+		else {
+		    tscl = 10;
+		    if (dt_sec < 300) { dt_sec = 300; }
+		}
+		$('#swidth').val(dt_sec/60);
+	    }
 	    dt_ticks = dt_sec * tickfreq;
+	    set_sw_width(dt_sec);
 	    if (recinfo.signal) {
 		signals = recinfo.signal;
 		nsig = signals.length;
@@ -575,23 +600,50 @@ function alist() {
 function rlist() {
     var i, rlist_text = '';
     url = server + '?action=rlist&callback=?&db=' + db;
-    $('#rlist').html('<td colspan=2>Reading list of records in ' + sdb
-		     + '</td>');
+    $('#rlname').empty();
+    $('#rlist').html('Reading list of records in ' + sdb);
+    $('#rslist').empty();
     show_status(true);
     $.getJSON(url, function(data) {
 	if (data) {
-	    rlist_text += '<td align=right>Record:</td>'
-		+ '<td><select name=\"record\">\n'
+	    rlist_text = '<select name=\"record\">\n'
 		+ '<option value=\"\" selected>--Choose one--</option>\n';
 	    for (i = 0; i < data.record.length; i++) {
 	        rlist_text += '<option value=\"' + data.record[i]
 		    + '\">' + data.record[i] + '</option>\n';
 	    }
-	    rlist_text += '</select></td>\n';
+	    rlist_text += '</select>';
 	}
+	$('#rlname').html("Record:");
 	$('#rlist').html(rlist_text);
 	// fetch the list of signals when the user selects a record
 	$('[name=record]').on("change", newrec);
+	show_status(false);
+    });
+}
+
+// Load the list of subrecords for the selected record, and set up an event
+// handler for subrecord selection.
+function rslist() {
+    var i, rec, rslist_text = '';
+
+    rec = record.slice(0, -1); // drop trailing '/'
+    url = server + '?action=rlist&callback=?&db=' + db + '/' + rec;
+    $('#rslist').html('Reading list of subrecords for ' + sdb + '/' + record);
+    show_status(true);
+    $.getJSON(url, function(data) {
+	if (data) {
+	    rslist_text = '<select name=\"subrec\">\n'
+		+ '<option value=\"\" selected>--Choose one--</option>\n';
+	    for (i = 0; i < data.record.length; i++) {
+	        rslist_text += '<option value=\"' + data.record[i]
+		    + '\">' + data.record[i] + '</option>\n';
+	    }
+	    rslist_text += '</select>';
+	}
+	$('#rslist').html(rslist_text);
+	// fetch the list of signals when the user selects a subrecord
+	$('[name=subrec]').on("change", newsubrec);
 	show_status(false);
     });
 }
@@ -610,7 +662,7 @@ function dblist() {
 	clearTimeout(timer);
 	if (data && data.database && data.database.length > 0) {
 	    dblist_text = '<td align=right>Database:</td>' + 
-		'<td><select name=\"db\" id=\"db\">\n' +
+		'<td colspan=2><select name=\"db\" id=\"db\">\n' +
 		'<option value=\"\" selected>--Choose one--</option>\n';
 	    for (i = 0; i < data.database.length; i++) {
 		dbi = data.database[i].name;
@@ -874,6 +926,33 @@ function newrec() {
     }
     ann = [];
     record = $('[name=record]').val();
+    if (record.match("/$")) {
+	$('#rslist').html('<td align=right>Sub-record:</td>' +
+		  '<td id="rslist">Reading list of sub-records...</td>');
+	rslist();
+	return;
+    }
+    $('#findbox').dialog("close");
+    $('#add_typebox').dialog("close");
+    prompt = 'Reading annotations for ' + sdb + '/' + record;
+    $('#prompt').html(prompt);
+    read_annotations("0");
+    prompt = 'Click on the <b>View/edit</b> tab to view ' + sdb + '/' + record;
+    $('#prompt').html(prompt);
+    set_sw_width(dt_sec);    
+}
+
+// When a new subrecord is selected, reload data and show the first dt_sec
+// seconds.
+function newsubrec() {
+    var i, prompt;
+ 
+    // save any pending edits
+    for (i = 0; i < nann; i++) {
+	save_editlog(db, record, ann[i].name);
+    }
+    ann = [];
+    record = $('[name=record]').val() + $('[name=subrec]').val();
     $('#findbox').dialog("close");
     $('#add_typebox').dialog("close");
     prompt = 'Reading annotations for ' + sdb + '/' + record;
@@ -952,22 +1031,23 @@ function show_plot() {
     grd = '<g id="grid">\n'
 	+ '<circle cx="-' + svgf + '" cy="' + svgh
 	+ '" r="' + svgc +'" stroke="rgb(200,100,100)"'
-        + ' stroke-width="4" fill="red" fill-opacity="' + g_visible + '"/>';
+        + ' stroke-width="' + lwb + '" fill="red" fill-opacity="'
+	+ g_visible + '"/>';
     if (g_visible === 0) {
 	grd += '<title>(click to show grid)</title></g>';
     }
     else {
-	x0s = (1000-Math.floor((t0_ticks % tickfreq)*1000/tickfreq))%1000;
-	x0r = x0s%200;
-	x0q = Math.floor(x0s/200)*200;
+	x0s = (tscl-Math.floor((t0_ticks % tickfreq)*tscl/tickfreq))%tscl;
+	x0r = x0s%griddx;
+	x0q = Math.floor(x0s/griddx)*griddx;
 	grd += '<title>(click to hide grid)</title></g>'
-	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="4"'
-	    + ' d="M' + x0r + ',0 ';
+	    + '<path stroke="rgb(200,100,100)" fill="red" stroke-width="' + lwl
+	    + '" d="M' + x0r + ',0 ';
 	uparrow = ' l-' + adx1 + ',' + ady1 + 'l' + adx2 + ',0 l-' + adx1
-	    + ',-' + ady1 +  'm200,-';
-	for (x = 0; x + x0r <= svgw; x += 200) {
-	    if (x%1000 === x0q) { grd += 'l0,' + svgh + uparrow + svgh; }
-	    else { grd += 'l0,' + svgh + ' m200,-' + svgh; }
+	    + ',-' + ady1 +  'm' + griddx + ',-';
+	for (x = 0; x + x0r <= svgw; x += griddx) {
+	    if (x%tscl === x0q) { grd += 'l0,' + svgh + uparrow + svgh; }
+	    else { grd += 'l0,' + svgh + ' m' + griddx + ',-' + svgh; }
 	}
 	grd += 'M0,0 ';
 	for (y = 0; y <= svgh; y += 200) {
@@ -977,13 +1057,13 @@ function show_plot() {
     }
 
     // timestamps
-    svgts = svgh + 20*dt_sec;
+    svgts = svgh + 2*ady1;
     ttick = Math.floor(t0_ticks/tickint) * tickint;
     if (ttick < t0_ticks) { ttick += tickint; }
 
     tst = '<g id="times">\n';
     while (ttick <= tf_ticks) {
-	xtick = Math.round((ttick - t0_ticks)*1000/tickfreq);
+	xtick = Math.round((ttick - t0_ticks)*tscl/tickfreq);
 	tst += '<text x="' + xtick + '" y="' + svgts + '" font-size="' + svgtf
 	    + '" fill="red" style="text-anchor: middle;">'
 	    + timstr(ttick) + '</text>\n';
@@ -995,7 +1075,8 @@ function show_plot() {
     sva = '<g id="mrkr">\n'
 	+ '<circle cx="-' + svgf + '" cy="0" r="' + svgc
 	+ '" stroke="rgb(0,0,200)"'
-        + ' stroke-width="4" fill="blue" fill-opacity="' + m_visible + '"/>';
+        + ' stroke-width="' + lwb + '" fill="blue" fill-opacity="'
+	+ m_visible + '"/>';
     if (m_visible === 0) {
 	sva += '<title>(click to show marker bars)</title></g>';
     }
@@ -1033,7 +1114,7 @@ function show_plot() {
 	    a = ann[ia].annotation;
 	    for (i = ann_after(a, t0_ticks);
 		 0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
-		x = Math.round((a[i].t - t0_ticks)*1000/tickfreq);
+		x = Math.round((a[i].t - t0_ticks)*tscl/tickfreq);
 		if (a[i].x) {
 		    if (a[i].a === '+') { y = y0+svgf; }
 		    else {y = y0-svgf; }
@@ -1047,8 +1128,8 @@ function show_plot() {
 		}
 		if (m_visible) {
 		    y1 = y - 150;
-		    sva += '<path stroke="rgb(0,0,200)" stroke-width="6"'
-			+ ' fill="blue" + opacity="' + m_visible
+		    sva += '<path stroke="rgb(0,0,200)" stroke-width="' + lwl
+			+ '" fill="blue" + opacity="' + m_visible
 			+ '" d="M' + x + downarrow + y1
 			+ ' m0,210 V' + svgh + '" />\n';
 		}
@@ -1107,14 +1188,14 @@ function show_plot() {
 	    v = Math.round(g*s[imin] - z);
 	    // move to start of trace
 	    svs += '<path stroke="black" fill="none" stroke-width="';
-	    if (sname === sigselected) { svs += dt_sec; }
-	    else { svs += dt_sec/2; }
+	    if (sname === sigselected) { svs += lwb; }
+	    else { svs += lwn; }
 	    svs += '" d="';
 	    t = 0;
 	    tnext = t0_ticks;
 	    tf = Math.min(tf_ticks, rdt_ticks);
 	    x = 0;
-	    xstep = 1000/tickfreq;
+	    xstep = tscl/tickfreq;
 	    pv = false;
 	    while (tnext < tf) {
 		if (tnext > t0_ticks) {
@@ -1172,7 +1253,7 @@ function show_plot() {
     if (selann >= 0) {
 	tt = selarr[selann].t - t0_ticks;
 	if (0 <= tt && tt < dt_ticks) {
-	    x = Math.round(tt * m.a * 1000/tickfreq + m.e);
+	    x = Math.round(tt * m.a * tscl/tickfreq + m.e);
 	    highlight_selection();
 	    show_time(x, 0);
 	}
@@ -1383,7 +1464,7 @@ function show_time(x, y) {
 
     if (y != 0 && editing) {
 	xc = x_cursor - 2*adx4;
-	svc = '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
+	svc = '<path stroke="rgb(0,150,0)" stroke-width="' + lwn
 	    + '" fill="none" style="cursor:pointer" d="M' + x_cursor
 	    + ',0 l-' + adx2 + ',-' + ady1 + ' l' + adx4 + ',0 l-' + adx2
 	    + ',' + ady1 + ' V' + svgh
@@ -1394,12 +1475,12 @@ function show_time(x, y) {
 	boxy0 = asy0 - 2*svgf;
 	if (boxy0 < y_cursor && y_cursor < boxy0 + boxh) {
 	    label = insert_mode ? selkey : "&#9003;";
-	    svc += '<path stroke="rgb(0,150,0)" stroke-width="' + dt_sec
+	    svc += '<path stroke="rgb(0,150,0)" stroke-width="' + lwn
 		+ '" d="M' + x_cursor + ',0 V' + boxy0
 		+ ' m0,' + 3*svgf + ' V' + svgh + '" />'
 		+ '<rect x="' + Number(x_cursor - svgf) + '" y="' + boxy0
 		+ '" width="' + 2*svgf + '" height="' + boxh
-		+ '" stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+		+ '" stroke="rgb(0,0,0)" stroke-width="' + lwn
 		+ '" fill="#88f" fill-opacity="0.2" style="cursor:pointer" />'
 		+ '<text x="' + x_cursor + '" y="' + Number(y_cursor - svgf)
 		+ '" style="text-anchor: middle"'
@@ -1471,18 +1552,30 @@ function load_palette(summary) {
 // Calculate various dimensions related to the duration of the signal window
 function set_sw_width(seconds) {
     dt_sec = seconds;
-    svgw = 1000*dt_sec;
-    svgh = svgw/2;
-    svgl = svgw/8;
-    svgr = svgw/24;
-    svgtw = svgl + svgw + svgr;
-    svgf = 12*dt_sec;
-    svgtf = 10*dt_sec;
-    svgc = 8*dt_sec;
-    adx1 = 2*dt_sec;
-    adx2 = 4*dt_sec;
-    adx4 = 8*dt_sec;
-    ady1 = 10*dt_sec;
+    if (dt_sec < 10) { tickint = tickfreq; griddt = tickfreq / 5; }
+    else if (dt_sec < 21) { tickint = 5 * tickfreq; griddt = tickfreq / 5; }
+    else if (dt_sec < 35) { tickint = 5 * tickfreq; griddt = tickfreq; }
+    else if (dt_sec < 181) { tickint = 10 * tickfreq; griddt = 2 * tickfreq; }
+    else if (dt_sec < 601) { tickint = 60 * tickfreq; griddt = 10 * tickfreq; }
+    else if (dt_sec < 1801){ tickint = 300 * tickfreq; griddt = 60 * tickfreq; }
+    else { tickint = 600 * tickfreq; griddt = 300 * tickfreq; }
+    griddx = tscl * griddt / tickfreq;
+
+    svgw = tscl*dt_sec;
+    svgh = Math.round(svgw/2);
+    svgl = Math.round(svgw/8);
+    svgr = Math.round(svgw/24);
+    svgtw= svgl + svgw + svgr;
+    svgf = Math.round(svgw * 0.012);
+    svgtf= Math.round(svgw * 0.01);
+    svgc = Math.round(svgw * 0.008);
+    lwl = Math.ceil(svgw * 0.0005);
+    lwn = lwl * 2;
+    lwb = lwl * 3;
+    adx1 = Math.round(svgw * 0.002);
+    adx2 = adx1 * 2;
+    adx4 = adx1 * 4;
+    ady1 = adx1 * 5;
 }
 
 // Create a palette button label/summary row name from an annotation
@@ -1595,9 +1688,6 @@ function go_here(t_ticks) {
     $('.t0_str').val(t0_string);
     t0_ticks = t_ticks;
     tf_ticks = t_ticks + dt_ticks;
-    if (dt_sec < 10) { tickint = tickfreq; }
-    else if (dt_sec < 35) { tickint = 5 * tickfreq; }
-    else { tickint = 10 * tickfreq; }
 
     read_signals(t0_ticks, true); // read signals not previously cached, if any
 
@@ -1920,9 +2010,9 @@ function highlight_selection() {
     if (selann >= 0) {
 	dt = selarr[selann].t - t0_ticks;
 	if (0 <= dt && dt <= dt_ticks) {
-	    x0 = Math.floor(dt*1000/tickfreq) - svgf;
+	    x0 = Math.floor(dt*tscl/tickfreq) - svgf;
 	    y0 = asy0 - 2*svgf;
-	    svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+	    svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + lwn
 		+ '" fill="yellow" fill-opacity="0.2" d="M'
 		+ x0 + ',' + y0 + ' l' + 2*svgf + ',0 l0,' + 3*svgf
 		+ ' l-' + 2*svgf + ',0 l0,-' + 3*svgf + '" />';
@@ -1937,9 +2027,9 @@ function highlight_phantom(t) {
     svsa = '';
     dt = t - t0_ticks;
     if (0 <= dt && dt <= dt_ticks) {
-	x0 = Math.floor(dt*1000/tickfreq) - svgf;
+	x0 = Math.floor(dt*tscl/tickfreq) - svgf;
 	y0 = asy0 - 2*svgf;
-	svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + dt_sec
+	svsa = '<path stroke="rgb(0,0,0)" stroke-width="' + lwn
 	    + '" stroke-dasharray="2" fill="white" fill-opacity="0.2" d="M'
 	    + x0 + ',' + y0 + ' l' + 2*svgf + ',0 l0,' + 3*svgf
 	    + ' l-' + 2*svgf + ',0 l0,-' + 3*svgf + '" />';
@@ -2210,7 +2300,7 @@ function select_type(e) {
 function jump_left() {
     var i, rr, t, t0, x, y;
 
-    t = t0_ticks + x_cursor*tickfreq/1000;
+    t = t0_ticks + x_cursor*tickfreq/tscl;
     i = ann_before(selarr, t);
     if (i >= 0) {
 	t = selarr[i].t;
@@ -2246,7 +2336,7 @@ function jump_left() {
 	t = t0 - rr;
 	highlight_phantom(t);
     }
-    x = Math.floor((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+    x = Math.floor((t - t0_ticks)*tscl/tickfreq * m.a + m.e);
     y = Math.round(asy0 * m.d + m.f);
     c_velocity = 10;
     show_time(x, y);
@@ -2280,7 +2370,7 @@ function nudge_right() {
 function jump_right() {
     var i, rr, t, t0, x, y;
 
-    t = t0_ticks + x_cursor*tickfreq/1000;
+    t = t0_ticks + x_cursor*tickfreq/tscl;
     i = ann_after(selarr, t);
     if (0 <= i && i < selarr.length) {
 	t = (selarr.length > 0) ? selarr[i].t : dt_ticks/2;
@@ -2303,7 +2393,7 @@ function jump_right() {
 	if (t > tf_ticks) go_here(t - dt_ticks/2);
 	highlight_phantom(t);
     }
-    x = Math.ceil((t - t0_ticks)*1000/tickfreq * m.a + m.e);
+    x = Math.ceil((t - t0_ticks)*tscl/tickfreq * m.a + m.e);
     y = Math.round(asy0 * m.d + m.f);
     c_velocity = 10;
     show_time(x, y);
@@ -2751,10 +2841,8 @@ function set_handlers() {
 		if (ui.value < 5) { ui.value = 1; }
 		$('#swidth').val(ui.value);
 		dt_sec = ui.value;
+		if (tickfreq <= 5) { dt_sec *= 60; }
 		dt_ticks = dt_sec * tickfreq;
-		if (dt_sec < 10) { tickint = tickfreq; }
-		else if (dt_sec < 35) { tickint = 5 * tickfreq; }
-		else { tickint = 10 * tickfreq; }
 		m = document.getElementById("viewport").getScreenCTM();
 		set_sw_width(dt_sec);
 		go_here(t0_ticks);
@@ -2852,7 +2940,8 @@ function parse_url() {
 	    $('#server').html(server);
 	    $('#scribe').html(scribe);
 	    $('#dblist').html(dblist);
-	    rlist =  '<td align=right>Record:</td><td>' + record + '</td>';
+	    rlist =  '<td align=right>Record:</td><td>' + record +
+		'<div id="subrec"></div></td>';
 	    $('#rlist').html(rlist);
 	    url = server + '?action=alist&callback=?&db=' + db;
 	    show_status(true);
