@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  31 May 2013	   version 0.63
+//			Last revised:	  17 May 2016	   version 0.64
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -45,8 +45,8 @@
 
 // 'server' and 'scribe' are the URLs of the LightWAVE server and its edit
 // backup server.  Change them if you are not using the public server.
-var server = 'http://physionet.org/cgi-bin/lightwave',
-    scribe = 'http://physionet.org/cgi-bin/lw-scribe',
+var server,
+    scribe,
 
     url,	// request sent to server (server + request-specific string)
     db = '',	// name of the selected database
@@ -2888,7 +2888,14 @@ function set_handlers() {
 
 // Check for query string in URL, decode and run query or queries if present
 function parse_url() {
-    var dblist_text, dbparts, n, q, s, t, title, t0_string, v;
+    var host = '', dblist_text, dbparts, n, q, s, t, title, t0_string, v;
+
+    // Set default server and scribe URLs
+    if (window.location.protocol === 'file:') {
+        host = 'https://physionet.org';
+    }
+    server = (server || host + '/cgi-bin/lightwave');
+    scribe = (scribe || host + '/cgi-bin/lw-scribe');
 
     s = window.location.href.split("?");
     n = s.length;
@@ -2896,7 +2903,22 @@ function parse_url() {
     t0_string = '0';
 
     $('#client').html('&nbsp;' + s[0]);   // show the client URL
-    if (n !== 2) {
+    q = (n > 1 ? s[1] : '').split("&");
+    for (n = 0; n < q.length; n++) {
+	v = q[n].split("=");
+	if (v[0] === 'db') { db = v[1]; }
+	else if (v[0] === 'record') { record = v[1]; }
+	else if (v[0] === 't0') {  t0_string = v[1]; }
+	else if (v[0] === 'server') { server = decodeURIComponent(v[1]); }
+	else if (v[0] === 'scribe') { scribe = decodeURIComponent(v[1]); }
+    }
+
+    // Convert relative URLs to absolute
+    var a = document.createElement('a');
+    a.href = server; server = a.href;
+    a.href = scribe; scribe = a.href;
+
+    if (db === '') {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
 	$('[name=server]').val(server);     // set default server URL
@@ -2904,14 +2926,7 @@ function parse_url() {
 	dblist();	// no query, get the list of databases
 	return;
     }
-    q = s[1].split("&");
-    for (n = 0; n < q.length; n++) {
-	v = q[n].split("=");
-	if (v[0] === 'db') { db = v[1]; }
-	else if (v[0] === 'record') { record = v[1]; }
-	else if (v[0] === 't0') {  t0_string = v[1]; }
-    }
-    if (db !== '') {
+    else {
 	dbparts = db.split('/');
 	if (dbparts.length > 1) { sdb = '.../' + dbparts.pop(); }
 	else { sdb = db; }
