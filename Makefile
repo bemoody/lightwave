@@ -1,6 +1,6 @@
-LWVERSION = 0.63
+LWVERSION = 0.64
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	 23 April 2013 (version 0.60)
+#			Last revised:	  17 May 2016 (version 0.64)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -142,9 +142,13 @@ client:	  clean FORCE
 	mkdir -p $(LWCLIENTDIR)
 	cp -pr client/* $(LWCLIENTDIR)
 	rm -f $(LWCLIENTDIR)/lightwave.html
-	sed s+http://physionet.org/cgi-bin/lightwave+$(LWSERVERURL)+ \
+	baseurl=`echo "$(LWSERVERURL)" | cut -d/ -f1-3`; \
+	serverpath=`echo "$(LWSERVERURL)" | cut -d/ -f4-`; \
+	scribepath=`echo "$(LWSCRIBEURL)" | cut -d/ -f4-`; \
+	sed "s+'https://physionet.org'+'$$baseurl'+" \
 	 <client/js/lightwave.js | \
-	sed s+http://physionet.org/cgi-bin/lw-scribe+$(LWSCRIBEURL)+ \
+	sed "s+'/cgi-bin/lightwave'+'/$$serverpath'+" | \
+	sed "s+'/cgi-bin/lw-scribe'+'/$$scribepath'+" \
 	  >$(LWCLIENTDIR)/js/lightwave.js
 	sed "s/\[local\]/$(LWVERSION)/" <client/lightwave.html \
 	  >$(LWCLIENTDIR)/index.html
@@ -180,7 +184,7 @@ patchann:	server/patchann.c
 
 # Make a tarball of sources.
 tarball: 	 clean
-	cd ..; tar cfvz lightwave-$(LWVERSION).tar.gz lightwave
+	cd ..; tar cfvz lightwave-$(LWVERSION).tar.gz --exclude='.git*' lightwave
 
 # 'make clean': Remove unneeded files from package.
 clean:
