@@ -1,7 +1,9 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -T
 # file: lw-scribe		G. Moody	26 March 2013
-#				Last revised:   23 April 2013  version 0.60
+#				Last revised:  9 November 2015  version 0.64
 # Receive and save annotations uploaded from a LightWAVE client
+
+$ENV{PATH} = '/usr/local/bin:/usr/bin:/bin';
 
 use CGI qw/:standard/;
 use CGI::Cookie;
@@ -16,11 +18,13 @@ use warnings;
 my %cookies = CGI::Cookie->fetch;
 my $lwurl = 0;
 if ($cookies{'LWURL'}) {
-    $lwurl = $cookies{'LWURL'}->value;
+    ($lwurl) = ($cookies{'LWURL'}->value =~ m{^(/lw/[-_.\@A-Za-z0-9]{3,32})$});
 }
 unless ($lwurl) {
     # This block is based on sub unique_id (CGI Programming with Perl, ch. 11)
-    my $id = $ENV{UNIQUE_ID};  # use Apache's mod_unique_id if available
+
+    # use Apache's mod_unique_id if available
+    my ($id) = (($ENV{UNIQUE_ID} // '') =~ /^([-\@A-Za-z0-9]+)$/);
     unless ($id) {
 	require Digest::MD5;
     
@@ -33,6 +37,7 @@ unless ($lwurl) {
 	$id =~ tr|+/=|-_.|;
     }
     $lwurl = "/lw/$id";
+    ($lwurl) = ($lwurl =~ m{^(/lw/[-_.\@A-Za-z0-9]{3,32})$});
 }
 my $lwc = CGI::Cookie->new(-name=>'LWURL', -value=>$lwurl, -expires=>'+10d');
 my $wdir = "/ptmp$lwurl";
@@ -61,10 +66,9 @@ sub err404() {
 
 unless (-d $wdir) { err404(); } # nonexistent working directory, quit
 
-my $file = param("file");
-unless ($file) { err404(); } # no file upload, quit
-my $ofile = $file;
-$ofile =~ s/[^a-zA-Z0-9._+]/-/g;  # sanitize the file name
+my $fh = upload("file");
+my ($ofile) = (param("file") =~ /^([-a-zA-Z0-9._+]{1,128})$/);
+unless ($fh && defined $ofile) { err404(); } # no file upload, quit
 
 my $data;
 my $dbdir = "$wdir/database";
@@ -81,7 +85,7 @@ unless (-d $dbdir) {
 }
 
 if (open LOG, ">$logdir/$ofile") {
-    while (read($file, $data, 1024)) {
+    while (read($fh, $data, 1024)) {
 	print LOG $data;
     }
     close(LOG);
