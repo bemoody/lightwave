@@ -315,6 +315,16 @@ function html_escape(s) {
         .replace(/>/g, '&gt;');
 }
 
+// Request JSONP data (equivalent to '$.getJSON' minus the
+// anti-caching and anti-cross-domain options)
+function get_jsonp(url, callback) {
+    $.ajax({ dataType: "json",
+             url: url,
+             success: callback,
+             cache: true,
+             crossDomain: true });
+}
+
 // Update the summary on the Tables tab
 function show_summary() {
     var i, ia, ii, is, itext = '', rdurstr, s;
@@ -530,7 +540,7 @@ function slist(t0_string) {
     url = server + '?action=info&db=' + db + '&record=' + record
 	+ '&callback=?';
     show_status(true);
-    $.getJSON(url, function(data) {
+    get_jsonp(url, function(data) {
 	if (data.success) {
 	    recinfo = data.info;
 	    tickfreq = recinfo.tfreq;
@@ -588,7 +598,7 @@ function slist(t0_string) {
 function alist() {
     url = server + '?action=alist&callback=?&db=' + db;
     show_status(true);
-    $.getJSON(url, function(data) {
+    get_jsonp(url, function(data) {
 	if (data.success) { ann_set = data.annotator; }
 	else { ann_set = []; }
 	show_status(false);
@@ -604,7 +614,7 @@ function rlist() {
     $('#rlist').html('Reading list of records in ' + sdb);
     $('#rslist').empty();
     show_status(true);
-    $.getJSON(url, function(data) {
+    get_jsonp(url, function(data) {
 	if (data) {
 	    rlist_text = '<select name=\"record\">\n'
 		+ '<option value=\"\" selected>--Choose one--</option>\n';
@@ -631,7 +641,7 @@ function rslist() {
     url = server + '?action=rlist&callback=?&db=' + db + '/' + rec;
     $('#rslist').html('Reading list of subrecords for ' + sdb + '/' + record);
     show_status(true);
-    $.getJSON(url, function(data) {
+    get_jsonp(url, function(data) {
 	if (data) {
 	    rslist_text = '<select name=\"subrec\">\n'
 		+ '<option value=\"\" selected>--Choose one--</option>\n';
@@ -658,7 +668,7 @@ function dblist() {
     url = server + '?action=dblist&callback=?';
     timer = setTimeout(alert_server_error, 10000);
     show_status(true);
-    $.getJSON(url, function(data) {
+    get_jsonp(url, function(data) {
 	clearTimeout(timer);
 	if (data && data.database && data.database.length > 0) {
 	    dblist_text = '<td align=right>Database:</td>' + 
@@ -697,7 +707,7 @@ function read_annotations(t0_string) {
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
 	    + '&dt=0&callback=?';
 	show_status(true);
-	$.getJSON(url, function(data) {
+	get_jsonp(url, function(data) {
 	    slist(t0_string);
 	    adt_ticks = 0;
 	    for (i = 0; i < data.fetch.annotator.length; i++, nann++) {
@@ -782,7 +792,7 @@ function read_signals(t0, update) {
 	    + '&dt=' + dt_sec
 	    + '&callback=?';
 	show_status(true);
-	$.getJSON(url, function(data) {
+	get_jsonp(url, function(data) {
 	    fetch = data.fetch;
 	    if (fetch && fetch.hasOwnProperty('signal')) {
 		s = data.fetch.signal;
@@ -2960,7 +2970,7 @@ function parse_url() {
 	    $('#rlist').html(rlist);
 	    url = server + '?action=alist&callback=?&db=' + db;
 	    show_status(true);
-	    $.getJSON(url, function(data) {
+	    get_jsonp(url, function(data) {
 		if (data.success) { ann_set = data.annotator; }
 		else { ann_set = ''; }
 		read_annotations(t0_string);
