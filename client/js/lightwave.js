@@ -583,7 +583,7 @@ function slist(t0_string) {
 	}
 	$('#tabs').tabs("enable");
 	show_summary();
-	$('#tabs').tabs("select", "#view");
+	$('#tabs').tabs("option", "active", $('#view').index());
 	if (t0_string !== '') { t = strtim(t0_string); }
 	else { t = 0; }
 	t0_string = timstr(t);
@@ -2663,7 +2663,7 @@ function handle_editmode() {
     }
 
     if (db !== '' && record !== '') {  // return to View/edit tab if record open
-	$('#tabs').tabs("select", "#view");
+	$('#tabs').tabs("option", "active", $('#view').index());
 	show_plot();
     }
 }
@@ -2723,10 +2723,10 @@ function new_annset() {
     svsa = '';
     $('#syncnote').html("Annotation set <b>"
 			+ ann[0].name + "</b> has been initialized.");
-    $('#tabs').tabs("select", "#view");
+    $('#tabs').tabs("option", "active", $('#view').index());
     show_plot();
     if (emode === 1) {
-	$('#tabs').tabs("select", "#settings");
+	$('#tabs').tabs("option", "active", $('#settings').index());
     }
 }
 
@@ -2802,8 +2802,8 @@ function set_handlers() {
 	    if (ui.tab.data("loaded")) { event.preventDefault(); return; }
 	    ui.jqXHR.success(function() { ui.tab.data("loaded", true); });
 	},
-	select: function(event, ui) {
-	    current_tab = $(ui.tab).text();
+	activate: function(event, ui) {
+	    current_tab = $(ui.newTab).text();
 	}
     });
 
@@ -2954,7 +2954,11 @@ function parse_url() {
 	}
 	else {
 	    $('#tabs').tabs();
-	    $('#tabs').tabs("remove",0);
+	    // FIXME: when a record is selected via URL parameters,
+	    // the 'choose input' tab is not functional.  The old code
+	    // had "$('#tabs').tabs("remove",0);" here, which does not
+	    // work anymore.  There must be some way to remove or
+	    // disable the tab but I have no idea how.
 	    title = 'LW: ' + sdb + '/' + record;
 	    document.title = title;
 	    $('.t0_str').val(t0_string);
