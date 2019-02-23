@@ -42,6 +42,7 @@ _______________________________________________________________________________
 #include <stdlib.h>
 #include <wfdb/wfdblib.h>
 #include "cgi.h"
+#include "sandbox.h"
 #include "setrepos.c"
 
 #ifndef LWDIR
@@ -90,6 +91,8 @@ int main(int argc, char **argv)
     static char *callback = NULL, *user;
     int i;
     extern int headers_initialized;
+
+    lightwave_sandbox();
 
     if (argc < 2) {  /* normal operation as a CGI application */
 	cgi_init();
