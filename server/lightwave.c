@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	  13 May 2013  version 0.62
+			Last revised:	22 February 2019  version 0.66
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -40,8 +40,8 @@ _______________________________________________________________________________
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <libcgi/cgi.h>
 #include <wfdb/wfdblib.h>
+#include "cgi.h"
 #include "setrepos.c"
 
 #ifndef LWDIR

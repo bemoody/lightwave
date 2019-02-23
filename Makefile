@@ -21,7 +21,6 @@ LWVERSION = 0.65
 #
 # Prerequisites for building and using the LightWAVE server:
 #  httpd	 (a properly configured web server, such as Apache)
-#  libcgi	 (from http://libcgi.sourceforge.net/)
 #  libwfdb	 (from http://physionet.org/physiotools/wfdb.shtml)
 #  libcurl	 (from http://curl.haxx.se/libcurl/)
 #
@@ -124,7 +123,7 @@ CFLAGS = -O -DLWDIR=\"$(LWCLIENTDIR)\" -DLWVER=\"$(LWVERSION)\" \
         -DLW_WFDB=\"$(LW_WFDB)\"
 
 # LDFLAGS is a set of options for the linker.
-LDFLAGS = -lcgi -lwfdb -lcurl
+LDFLAGS = -lwfdb -lcurl
 
 # Install both the lightwave server and client on this machine.
 install:	server scribe client
@@ -175,8 +174,8 @@ scribedir:
 	sudo chown $(User) $(LWTMP)
 
 # Compile the lightwave server.
-lightwave:	server/lightwave.c
-	$(CC) $(CFLAGS) server/lightwave.c -o lightwave $(LDFLAGS)
+lightwave:	server/lightwave.c server/cgi.c server/*.h
+	$(CC) $(CFLAGS) server/lightwave.c server/cgi.c -o lightwave $(LDFLAGS)
 
 # Compile and install patchann.
 patchann:	server/patchann.c
