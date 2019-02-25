@@ -159,6 +159,7 @@ void lightwave_sandbox()
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(close), 0);
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(brk), 0);
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
+    seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getcwd), 0);
 
     /* permit open(..., O_RDONLY) */
     seccomp_rule_add_exact
