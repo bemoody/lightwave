@@ -1,4 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
+			Last revised:	25 February 2019
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -25,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/prctl.h>
 #include <signal.h>
 #include <seccomp.h>
 
@@ -129,6 +131,8 @@ void lightwave_sandbox()
         FAILERR("cannot chroot to $LIGHTWAVE_ROOT");
     if (setreuid(realuid, realuid) != 0)
         FAILERR("cannot set real/effective user ID");
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1UL, 0UL, 0UL, 0UL) != 0)
+        FAILERR("cannot set no-new-privs");
 
     /* resource limits */
     set_hard_rlimit(RLIMIT_CORE, 0);
