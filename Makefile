@@ -155,7 +155,7 @@ client:	  clean FORCE
 # Install the LightWAVE server.
 server:	lightwave
 	mkdir -p $(CGIDIR)
-	cp -p lightwave $(CGIDIR)
+	install -m 755 lightwave $(CGIDIR)
 
 
 # Install the LightWAVE scribe.
