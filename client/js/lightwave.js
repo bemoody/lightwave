@@ -2884,7 +2884,7 @@ function set_handlers() {
     $('#show_status').on("click", toggle_show_status);
     $('#show_requests').on("click", toggle_show_requests);
     $('#clear_requests').on("click", clear_requests);
-    $("#edit_mode").buttonset().on("change", handle_editmode);
+    $("#edit_mode").controlgroup().on("change", handle_editmode);
     $('#new_annset').on("click", new_annset);
     $('#show_edits').on("click", toggle_show_edits);
     $('#sync_edits').on("click", sync_edits);
