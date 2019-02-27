@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	22 November 2018   version 0.65
+//			Last revised:	27 February 2019   version 0.66
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -459,7 +459,7 @@ function show_tables() {
     }
     else { $('#anndata').empty(); }
 
-    if ($('#viewsig').attr('checked')) {
+    if ($('#viewsig').prop('checked')) {
 	if (signals) {
 	    sig = [];
 	    for (i = is = 0; i < signals.length; i++) {
@@ -2643,13 +2643,13 @@ function handle_editmode() {
     if (!editing) { test_sync(); }
 
     // set state based on edit_mode radio buttons
-    if ($('#no_edit').attr('checked')) {
+    if ($('#no_edit').prop('checked')) {
 	if (emode === 1) { return; } // do nothing if emode unchanged
 	emode = 1;  // view only, no editing
 	editing = mouse = false;
 	$('.editgroup').hide();
     }
-    else if ($('#mouse_edit').attr('checked')) {
+    else if ($('#mouse_edit').prop('checked')) {
 	if (emode === 2) { return; }
 	emode = 2;  // use mouse/trackball interface for editing
 	editing = mouse = true;
