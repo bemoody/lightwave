@@ -157,6 +157,10 @@ server:	lightwave
 	mkdir -p $(CGIDIR)
 	install -m 755 lightwave $(CGIDIR)
 
+# Install the sandboxed LightWAVE server.
+sandboxed-server:	sandboxed-lightwave
+	mkdir -p $(CGIDIR)
+	sudo install -m 4755 sandboxed-lightwave $(CGIDIR)
 
 # Install the LightWAVE scribe.
 scribe:	  patchann scribedir
@@ -176,6 +180,12 @@ scribedir:
 # Compile the lightwave server.
 lightwave:	server/lightwave.c server/cgi.c server/*.h
 	$(CC) $(CFLAGS) server/lightwave.c server/cgi.c -o lightwave $(LDFLAGS)
+
+# Compile the sandboxed lightwave server.
+sandboxed-lightwave:	server/lightwave.c server/cgi.c server/sandbox.c server/*.h
+	$(CC) $(CFLAGS) -DSANDBOX -DLW_ROOT=\"$(LW_ROOT)\" \
+	  server/lightwave.c server/cgi.c server/sandbox.c \
+	  -o sandboxed-lightwave $(LDFLAGS) -lseccomp
 
 # Compile and install patchann.
 patchann:	server/patchann.c
