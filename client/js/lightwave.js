@@ -1011,9 +1011,10 @@ function update_output() {
 
 // Refresh the signal window on the View/edit tab
 function show_plot() {
-    var a, downarrow, dy, g, grd, i, imin, imax, ia, is, j, pv, s, sname,
-      sva, svgts, svs, t, tf, tnext, tps, trace, tst, tt, ttick, txt, uparrow,
-      v, x, xstep, xtick, x0q, x0r, x0s, y, ytop, y0, y0s = [], y1, y0a = [], z;
+    var a, downarrow, desc, dy, g, grd, i, imin, imax, ia, is, j, pv, s, sname,
+      sva, svgts, svs, t, tf, title, tnext, tps, trace, tst, tt, ttick, txt,
+      uparrow, v, x, xstep, xtick, x0q, x0r, x0s, y, ytop, y0, y0s = [], y1,
+      y0a = [], z;
     
     width = $('#plotdata').width();  // total available width in View/edit panel
     swl = Math.round(width*svgl/svgtw);    // left column width
@@ -1122,6 +1123,7 @@ function show_plot() {
 	    if (ann[ia].state === 2) { sva += ' font-weight="bold"'; }
 	    sva += '>' + html_escape(ann[ia].name) + '</text></g>\n';
 	    a = ann[ia].annotation;
+	    desc = (ann[ia].description || {});
 	    for (i = ann_after(a, t0_ticks);
 		 0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
 		x = Math.round((a[i].t - t0_ticks)*tscl/tickfreq);
@@ -1157,11 +1159,16 @@ function show_plot() {
 			+ '" d="M' + x + downarrow + y1
 			+ ' m0,210 V' + svgh + '" />\n';
 		}
+		title = desc[a[i].a];
+		if (title) {
+		    sva += '<g><title>' + html_escape(title) + '</title>';
+		}
 		sva += '<text x="' + x + '" y="' + y
 		    + '" style="text-anchor: middle;"';
 		if (ann[ia].state === 2) { sva += ' font-weight="bold"'; }
 		sva += ' font-size="' + svgf + '" fill="rgb(0,0,200)">'
 		    + txt + '</text>\n'; 
+		if (title) { sva += '</g>'; }
 	    }
 	}
 	else {
