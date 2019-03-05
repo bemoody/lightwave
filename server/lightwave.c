@@ -41,6 +41,7 @@ _______________________________________________________________________________
 #include <stdio.h>
 #include <stdlib.h>
 #include <wfdb/wfdblib.h>
+#include <wfdb/ecgcodes.h>
 #include "cgi.h"
 #include "sandbox.h"
 #include "setrepos.c"
@@ -565,6 +566,8 @@ int fetchannotations(void)
 	    char *p;
 	    int first = 1;
 	    WFDB_Annotation annot;
+	    unsigned char used[ACMAX + 1] = { 0 };
+	    int j;
 
 	    if (ta0 > 0L) iannsettime(ta0);
 	    if (!afirst) printf(",");
@@ -575,6 +578,8 @@ int fetchannotations(void)
 	    while ((getann(0, &annot) == 0) && (taf <= 0 || annot.time < taf)) {
 		if (!first) printf(",");
 		else first = 0;
+		if (annot.anntyp > 0 && annot.anntyp <= ACMAX)
+		    used[annot.anntyp] = 1;
 		printf("\n          { \"t\": %ld,\n", (long)(annot.time));
 		printf("            \"a\": %s,\n",
 		       p = strjson(annstr(annot.anntyp)));
@@ -590,7 +595,19 @@ int fetchannotations(void)
 		    printf("            \"x\": null\n");
 		printf("          }");
 	    }
-	    printf("\n        ]\n      }");	    
+	    printf("\n        ],\n        \"description\":\n        {");
+	    first = 1;
+	    for (j = 1; j <= ACMAX; j++) {
+		if (used[j] && (p = anndesc(j)) && p[0]) {
+		    if (!first) printf(",");
+		    else first = 0;
+		    printf("\n          %s: ", p = strjson(annstr(j)));;
+		    SFREE(p);
+		    printf("%s", p = strjson(anndesc(j)));
+		    SFREE(p);
+		}
+	    }
+	    printf("\n        }\n      }");
 	}
     }
     printf("\n    ]\n  }\n");
