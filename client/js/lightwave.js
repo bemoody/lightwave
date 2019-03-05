@@ -1011,7 +1011,7 @@ function update_output() {
 
 // Refresh the signal window on the View/edit tab
 function show_plot() {
-    var a, downarrow, dy, g, grd, i, imin, imax, ia, is, pv, s, sname,
+    var a, downarrow, dy, g, grd, i, imin, imax, ia, is, j, pv, s, sname,
       sva, svgts, svs, t, tf, tnext, tps, trace, tst, tt, ttick, txt, uparrow,
       v, x, xstep, xtick, x0q, x0r, x0s, y, ytop, y0, y0s = [], y1, y0a = [], z;
     
@@ -1134,6 +1134,20 @@ function show_plot() {
 		    y = y0;
 		    // display N annotations as bullets
 		    if (a[i].a === 'N') { txt = '&bull;'; }
+		    else if (a[i].a === '~' && nsig > 0) {
+			y = y0-svgf;
+			if (a[i].s == -1) {
+			    txt = 'U';
+			}
+			else {
+			    txt = '';
+			    for (j = 0; j < 4 && j < nsig; j++) {
+				if (a[i].s & (16 << j)) { txt += 'u'; }
+				else if (a[i].s & (1 << j)) { txt += 'n'; }
+				else { txt += 'c'; }
+			    }
+			}
+		    }
 		    else { txt = a[i].a; }
 		}
 		if (m_visible) {
