@@ -1098,9 +1098,9 @@ function show_plot() {
     for (ia = 0; ia < nann; ia++) {
 	y0 = y0a[ia];
 	ytop = y0 - svgf;
-	sva += '<g id="ann;;' + ann[ia].name + '">\n';
+	sva += '<g id="ann;;' + html_escape(ann[ia].name) + '">\n';
 	if (ann[ia].state > 0) {
-	    sva += '<title>' + ann[ia].desc;
+	    sva += '<title>' + html_escape(ann[ia].desc);
 	    if (ann[ia].state === 2) {
 		asy0 = y0;
 		sva += ' (click for normal view)</title>';
@@ -1120,7 +1120,7 @@ function show_plot() {
 		+ '" font-size="' + svgf + '" fill="blue" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
 	    if (ann[ia].state === 2) { sva += ' font-weight="bold"'; }
-	    sva += '>' + ann[ia].name + '</text></g>\n';
+	    sva += '>' + html_escape(ann[ia].name) + '</text></g>\n';
 	    a = ann[ia].annotation;
 	    for (i = ann_after(a, t0_ticks);
 		 0 <= i && i < a.length && a[i].t <= tf_ticks; i++) {
@@ -1165,7 +1165,7 @@ function show_plot() {
 	    }
 	}
 	else {
-	    sva += '<title>' + ann[ia].desc
+	    sva += '<title>' + html_escape(ann[ia].desc)
 	    	+ ' (click for highlighted view)</title>'
 		+ '<rect x="-' + svgl + '" y="' + ytop
 		+ '" width="' + svgl + '" height="' + 2*svgf
@@ -1173,7 +1173,7 @@ function show_plot() {
 		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
 		+ '" fill="rgb(150,150,200)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ ann[ia].name + '</text></g>\n';
+		+ html_escape(ann[ia].name) + '</text></g>\n';
 	}
     }
 
