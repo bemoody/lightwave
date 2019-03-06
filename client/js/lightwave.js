@@ -1128,7 +1128,7 @@ function show_plot() {
 		if (a[i].x) {
 		    if (a[i].a === '+') { y = y0+svgf; }
 		    else {y = y0-svgf; }
-		    txt = String(a[i].x);
+		    txt = html_escape(String(a[i].x));
 		}
 		else {
 		    y = y0;
@@ -1148,7 +1148,7 @@ function show_plot() {
 			    }
 			}
 		    }
-		    else { txt = a[i].a; }
+		    else { txt = html_escape(a[i].a); }
 		}
 		if (m_visible) {
 		    y1 = y - 150;
