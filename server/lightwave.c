@@ -567,7 +567,7 @@ int fetchannotations(void)
 	    int first = 1;
 	    WFDB_Annotation annot;
 	    unsigned char used[ACMAX + 1] = { 0 };
-	    int j;
+	    int j, k;
 
 	    if (ta0 > 0L) iannsettime(ta0);
 	    if (!afirst) printf(",");
@@ -596,6 +596,13 @@ int fetchannotations(void)
 		printf("          }");
 	    }
 	    printf("\n        ],\n        \"description\":\n        {");
+
+	    /* Do not show descriptions for ambiguous mnemonics. */
+	    for (j = 1; j < ACMAX; j++) {
+		k = strann(annstr(j));
+		if (j != k && k > 0 && k < ACMAX)
+		    used[j] = used[k] = 0;
+	    }
 	    first = 1;
 	    for (j = 1; j <= ACMAX; j++) {
 		if (used[j] && (p = anndesc(j)) && p[0]) {
