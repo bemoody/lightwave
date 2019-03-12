@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	22 February 2019  version 0.66
+			Last revised:	  12 March 2019   version 0.67
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -303,10 +303,36 @@ char *get_param_multiple(char *name)
     else return cgi_param_multiple(name);
 }
 
+/* Return the length of a UTF-8 character in bytes, or 0 if the input
+   is not valid UTF-8. */
+static int utf8_char_len(const char *s)
+{
+    unsigned int c = (unsigned char) s[0], n = 0, i;
+    static const unsigned int min[] = { 0x80, 0x800, 0x10000 };
+
+    if (c < 0x80)
+	return 1;
+    while (c & (0x80 >> n))
+	n++;
+    if (n < 2 || n > 4)
+	return 0;
+    c &= (0x7f >> n);
+    for (i = 1; i < n; i++) {
+	if (((unsigned char) s[i] & 0xc0) != 0x80)
+	    return 0;
+	c = (c << 6) | ((unsigned char) s[i] & 0x3f);
+    }
+    if (c < min[n - 2] || c > 0x10ffff || (c & ~0x7ff) == 0xd800)
+	return 0;
+    return n;
+}
+
 /* Convert a string to a JSON quoted string.  Note that newlines and other
 control characters that cannot appear in JSON strings are converted to
-spaces.  IMPORTANT:  the caller must free the string after use to avoid
-memory leaks! */
+spaces.  Non-UTF-8 characters are converted to question marks.
+
+IMPORTANT: the caller must free the string after use to avoid memory
+leaks! */
 char *strjson(char *s)
 {
     char *js;
@@ -316,7 +342,14 @@ char *strjson(char *s)
        be escaped in it. */
     for (i = q = 0; s[i]; i++) {
 	if (s[i] == '"' || s[i] == '\\') q++;
-	else if (s[i] < ' ') s[i] = ' ';
+	else if ((unsigned char) s[i] < 0x20) s[i] = ' ';
+	else if ((unsigned char) s[i] >= 0x80) {
+	    j = utf8_char_len(&s[i]);
+	    if (j == 0)
+		s[i] = '?';
+	    else
+		i += j - 1;
+	}
     }    
     imax = i;
 
