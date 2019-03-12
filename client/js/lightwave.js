@@ -2544,7 +2544,8 @@ function edits_pending(db, record, annotator) {
     var key, s;
 
     key = 'LightWAVE-editlog|' + db + '|' + record + '|' + annotator;
-    s = localStorage.getItem(key);
+    try { s = localStorage.getItem(key); }
+    catch (e) { }
     if (s) { return true; }
     return false;
 }
@@ -2555,12 +2556,17 @@ function edits_pending(db, record, annotator) {
 function show_localstorage() {
     var etext = '', i, key;
 
-    for (i = 0; i < localStorage.length; i++) {
-	key = localStorage.key(i);
-	if (key.match(/^LightWAVE/)) {
-	    etext += '<p><b>' + key + '</b>: <pre>'
-		+ localStorage.getItem(key) + '</pre><br><hr>';
+    try {
+	for (i = 0; i < localStorage.length; i++) {
+	    key = localStorage.key(i);
+	    if (key.match(/^LightWAVE/)) {
+		etext += '<p><b>' + key + '</b>: <pre>'
+		    + localStorage.getItem(key) + '</pre><br><hr>';
+	    }
 	}
+    }
+    catch (e) {
+	etext += '<i>(cannot access local storage)</i>';
     }
     $('#editlog').html(etext);
     etext = '';
@@ -2572,7 +2578,8 @@ function load_editlog(db, record, annotator, redo) {
     var i, key, n, s;
 
     key = 'LightWAVE-editlog|' + db + '|' + record + '|' + annotator;
-    s = localStorage.getItem(key);
+    try { s = localStorage.getItem(key); }
+    catch (e) { }
     if (s) {
 	changes = s.split("\n");
 	changes.pop();  // discard empty element after last '\n' in s
