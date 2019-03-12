@@ -1185,9 +1185,9 @@ function show_plot() {
 	sname = signals[is].name;
 	trace = find_trace(db, record, sname, t0_ticks);
 	
-	svs += '<g id="sig;;' + sname + '">\n';
+	svs += '<g id="sig;;' + html_escape(sname) + '">\n';
 	if (trace && s_visible[sname] === 1) {
-	    svs += '<title>' + sname;
+	    svs += '<title>' + html_escape(sname);
 	    if (sname === sigselected) {
 		svs += ' (click for normal view)</title>';
 	    }
@@ -1201,7 +1201,7 @@ function show_plot() {
 		+ '" font-size="' + svgf + '" fill="black" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle"';
 	    if (sname === sigselected) { svs += ' font-weight="bold"'; }
-	    svs += '>' + sname + '</text></g>\n';
+	    svs += '>' + html_escape(sname) + '</text></g>\n';
 
 	    s = trace.samp;
 	    tps = trace.tps;
@@ -1259,14 +1259,15 @@ function show_plot() {
 	    svs += '" />\n';
 	}
 	else {	// signal is hidden, show label only
-	    svs += '<title>' + sname + ' (click for highlighted view)</title>'
+	    svs += '<title>' + html_escape(sname)
+		+ ' (click for highlighted view)</title>'
 		+ '<rect x="-' + svgl + '" y="' + ytop
 		+ '" width="' + svgl + '" height="' + 2*svgf
 		+ '" fill="white" />'
 		+ '<text x="-50" y="' + y0 + '"' + ' font-size="' + svgf
 		+ '" fill="rgb(128,128,128)" font-style="italic"'
 		+ ' style="text-anchor: end; dominant-baseline: middle">'
-		+ sname + '</text></g>\n';
+		+ html_escape(sname) + '</text></g>\n';
 	}
     }
 
