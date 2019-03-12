@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	27 February 2019   version 0.66
+//			Last revised:	  12 March 2019    version 0.67
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -2917,6 +2917,10 @@ function set_handlers() {
     $('#new_annset').on("click", new_annset);
     $('#show_edits').on("click", toggle_show_edits);
     $('#sync_edits').on("click", sync_edits);
+
+    // disable editing if localStorage is unavailable
+    try { var x = localStorage.length; }
+    catch (e) { $('#edit_mode').controlgroup('disable'); }
 
     // on Help tab:
     $('#helpframe').attr('height', $(window).height() - 180 + 'px');
