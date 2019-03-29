@@ -1,5 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
-			Last revised:	25 February 2019
+			Last revised:	  23 April 2019    version 0.68
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -104,7 +104,7 @@ void lightwave_sandbox()
 {
     uid_t realuid = getuid();
     gid_t realgid = getgid();
-    char *rootdir;
+    char *rootdir, *dbcalfile;
     struct sigaction sa;
     scmp_filter_ctx ctx;
 
@@ -123,6 +123,16 @@ void lightwave_sandbox()
         FAILERR("cannot set effective user ID");
     if (setregid(realgid, realgid) != 0)
         FAILERR("cannot set real/effective group ID");
+
+    /* If $LIGHTWAVE_WFDBCAL is set, use it as the path to a
+       calibration file stored outside the root directory. */
+    dbcalfile = getenv("LIGHTWAVE_WFDBCAL");
+    if (dbcalfile) {
+        if (!freopen(dbcalfile, "r", stdin))
+            FAILERR("cannot read $LIGHTWAVE_WFDBCAL");
+        setenv("WFDBCAL", "-", 1);
+    }
+
     if (chdir(rootdir) != 0)
         FAILERR("cannot chdir to $LIGHTWAVE_ROOT");
     if (seteuid(0) != 0)
