@@ -665,7 +665,7 @@ int fetchsignals(void)
     if (nosig < 1 || t0 >= tf) return (0);
 
     /* Open the signal calibration database. */
-    (void)calopen("wfdbcal");
+    (void)calopen(NULL);
 
     if (tfreq != ffreq) {
 	ts0 = (WFDB_Time)(t0*tfreq/ffreq + 0.5);
