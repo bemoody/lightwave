@@ -48,6 +48,7 @@
 var server,
     scribe,
 
+    server_flags, // extra query parameters sent to server
     url,	// request sent to server (server + request-specific string)
     db = '',	// name of the selected database
     sdb = '',	// shortened name of the selected database
@@ -538,7 +539,7 @@ function slist(t0_string) {
     m = null;
     nsig = 0;
     url = server + '?action=info&db=' + db + '&record=' + record
-	+ '&callback=?';
+	+ server_flags;
     show_status(true);
     get_jsonp(url, function(data) {
 	if (data.success) {
@@ -596,7 +597,7 @@ function slist(t0_string) {
 
 // Load the list of annotators in the selected database.
 function alist() {
-    url = server + '?action=alist&callback=?&db=' + db;
+    url = server + '?action=alist&db=' + db + server_flags;
     show_status(true);
     get_jsonp(url, function(data) {
 	if (data.success) { ann_set = data.annotator; }
@@ -609,7 +610,7 @@ function alist() {
 // handler for record selection.
 function rlist() {
     var i, rlist_text = '';
-    url = server + '?action=rlist&callback=?&db=' + db;
+    url = server + '?action=rlist&db=' + db + server_flags;
     $('#rlname').empty();
     $('#rlist').html('Reading list of records in ' + sdb);
     $('#rslist').empty();
@@ -638,7 +639,7 @@ function rslist() {
     var i, rec, rslist_text = '';
 
     rec = record.slice(0, -1); // drop trailing '/'
-    url = server + '?action=rlist&callback=?&db=' + db + '/' + rec;
+    url = server + '?action=rlist&db=' + db + '/' + rec + server_flags;
     $('#rslist').html('Reading list of subrecords for ' + sdb + '/' + record);
     show_status(true);
     get_jsonp(url, function(data) {
@@ -663,9 +664,18 @@ function dblist() {
     var dbi, dblist_text = '', dbparts, i, sdbi, timer;
 
     server = $('[name=server]').val();
+    i = server.indexOf('?');
+    if (i > 0) {
+	server_flags = '&' + server.substring(i + 1);
+	server = server.substring(0, i);
+    }
+    else {
+	server_flags = '';
+    }
+
     scribe = $('[name=scribe]').val();
     $('#dblist').html('<td colspan=2>Loading list of databases ...</td>');
-    url = server + '?action=dblist&callback=?';
+    url = server + '?action=dblist' + server_flags;
     timer = setTimeout(alert_server_error, 10000);
     show_status(true);
     get_jsonp(url, function(data) {
@@ -705,7 +715,7 @@ function read_annotations(t0_string) {
 	    annreq += '&annotator=' + encodeURIComponent(ann_set[i].name);
 	}
 	url = server + '?action=fetch&db=' + db + '&record=' + record + annreq
-	    + '&dt=0&callback=?';
+	    + '&dt=0' + server_flags;
 	show_status(true);
 	get_jsonp(url, function(data) {
 	    slist(t0_string);
@@ -790,7 +800,7 @@ function read_signals(t0, update) {
 	    + sigreq
 	    + '&t0=' + tr/tickfreq
 	    + '&dt=' + dt_sec
-	    + '&callback=?';
+	    + server_flags;
 	show_status(true);
 	get_jsonp(url, function(data) {
 	    fetch = data.fetch;
@@ -2961,11 +2971,20 @@ function parse_url() {
     a.href = server; server = a.href;
     a.href = scribe; scribe = a.href;
 
+    $('[name=server]').val(server);     // set default server URL
+    $('[name=scribe]').val(scribe);     // set default scribe URL
+    var i = server.indexOf('?');
+    if (i > 0) {
+	server_flags = '&' + server.substring(i + 1);
+	server = server.substring(0, i);
+    }
+    else {
+	server_flags = '';
+    }
+
     if (db === '') {
 	$('#tabs').tabs({disabled:[1,2]});  // disable the View and Tables tabs
 	$('#top').show();
-	$('[name=server]').val(server);     // set default server URL
-	$('[name=scribe]').val(scribe);     // set default scribe URL
 	dblist();	// no query, get the list of databases
 	return;
     }
@@ -2978,8 +2997,6 @@ function parse_url() {
 	    document.title = title;
 	    $('#tabs').tabs({disabled:[1,2]});  // disable View and Tables tabs
 	    $('#top').show();
-	    $('[name=server]').val(server);     // set default server URL
-	    $('[name=scribe]').val(scribe);     // set default server URL
 	    dblist_text = '<td align=right>Database:</td><td>' + db + '</td>';
 	    $('#dblist').html(dblist_text);
 	    alist();
@@ -3005,7 +3022,7 @@ function parse_url() {
 	    rlist =  '<td align=right>Record:</td><td>' + record +
 		'<div id="subrec"></div></td>';
 	    $('#rlist').html(rlist);
-	    url = server + '?action=alist&callback=?&db=' + db;
+	    url = server + '?action=alist&db=' + db + server_flags;
 	    show_status(true);
 	    get_jsonp(url, function(data) {
 		if (data.success) { ann_set = data.annotator; }
