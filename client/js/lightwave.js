@@ -742,6 +742,9 @@ function read_annotations(t0_string) {
 		selarr = ann[0].annotation;
 		load_palette(ann[0].summary);
 	    }
+	    else {
+		load_palette([]);
+	    }
 	    // also load any annotators created from scratch using LightWAVE
 	    if (edits_pending(db, record, "new")) {
 		for (i = 0; i < nann; i++) {
@@ -761,6 +764,7 @@ function read_annotations(t0_string) {
 	});
     }
     else {
+	load_palette([]);
 	annselected = null;
 	selarr = null;
 	slist(t0_string);
@@ -1556,6 +1560,10 @@ function track_pointer(e) {
 // Initialize the palette with the most common annotation types in summary
 function load_palette(summary) {
     var annot, f, i, imax, ptext = '';
+
+    if (summary.length == 0) {
+	summary = [[ 'N', -1 ]];
+    }
 
     annot = { "t": null, "a": null, "c": null,
 	      "n": null, "s": null, "x": null };
@@ -2756,7 +2764,9 @@ function new_annset() {
     annselected = ann[0].name;
     selarr = ann[0].annotation;
     load_editlog(db, record, annselected, true);
-    summarize(ann[i]);
+    if (i < nann) {
+        summarize(ann[i]);
+    }
     load_palette(ann[0].summary);
     ilast = selann = -1;
     svsa = '';
