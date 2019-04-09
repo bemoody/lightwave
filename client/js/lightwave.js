@@ -2965,8 +2965,6 @@ function parse_url() {
 	if (v[0] === 'db') { db = v[1]; }
 	else if (v[0] === 'record') { record = v[1]; }
 	else if (v[0] === 't0') {  t0_string = v[1]; }
-	else if (v[0] === 'server') { server = decodeURIComponent(v[1]); }
-	else if (v[0] === 'scribe') { scribe = decodeURIComponent(v[1]); }
     }
 
     // Convert relative URLs to absolute
