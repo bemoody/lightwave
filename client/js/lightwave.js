@@ -1531,7 +1531,7 @@ function track_touch(e) {
     var ts;
 
     c_velocity = 10;
-    svgxyt(e.pageX, e.pageY);
+    svgxyt(e.clientX, e.clientY);
     ts = mstimstr(t_cursor);
     $('.pointer').html(ts);
 }
@@ -1539,7 +1539,7 @@ function track_touch(e) {
 // Track mouse move ("drag") events (with edit marker bar)
 function track_pointer(e) {
     c_velocity = 10;
-    show_time(e.pageX, e.pageY);
+    show_time(e.clientX, e.clientY);
 }
 
 
@@ -2073,7 +2073,7 @@ function select_ann(e) {
     var dtr, dtf, dt_tol, i;
 
     selann = -1;
-    svgxyt(e.pageX, e.pageY);
+    svgxyt(e.clientX, e.clientY);
     if (editing && selarr && xx_cursor >= -svgf && x_cursor < svgw &&
 	asy0 - 2*svgf < y_cursor && y_cursor < asy0 + svgf) {
 	dt_tol = Math.round(dt_ticks * 0.012);
@@ -2448,7 +2448,7 @@ function undo() {
 function mark(e) {
     var anew, asel = null, dt_tol, in_box = false;
 
-    svgxyt(e.pageX, e.pageY);
+    svgxyt(e.clientX, e.clientY);
     if (!editing || !selarr || xx_cursor < -svgf || x_cursor > svgw) {
 	return;
     }
