@@ -2943,6 +2943,9 @@ function set_handlers() {
 function parse_url() {
     var host = '', dblist_text, dbparts, n, q, s, t, title, t0_string, v;
 
+    server = (server || $('[name=default_server]').val());
+    scribe = (scribe || $('[name=default_scribe]').val());
+
     // Set default server and scribe URLs
     if (window.location.protocol === 'file:') {
         host = 'https://physionet.org';
