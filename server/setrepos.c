@@ -1,4 +1,5 @@
 /* file: setrepos.c		G. Moody		17 February 2013
+                                Last revised:             23 April 2019
 
 This file defines the LightWAVE server's setrepos() macro, which is used to
 define the set of data repositories accessible via the server.  LW_WFDB can be
@@ -19,7 +20,10 @@ compiled).
 */
 
 #ifdef LW_WFDB
-#define setrepos() setwfdb(LW_WFDB)
+#define setrepos() do {		\
+	if (!getenv("WFDB"))	\
+	    setwfdb(LW_WFDB);	\
+    } while (0)
 #else
 #define setrepos()
 #endif
