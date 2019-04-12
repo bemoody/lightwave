@@ -117,6 +117,10 @@ int main(int argc, char **argv)
     if (!interactive && (callback = get_param("callback"))) {
 	printf("%s(", callback);	/* JSONP:  "wrap" output in callback */
 	atexit(jsonp_end);	/* close the output with ")" before exiting */
+	if (getenv("LIGHTWAVE_DISABLE_JSONP")) {
+	    lwfail("This server does not allow JSONP requests");
+	    exit(0);
+	}
     }
 
     if (strcmp(action, "dblist") == 0)
