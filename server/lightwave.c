@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	  12 March 2019   version 0.67
+			Last revised:	  23 April 2019   version 0.68
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -393,9 +393,36 @@ void jsonp_end(void)
 
 void dblist(void)
 {
-    char *next, *wfdb = getwfdb();
+    char *next, *wfdb = getwfdb(), *list;
     int first = 1;
-   
+
+    /* If $LIGHTWAVE_DBLIST is set, the value of this variable
+       contains the list of available databases. */
+    if ((list = getenv("LIGHTWAVE_DBLIST"))) {
+	while (list) {
+	    char *p, *name, *desc;
+	    next = strchr(list, '\n');
+	    if (next)
+		*next++ = 0;
+	    if ((p = strchr(list, '\t'))) {
+		*p++ = 0;
+		while (*p == '\t')
+		    p++;
+		if (first) printf("{ \"database\": [\n");
+		else printf(",\n");
+		first = 0;
+		name = strjson(list);
+		desc = strjson(p);
+		printf("    { \"name\": %s,\n      \"desc\": %s\n    }",
+		       name, desc);
+		SFREE(desc);
+		SFREE(name);
+	    }
+	    list = next;
+	}
+	wfdb = "";
+    }
+    /* Otherwise, read the list of databases from the DBS file(s). */
     while (*wfdb) {
 	/* Isolate the next component of the WFDB path. */
 	for (next = wfdb; *next && next - wfdb < MFNLEN - 6; next++)
