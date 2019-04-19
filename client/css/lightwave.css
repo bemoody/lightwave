@@ -1,9 +1,17 @@
 /* file: lightwave.css	G. Moody	18 November 2012
-			Last revised:	  1 April 2013  version 0.54
+			Last revised:	  23 April 2019    version 0.68
 */
 
-body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+#top { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
        color: #444; font-size: 100%; background: #fff; margin: 0 10px; }
+table, tbody, thead, tfoot {
+	border: none;
+	padding: 0px;
+	margin: 0px;
+}
+th, td {
+	padding: 0.25em;
+}
 .container { border:2px solid #ccc; width:90%; height: 100px;
              overflow-y: scroll; }
 .dtable { table-layout: fixed; }
