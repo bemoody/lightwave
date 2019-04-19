@@ -4,6 +4,7 @@
 <meta http-equiv='content-type' content='text/html; charset=utf-8'>
 <meta http-equiv="X-UA-Compatible" content="chrome=1">
 <title>LightWAVE [local]</title>
+<!-- -{##}->{% include "lightwave/lw-head.html" %}<!-{##}- -->
 <link rel="stylesheet" href="css/jquery-ui.min.css">
 <link rel="stylesheet" href="css/lightwave.css">
 <script src="js/jquery.min.js"></script>
@@ -14,7 +15,7 @@
 </head>
 <!--
 LightWAVE main page	G. Moody	18 November 2012
-			Last revised:	  31 May 2013   version 0.63
+			Last revised:	  23 April 2019    version 0.68
 
 LightWAVE is a lightweight waveform and annotation viewer and editor.  Use it
 to view any of the recordings of physiologic signals and time series in
@@ -32,11 +33,9 @@ code, which runs within the browser to provide low-latency interaction with the
 user).  The other .css and .js files are recent unmodified versions of standard
 jQuery and jQuery UI components.
 -->
-<body style='background-color:#fff'>
-
+<body>
+<!-- -{##}->{% include "lightwave/lw-top.html" %}<!-{##}- -->
 <noscript>
-</body>
-<body style='display: block'>
 <p>LightWAVE requires a Javascript-enabled browser.
 The <a href="http://physionet.org/cgi-bin/ATM">PhysioBank ATM</a>
 provides some of the functions of LightWAVE without Javascript.
@@ -428,5 +427,6 @@ and links to more information">Main help</button>
 </td></tr></table>
 </div>  <!-- end of "js" div -->
 </div>  <!-- end of "top" div -->
+<!-- -{##}->{% include "lightwave/lw-bottom.html" %}<!-{##}- -->
 </body>
 </html>
