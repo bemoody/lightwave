@@ -1,5 +1,5 @@
 // file: lightwave.js	G. Moody	18 November 2012
-//			Last revised:	  12 March 2019    version 0.67
+//			Last revised:	  23 April 2019    version 0.68
 // LightWAVE Javascript code
 //
 // Copyright (C) 2012-2013 George B. Moody
@@ -920,8 +920,9 @@ function sync_edits() {
 	    etext = '<p>Edits for record <b>' + sdb + '/' + record
 				+ '</b>, annotator <b>' + annselected
 				+ '</b> backed up successfully.';
-	    cookie = $.cookie("LWURL");
+	    cookie = ((data && data.url) || $.cookie("LWURL"));
 	    if (cookie) {
+		cookie = new URL(cookie, scribe);
 		etext += '<p><a href="' + cookie
 		    + '/" target="other">Download'
 		    + ' (opens in another browser tab or window)</a>';
