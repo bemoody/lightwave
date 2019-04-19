@@ -1,6 +1,6 @@
 #!/usr/bin/perl -T
 # file: lw-scribe		G. Moody	26 March 2013
-#				Last revised:  9 November 2015  version 0.64
+#				Last revised:   23 April 2019   version 0.68
 # Receive and save annotations uploaded from a LightWAVE client
 
 $ENV{PATH} = '/usr/local/bin:/usr/bin:/bin';
@@ -54,7 +54,9 @@ my $patchann = '/usr/local/bin/patchann';
 # success200 is executed if log and annotation files are created successfully
 sub success200() {
     system("ln -sf /ptmp/lw/download.html $wdir/index.html");
-    print header(-charset=>'utf-8', -cookie=>$lwc, -status => "200 OK");
+    print header(-type=>'application/json', -charset=>'utf-8',
+		 -cookie=>$lwc, -status => "200 OK");
+    print "{\"url\": \"$lwurl\"}\n";
     exit;
 }
 
