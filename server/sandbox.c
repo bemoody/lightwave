@@ -175,10 +175,13 @@ void lightwave_sandbox()
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getcwd), 0);
 
-    /* permit open(..., O_RDONLY) */
+    /* permit open(..., O_RDONLY) and openat(..., ..., O_RDONLY*/
     seccomp_rule_add_exact
         (ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
          SCMP_A1(SCMP_CMP_EQ, O_RDONLY));
+    seccomp_rule_add_exact
+        (ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
+         SCMP_A2(SCMP_CMP_EQ, O_RDONLY));
 
     /* permit mmap(..., PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, ...)
        (typically lightwave doesn't allocate any huge blocks of memory
