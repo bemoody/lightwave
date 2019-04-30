@@ -123,7 +123,7 @@ CFLAGS = -O -DLWDIR=\"$(LWCLIENTDIR)\" -DLWVER=\"$(LWVERSION)\" \
         -DLW_WFDB=\"$(LW_WFDB)\"
 
 # LDFLAGS is a set of options for the linker.
-LDFLAGS = -lwfdb -lcurl
+LDFLAGS = -lwfdb
 
 # Install both the lightwave server and client on this machine.
 install:	server scribe client
