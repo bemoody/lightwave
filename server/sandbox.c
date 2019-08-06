@@ -1,5 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
-			Last revised:	  23 April 2019    version 0.68
+			Last revised:	  6 August 2019    version 0.69
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -174,6 +174,7 @@ void lightwave_sandbox()
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(brk), 0);
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getcwd), 0);
+    seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(munmap), 0);
 
     /* permit open(..., O_RDONLY) and openat(..., ..., O_RDONLY) */
     seccomp_rule_add_exact
