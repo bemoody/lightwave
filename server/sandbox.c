@@ -1,5 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
-			Last revised:	  6 August 2019    version 0.69
+			Last revised:	  18 March 2021    version 0.70
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -176,12 +176,16 @@ void lightwave_sandbox()
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getcwd), 0);
     seccomp_rule_add_exact(ctx, SCMP_ACT_ALLOW, SCMP_SYS(munmap), 0);
 
-    /* permit open(..., O_RDONLY) and openat(..., ..., O_RDONLY) */
+    /* permit open(..., O_RDONLY) and openat(AT_FDCWD, ..., O_RDONLY)
+       (openat without AT_FDCWD would allow a local attacker to escape
+       from an outer chroot environment; the same goes for fchdir or
+       any of the other *at() functions.) */
     seccomp_rule_add_exact
         (ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 1,
          SCMP_A1(SCMP_CMP_EQ, O_RDONLY));
     seccomp_rule_add_exact
-        (ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 1,
+        (ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 2,
+         SCMP_A0(SCMP_CMP_EQ, (uint32_t) AT_FDCWD),
          SCMP_A2(SCMP_CMP_EQ, O_RDONLY));
 
     /* permit mmap(..., PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, ...)
