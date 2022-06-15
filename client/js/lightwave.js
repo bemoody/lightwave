@@ -1092,7 +1092,7 @@ function show_plot() {
 	    + '" d="M' + x0r + ',0 ';
 	uparrow = ' l-' + adx1 + ',' + ady1 + 'l' + adx2 + ',0 l-' + adx1
 	    + ',-' + ady1 +  'm' + griddx + ',-';
-	for (x = 0; x + x0r <= svgw; x += griddx) {
+	for (x = 0; x + x0r <= svgw + 0.01 * griddx; x += griddx) {
 	    if (x%tscl === x0q) { grd += 'l0,' + svgh + uparrow + svgh; }
 	    else { grd += 'l0,' + svgh + ' m' + griddx + ',-' + svgh; }
 	}
@@ -1109,7 +1109,7 @@ function show_plot() {
     if (ttick < t0_ticks) { ttick += tickint; }
 
     tst = '<g id="times">\n';
-    while (ttick <= tf_ticks) {
+    while (ttick <= tf_ticks + 0.1) {
 	xtick = Math.round((ttick - t0_ticks)*tscl/tickfreq);
 	tst += '<text x="' + xtick + '" y="' + svgts + '" font-size="' + svgtf
 	    + '" fill="red" style="text-anchor: middle;">'
