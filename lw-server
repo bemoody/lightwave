@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+# file: lw-server	B. Moody	14 June 2022
+#
+# HTTP server for viewing local files using LightWAVE
+
+import argparse
+import http.server
+import os
+import shutil
+import sys
+import tempfile
+
+
+def script_dir():
+    return os.path.dirname(os.path.realpath(__file__))
+
+
+def lightwave_server(db_paths, server_path, client_path, port):
+    if not db_paths:
+        db_paths = ['.']
+    for path in db_paths:
+        records_path = os.path.join(path, 'RECORDS')
+        if not os.path.isfile(records_path):
+            sys.exit('{} not found'.format(records_path))
+
+    if server_path:
+        server_path = shutil.which(server_path)
+    else:
+        server_path = os.path.join(script_dir(), 'lightwave')
+    server_path = os.path.realpath(server_path)
+    if not os.access(server_path, os.X_OK):
+        sys.exit('{} not found or not executable'.format(server_path))
+
+    if not client_path:
+        client_path = os.path.join(script_dir(), 'client')
+    client_path = os.path.realpath(client_path)
+    if not os.path.isdir(client_path):
+        sys.exit('{} not found'.format(client_path))
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        cgi_dir = 'cgi-bin'
+        client_dir = 'lightwave'
+        home_page = 'lightwave.html'
+        dbroot_dir = 'data'
+
+        os.mkdir(os.path.join(tmp_dir, cgi_dir))
+        os.symlink(server_path, os.path.join(tmp_dir, cgi_dir, 'lightwave'))
+        os.symlink(client_path, os.path.join(tmp_dir, client_dir))
+
+        db_list = ''
+        os.mkdir(os.path.join(tmp_dir, dbroot_dir))
+        for path in db_paths:
+            name = os.path.basename(os.path.abspath(path))
+            path = os.path.realpath(path)
+            os.symlink(path, os.path.join(tmp_dir, dbroot_dir, name))
+            db_list += '{}\t{}\n'.format(name, path)
+
+        os.environ['WFDB'] = os.path.join(tmp_dir, dbroot_dir)
+        os.environ['LIGHTWAVE_DBLIST'] = db_list
+        os.environ['QUERY_STRING'] = ''
+
+        address = ('127.0.0.1', port)
+        handler = http.server.CGIHTTPRequestHandler
+        try:
+            cls = http.server.ThreadingHTTPServer
+        except AttributeError:
+            cls = http.server.HTTPServer
+        server = cls(address, handler)
+        port = server.server_address[1]
+
+        url = 'http://localhost:{}/{}/{}'.format(port, client_dir, home_page)
+        print('LightWAVE server running at:\n  {}'.format(url))
+
+        os.chdir(tmp_dir)
+        server.serve_forever()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('dbpath', metavar='DIRECTORY', nargs='*',
+                    help='source database (default: current directory)')
+    ap.add_argument('-P', '--port', type=int, default=0, metavar='PORT',
+                    help='local port number for HTTP server')
+    ap.add_argument('--server', metavar='PROGRAM',
+                    help='path to lightwave executable')
+    ap.add_argument('--client', metavar='DIRECTORY',
+                    help='path to lightwave client files')
+    opts = ap.parse_args()
+    try:
+        lightwave_server(opts.dbpath, opts.server, opts.client, opts.port)
+    except KeyboardInterrupt:
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
