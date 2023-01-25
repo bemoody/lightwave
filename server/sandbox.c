@@ -1,5 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
-			Last revised:	  18 March 2021    version 0.70
+			Last revised:	 25 January 2023   version 0.72
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -24,9 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/capability.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/prctl.h>
+#include <sched.h>
 #include <signal.h>
 #include <seccomp.h>
 
@@ -102,11 +104,13 @@ static void handle_sigsys(int signum, siginfo_t *info, void *context0)
 
 void lightwave_sandbox()
 {
+    uid_t effectiveuid = geteuid();
     uid_t realuid = getuid();
     gid_t realgid = getgid();
     char *rootdir, *dbcalfile;
     struct sigaction sa;
     scmp_filter_ctx ctx;
+    cap_t no_capabilities;
 
     /* chdir and chroot into $LIGHTWAVE_ROOT, so only files in that
        directory can be read */
@@ -135,12 +139,26 @@ void lightwave_sandbox()
 
     if (chdir(rootdir) != 0)
         FAILERR("cannot chdir to $LIGHTWAVE_ROOT");
-    if (seteuid(0) != 0)
-        FAILERR("cannot set effective user ID");
-    if (chroot(".") != 0)
-        FAILERR("cannot chroot to $LIGHTWAVE_ROOT");
-    if (setreuid(realuid, realuid) != 0)
-        FAILERR("cannot set real/effective user ID");
+
+    if (effectiveuid == 0) {
+        if (seteuid(0) != 0)
+            FAILERR("cannot set effective user ID");
+        if (chroot(".") != 0)
+            FAILERR("cannot chroot to $LIGHTWAVE_ROOT");
+        if (setreuid(realuid, realuid) != 0)
+            FAILERR("cannot set real/effective user ID");
+    }
+    else {
+        if (unshare(CLONE_NEWUSER) != 0)
+            FAILERR("cannot create user namespace");
+        if (chroot(".") != 0)
+            FAILERR("cannot chroot to $LIGHTWAVE_ROOT");
+        no_capabilities = cap_init();
+        if (cap_set_proc(no_capabilities) != 0)
+            FAILERR("cannot set process capabilities");
+        cap_free(no_capabilities);
+    }
+
     if (prctl(PR_SET_NO_NEW_PRIVS, 1UL, 0UL, 0UL, 0UL) != 0)
         FAILERR("cannot set no-new-privs");
 

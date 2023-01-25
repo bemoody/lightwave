@@ -1,6 +1,6 @@
 LWVERSION = 0.71
 # file: Makefile	G. Moody	18 November 2012
-#			Last revised:	27 February 2019 (version 0.66)
+#			Last revised:	25 January 2023 (version 0.72)
 # 'make' description file for building and installing LightWAVE
 #
 # *** It is not necessary to install LightWAVE in order to use it!
@@ -185,7 +185,7 @@ lightwave:	server/lightwave.c server/cgi.c server/*.h
 sandboxed-lightwave:	server/lightwave.c server/cgi.c server/sandbox.c server/*.h
 	$(CC) $(CFLAGS) -DSANDBOX -DLW_ROOT=\"$(LW_ROOT)\" \
 	  server/lightwave.c server/cgi.c server/sandbox.c \
-	  -o sandboxed-lightwave $(LDFLAGS) -lseccomp
+	  -o sandboxed-lightwave $(LDFLAGS) -lseccomp -lcap
 
 # Compile and install patchann.
 patchann:	server/patchann.c
