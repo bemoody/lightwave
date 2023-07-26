@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <sys/capability.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -205,6 +206,17 @@ void lightwave_sandbox()
         (ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 2,
          SCMP_A0(SCMP_CMP_EQ, (uint32_t) AT_FDCWD),
          SCMP_A2(SCMP_CMP_EQ, O_RDONLY));
+
+    /* deny newfstatat(fd, ..., ..., AT_EMPTY_PATH)
+       (could allow a local attacker to examine files outside an outer
+       chroot environment; unfortunately seccomp can't distinguish
+       empty from non-empty paths.  If a working fstat() function is
+       actually needed, it must be implemented using the fstat system
+       call rather than newfstatat.) */
+    seccomp_rule_add_exact
+        (ctx, SCMP_ACT_ERRNO(ENOSYS), SCMP_SYS(newfstatat), 2,
+         SCMP_A0(SCMP_CMP_NE, (uint32_t) AT_FDCWD),
+         SCMP_A3(SCMP_CMP_EQ, AT_EMPTY_PATH));
 
     /* permit mmap(..., PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, ...)
        (typically lightwave doesn't allocate any huge blocks of memory
