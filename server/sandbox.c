@@ -1,5 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
-			Last revised:	 25 January 2023   version 0.72
+			Last revised:	  26 July 2023     version 0.72
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -67,7 +67,7 @@ static void pr_str(const char *str)
 static void pr_hex(unsigned long value)
 {
     char c;
-    if (value > 16) pr_hex(value / 16);
+    if (value >= 16) pr_hex(value / 16);
     else pr_str("0x");
     c = (value % 16 < 10 ? '0' + value % 16 : 'a' + value % 16 - 10);
     write(STDERR_FILENO, &c, 1);
