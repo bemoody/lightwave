@@ -1,4 +1,4 @@
-LWVERSION = 0.71
+LWVERSION = 0.72
 # file: Makefile	G. Moody	18 November 2012
 #			Last revised:	25 January 2023 (version 0.72)
 # 'make' description file for building and installing LightWAVE
