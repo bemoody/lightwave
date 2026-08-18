@@ -1,5 +1,5 @@
 /* file: sandbox.c	B. Moody	22 February 2019
-			Last revised:	  26 July 2023     version 0.72
+			Last revised:	 18 August 2026    version 0.73
 
 Simple sandbox for the LightWAVE server
 Copyright (C) 2019 Benjamin Moody
@@ -204,7 +204,9 @@ void lightwave_sandbox()
          SCMP_A1(SCMP_CMP_EQ, O_RDONLY));
     seccomp_rule_add_exact
         (ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 2,
-         SCMP_A0(SCMP_CMP_EQ, (uint32_t) AT_FDCWD),
+         SCMP_A0(SCMP_CMP_MASKED_EQ,
+		 (unsigned int) -1,
+		 (unsigned int) AT_FDCWD),
          SCMP_A2(SCMP_CMP_EQ, O_RDONLY));
 
     /* deny newfstatat(fd, ..., ..., AT_EMPTY_PATH)
