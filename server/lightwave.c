@@ -1,5 +1,5 @@
 /* file: lightwave.c	G. Moody	18 November 2012
-			Last revised:	  23 April 2019   version 0.68
+			Last revised:	 18 August 2026   version 0.73
 LightWAVE server
 Copyright (C) 2012-2013 George B. Moody
 
@@ -543,7 +543,7 @@ void info(void)
 
     prep_signals();
     if (nsig < 0) {
-	lwfail("The '.hea' file could not be read");
+	lwfail(wfdberror());
 	return;
     }
     printf("{ \"info\":\n");
